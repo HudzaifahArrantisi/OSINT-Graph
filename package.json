@@ -1,0 +1,25 @@
+{
+  "name": "nexusgraph",
+  "version": "0.1.0",
+  "private": true,
+  "description": "OSINT Investigation Graph - Public digital-footprint correlation platform",
+  "scripts": {
+    "dev": "pnpm -r --parallel dev",
+    "dev:web": "pnpm --filter @nexusgraph/web dev",
+    "dev:api": "pnpm --filter @nexusgraph/api dev",
+    "build": "pnpm -r build",
+    "build:web": "pnpm --filter @nexusgraph/web build",
+    "build:api": "pnpm --filter @nexusgraph/api build",
+    "lint": "pnpm -r lint",
+    "test": "pnpm -r test",
+    "test:unit": "pnpm -r test:unit",
+    "typecheck": "pnpm -r typecheck",
+    "clean": "pnpm -r clean",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,css,md}\""
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  },
+  "packageManager": "pnpm@10.12.1"
+}

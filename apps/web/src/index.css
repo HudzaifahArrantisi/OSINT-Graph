@@ -1,0 +1,200 @@
+/* Google Fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ─── Base Styles ────────────────────────────────────────────────── */
+
+:root {
+  --bg: #0b0f14;
+  --surface: #111821;
+  --surface-2: #17202b;
+  --surface-3: #1d2733;
+  --border: #283442;
+  --text: #f3f6f9;
+  --text-secondary: #aeb9c6;
+  --text-muted: #74808d;
+  --primary: #7c6cff;
+  --primary-hover: #8b7dff;
+  --cyan: #35c9e8;
+  --success: #32c48d;
+  --warning: #f2b84b;
+  --danger: #ef6262;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  font-family: 'Inter', system-ui, sans-serif;
+  color: var(--text);
+  background-color: var(--bg);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  min-height: 100vh;
+  background-color: var(--bg);
+}
+
+#root {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ─── Scrollbar ──────────────────────────────────────────────────── */
+
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}
+
+/* ─── Selection ──────────────────────────────────────────────────── */
+
+::selection {
+  background: rgba(124, 108, 255, 0.3);
+  color: var(--text);
+}
+
+/* ─── Focus Styles ───────────────────────────────────────────────── */
+
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* ─── React Flow Overrides ───────────────────────────────────────── */
+
+.react-flow__background {
+  background-color: var(--bg) !important;
+}
+
+.react-flow__minimap {
+  background-color: var(--surface) !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border) !important;
+}
+
+.react-flow__controls {
+  background-color: var(--surface) !important;
+  border-radius: 8px !important;
+  border: 1px solid var(--border) !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+}
+
+.react-flow__controls-button {
+  background-color: var(--surface) !important;
+  border-color: var(--border) !important;
+  color: var(--text-secondary) !important;
+  fill: var(--text-secondary) !important;
+}
+
+.react-flow__controls-button:hover {
+  background-color: var(--surface-2) !important;
+  color: var(--text) !important;
+  fill: var(--text) !important;
+}
+
+.react-flow__edge-path {
+  stroke: var(--border) !important;
+  stroke-width: 1.5 !important;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  stroke: var(--primary) !important;
+  stroke-width: 2 !important;
+}
+
+/* ─── Component Layer ────────────────────────────────────────────── */
+
+@layer components {
+  .btn-primary {
+    @apply bg-primary hover:bg-primary-hover text-white font-medium px-4 py-2
+      rounded-button transition-colors duration-micro
+      focus:outline-none focus-visible:ring-2 focus-visible:ring-primary;
+  }
+
+  .btn-secondary {
+    @apply bg-surface-2 hover:bg-surface-3 text-text-secondary
+      border border-border-subtle font-medium px-4 py-2
+      rounded-button transition-colors duration-micro;
+  }
+
+  .btn-ghost {
+    @apply bg-transparent hover:bg-surface-2 text-text-secondary
+      px-3 py-2 rounded-button transition-colors duration-micro;
+  }
+
+  .btn-danger {
+    @apply bg-status-danger/10 hover:bg-status-danger/20 text-status-danger
+      border border-status-danger/30 font-medium px-4 py-2
+      rounded-button transition-colors duration-micro;
+  }
+
+  .btn-icon {
+    @apply p-2 rounded-button bg-transparent hover:bg-surface-2
+      text-text-muted hover:text-text transition-colors duration-micro;
+  }
+
+  .input-field {
+    @apply w-full bg-surface-2 border border-border-subtle rounded-input
+      px-3 py-2 text-text placeholder:text-text-muted
+      focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30
+      transition-colors duration-micro;
+  }
+
+  .card {
+    @apply bg-surface border border-border-subtle rounded-card p-4;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-badge
+      text-xs font-medium;
+  }
+
+  .badge-primary {
+    @apply badge bg-primary/15 text-primary;
+  }
+
+  .badge-success {
+    @apply badge bg-status-success/15 text-status-success;
+  }
+
+  .badge-warning {
+    @apply badge bg-status-warning/15 text-status-warning;
+  }
+
+  .badge-danger {
+    @apply badge bg-status-danger/15 text-status-danger;
+  }
+
+  .badge-cyan {
+    @apply badge bg-accent-cyan/15 text-accent-cyan;
+  }
+
+  .badge-muted {
+    @apply badge bg-surface-3 text-text-muted;
+  }
+}
