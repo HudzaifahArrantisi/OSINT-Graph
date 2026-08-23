@@ -1,17 +1,20 @@
 /**
  * Discovery Planner — determines which transforms to execute for a seed.
- * Uses seed type to select strictly relevant transform families.
+ * Uses seed type + value analysis to select strictly relevant transform families.
  * Does NOT blindly execute every transform or fall back to universal SEED search.
  */
 
 import type { SeedType, TransformDefinition, EntityType } from '@nexusgraph/shared';
 import { getTransform } from '../transforms/registry.js';
 import { getEffectiveType } from './seed-classifier.js';
+import { analyzeValue, inferEffectiveInputType } from './value-analyzer.js';
+import type { ValueAnalysis } from './value-analyzer.js';
 
 export interface DiscoveryPlanOutput {
   seedType: SeedType;
   seedValue: string;
   effectiveType: EntityType;
+  valueAnalysis: ValueAnalysis;
   transforms: TransformDefinition[];
 }
 
@@ -33,6 +36,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   EMAIL: [
     'domain.resolve-dns',
     'developer.github-profile',
+    'mentions.search-public-web',
   ],
   USERNAME: [
     'social.discover-public-profiles',
@@ -66,24 +70,49 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'domain.resolve-dns',
   ],
   SOCIAL_PROFILE: [
-    'domain.webpage-metadata',
     'social.discover-public-profiles',
+    'developer.github-profile',
+    'developer.gitlab-profile',
+    'social.youtube-channel',
+    'mentions.search-public-web',
+    'domain.webpage-metadata',
   ],
 };
 
 /**
  * Build a discovery plan for a seed.
- * Strictly maps the seed type to its allowed transform suite.
+ * Uses value analysis to intelligently select transforms:
+ * - If SOCIAL_PROFILE + URL value → includes both URL-type and username-type transforms
+ * - If SOCIAL_PROFILE + username value → includes username-type transforms
+ * - EMAIL → includes DNS resolution for provider domain & exact email search on GitHub
  */
 export function buildDiscoveryPlan(
   seedType: SeedType,
   seedValue: string,
 ): DiscoveryPlanOutput {
   const effectiveType = getEffectiveType(seedType);
-  const transformIds = SEED_TRANSFORM_MAP[seedType] || [];
+  const valueAnalysis = analyzeValue(seedValue);
+  const effectiveInputType = inferEffectiveInputType(seedType, valueAnalysis);
+
+  // Start with the transforms for the declared seed type
+  const transformIdSet = new Set<string>(SEED_TRANSFORM_MAP[seedType] || []);
+
+  // If value analysis infers a different effective type, ALSO include those transforms
+  if (effectiveInputType !== seedType && SEED_TRANSFORM_MAP[effectiveInputType]) {
+    for (const id of SEED_TRANSFORM_MAP[effectiveInputType]) {
+      transformIdSet.add(id);
+    }
+  }
+
+  // If the value is a URL and the seed is SOCIAL_PROFILE, ensure URL transforms are included
+  if (seedType === 'SOCIAL_PROFILE' && valueAnalysis.isUrl) {
+    for (const id of SEED_TRANSFORM_MAP['URL']) {
+      transformIdSet.add(id);
+    }
+  }
 
   const transforms: TransformDefinition[] = [];
-  for (const id of transformIds) {
+  for (const id of transformIdSet) {
     const t = getTransform(id);
     if (t && t.enabled) {
       transforms.push(t);
@@ -102,7 +131,7 @@ export function buildDiscoveryPlan(
     seedType,
     seedValue,
     effectiveType,
+    valueAnalysis,
     transforms,
   };
 }
-

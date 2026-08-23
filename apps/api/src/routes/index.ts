@@ -39,6 +39,7 @@ import { executeTransform } from '../transforms/adapter.js';
 import { runDiscovery } from '../discovery/executor.js';
 import { buildDiscoveryPlan } from '../discovery/planner.js';
 import { rateLimitMiddleware } from '../middleware/index.js';
+import { logger } from '../lib/logger.js';
 
 const api = new Hono();
 
@@ -776,4 +777,71 @@ api.get('/investigations/:id/export/markdown', async (c) => {
   }
 });
 
+// ─── System & Execution Live Logs ───────────────────────────────────
+
+api.get('/system/logs', (c) => {
+  const buffer = logger.getBuffer();
+  return c.json({ data: buffer });
+});
+
+api.delete('/system/logs', (c) => {
+  logger.clearBuffer();
+  return c.json({ data: { message: 'Logs buffer cleared' } });
+});
+
+api.get('/system/logs/stream', async (c) => {
+  return streamSSE(c, async (stream) => {
+    // 1. Send recent buffered history
+    const buffer = logger.getBuffer();
+    if (buffer.length > 0) {
+      await stream.writeSSE({
+        event: 'history',
+        data: JSON.stringify(buffer),
+      });
+    }
+
+    // 2. Stream new logs in real-time
+    const onNewLog = async (entry: any) => {
+      try {
+        await stream.writeSSE({
+          event: 'log',
+          data: JSON.stringify(entry),
+        });
+      } catch {
+        // stream may be closed
+      }
+    };
+
+    logger.onLog(onNewLog);
+
+    // 3. Heartbeat ping loop
+    const pingInterval = setInterval(async () => {
+      try {
+        await stream.writeSSE({
+          event: 'ping',
+          data: JSON.stringify({ ping: Date.now() }),
+        });
+      } catch {
+        clearInterval(pingInterval);
+        logger.offLog(onNewLog);
+      }
+    }, 15000);
+
+    stream.onAbort(() => {
+      clearInterval(pingInterval);
+      logger.offLog(onNewLog);
+    });
+
+    // Keep stream open until abort
+    await new Promise<void>((resolve) => {
+      stream.onAbort(() => {
+        clearInterval(pingInterval);
+        logger.offLog(onNewLog);
+        resolve();
+      });
+    });
+  });
+});
+
 export { api };
+

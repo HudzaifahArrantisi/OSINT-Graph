@@ -1,11 +1,12 @@
 /**
  * Seed Classifier — creates the initial SEED entity with appropriate low confidence.
  * The seed is the investigation starting point, NOT a verified discovery.
- * Also provides deterministic entity extraction (URL -> DOMAIN, EMAIL -> DOMAIN).
+ * Also provides deterministic entity extraction (URL -> DOMAIN, EMAIL -> DOMAIN, SOCIAL_PROFILE -> USERNAME/DOMAIN).
  */
 
 import type { SeedType, EntityType, CreateEntityInput, RelationshipType } from '@nexusgraph/shared';
 import { normalizeDomain } from '@nexusgraph/shared';
+import { analyzeValue } from './value-analyzer.js';
 
 export interface DerivedSeedEntity {
   type: EntityType;
@@ -26,6 +27,7 @@ export function parseSeed(seedType: SeedType, seedValue: string): ParsedSeed {
   const trimmed = seedValue.trim();
   const seedEntity = classifySeed(seedType, trimmed);
   const derivedEntities: DerivedSeedEntity[] = [];
+  const analysis = analyzeValue(trimmed);
 
   if (seedType === 'URL') {
     try {
@@ -55,6 +57,35 @@ export function parseSeed(seedType: SeedType, seedValue: string): ParsedSeed {
           reason: `Deterministic derivation: Email "${trimmed}" uses mail provider domain "${domain}"`,
         });
       }
+    }
+  } else if (seedType === 'SOCIAL_PROFILE') {
+    if (analysis.isUrl) {
+      if (analysis.extractedDomain) {
+        const domain = normalizeDomain(analysis.extractedDomain);
+        if (domain) {
+          derivedEntities.push({
+            type: 'DOMAIN',
+            value: domain,
+            relationshipType: 'HOSTED_ON',
+            reason: `Deterministic derivation: Profile URL hosted on domain "${domain}"`,
+          });
+        }
+      }
+      if (analysis.extractedUsername) {
+        derivedEntities.push({
+          type: 'USERNAME',
+          value: analysis.extractedUsername,
+          relationshipType: 'USES_USERNAME',
+          reason: `Deterministic derivation: Extracted handle "${analysis.extractedUsername}" from profile URL`,
+        });
+      }
+    } else if (analysis.isUsername && analysis.extractedUsername) {
+      derivedEntities.push({
+        type: 'USERNAME',
+        value: analysis.extractedUsername,
+        relationshipType: 'USES_USERNAME',
+        reason: `Deterministic derivation: Social profile handle "${analysis.extractedUsername}"`,
+      });
     }
   }
 
@@ -101,4 +132,3 @@ export function getEffectiveType(seedType: SeedType): EntityType {
   };
   return mapping[seedType] || 'SEED';
 }
-

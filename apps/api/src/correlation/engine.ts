@@ -73,18 +73,7 @@ const correlationRules: CorrelationRule[] = [
       return `DNS resolution: ${domain} resolves to ${ip}`;
     },
   },
-  {
-    name: 'shared-ip',
-    description: 'Multiple domains resolving to the same IP',
-    match(a, b) {
-      return a.type === 'DOMAIN' && b.type === 'DOMAIN' && getValue(a) !== getValue(b);
-    },
-    confidence: CONFIDENCE_FACTORS.DIRECT_PUBLIC_REFERENCE,
-    relationshipType: 'RELATED_TO',
-    reason(a, b) {
-      return `Domains ${getValue(a)} and ${getValue(b)} share infrastructure`;
-    },
-  },
+
   {
     name: 'website-links-repo',
     description: 'Public website links to repository',

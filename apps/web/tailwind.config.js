@@ -5,39 +5,39 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Design system semantic tokens
-        app: '#0b0f14',
+        // Design system semantic tokens — Tactical OSINT cyber theme
+        app: '#080c14',
         surface: {
-          DEFAULT: '#111821',
-          2: '#17202b',
-          3: '#1d2733',
-          hover: '#1f2937',
+          DEFAULT: '#0d121c',
+          2: '#121927',
+          3: '#182234',
+          hover: '#1b263a',
         },
         border: {
-          subtle: '#283442',
-          DEFAULT: '#374151',
+          subtle: '#1a2334',
+          DEFAULT: '#253248',
         },
         text: {
-          DEFAULT: '#f3f6f9',
-          secondary: '#aeb9c6',
-          muted: '#74808d',
+          DEFAULT: '#e2e8f0',
+          secondary: '#94a3b8',
+          muted: '#64748b',
         },
         primary: {
-          DEFAULT: '#7c6cff',
-          hover: '#8b7dff',
-          muted: '#7c6cff33',
+          DEFAULT: '#0284c7',
+          hover: '#0369a1',
+          muted: '#0284c725',
         },
         accent: {
-          cyan: '#35c9e8',
-          'cyan-muted': '#35c9e833',
+          cyan: '#38bdf8',
+          'cyan-muted': '#38bdf820',
         },
         status: {
-          success: '#32c48d',
-          'success-muted': '#32c48d33',
-          warning: '#f2b84b',
-          'warning-muted': '#f2b84b33',
-          danger: '#ef6262',
-          'danger-muted': '#ef626233',
+          success: '#10b981',
+          'success-muted': '#10b98120',
+          warning: '#f59e0b',
+          'warning-muted': '#f59e0b20',
+          danger: '#f43f5e',
+          'danger-muted': '#f43f5e20',
         },
       },
       fontFamily: {

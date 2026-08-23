@@ -319,18 +319,31 @@ export interface RunTransformInput {
   entity_id: string;
 }
 
-export type LogLevel = 'info' | 'scan' | 'found' | 'warn' | 'error' | 'success';
+export type LogLevel =
+  | 'info'
+  | 'scan'
+  | 'found'
+  | 'warn'
+  | 'error'
+  | 'success'
+  | 'debug'
+  | 'http'
+  | 'transform'
+  | 'collector'
+  | 'system';
 
 export interface DiscoveryLogEntry {
   id: string;
   timestamp: string;
   level: LogLevel;
+  tag?: string;
   message: string;
   transformId?: string;
   transformName?: string;
   entityCount?: number;
   relationshipCount?: number;
   data?: Record<string, unknown>;
+  raw?: string;
 }
 
 export interface DiscoveryProgressEvent {

@@ -30,11 +30,14 @@ interface AppState {
   sidebarOpen: boolean;
   setSidebarOpen: (open: boolean) => void;
 
-  // Real-time Discovery Logs Sidebar
+  // Real-time System & Execution Logs Sidebar
   liveLogsOpen: boolean;
   setLiveLogsOpen: (open: boolean) => void;
+  isLiveStreaming: boolean;
+  setIsLiveStreaming: (streaming: boolean) => void;
   liveDiscoveryLogs: DiscoveryLogEntry[];
   addLiveLog: (log: DiscoveryLogEntry) => void;
+  setLiveLogs: (logs: DiscoveryLogEntry[]) => void;
   clearLiveLogs: () => void;
   isDiscovering: boolean;
   setIsDiscovering: (discovering: boolean) => void;
@@ -82,14 +85,25 @@ export const useAppStore = create<AppState>((set) => ({
   sidebarOpen: true,
   setSidebarOpen: (open) => set({ sidebarOpen: open }),
 
-  // Real-time Discovery Logs
+  // Real-time System & Execution Logs
   liveLogsOpen: false,
   setLiveLogsOpen: (open) => set({ liveLogsOpen: open }),
+  isLiveStreaming: false,
+  setIsLiveStreaming: (streaming) => set({ isLiveStreaming: streaming }),
   liveDiscoveryLogs: [],
   addLiveLog: (log) =>
-    set((state) => ({
-      liveDiscoveryLogs: [...state.liveDiscoveryLogs.slice(-400), log],
-    })),
+    set((state) => {
+      if (state.liveDiscoveryLogs.some((l) => l.id === log.id)) {
+        return state;
+      }
+      return {
+        liveDiscoveryLogs: [...state.liveDiscoveryLogs.slice(-600), log],
+      };
+    }),
+  setLiveLogs: (logs) =>
+    set({
+      liveDiscoveryLogs: logs.slice(-600),
+    }),
   clearLiveLogs: () => set({ liveDiscoveryLogs: [], discoveryProgress: null }),
   isDiscovering: false,
   setIsDiscovering: (discovering) => set({ isDiscovering: discovering }),

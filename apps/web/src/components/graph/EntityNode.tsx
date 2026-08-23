@@ -1,129 +1,130 @@
-import { memo } from 'react';
+import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
+import { ConfidenceBadge } from '../ui/ConfidenceBadge';
+import { EntityType } from '@nexusgraph/shared';
 import {
-  UserRound,
-  AtSign,
-  Mail,
   Globe2,
-  Link2,
+  Mail,
+  User,
   Network,
-  Building2,
-  GitBranch,
-  ContactRound,
+  Link,
+  Building,
+  FolderGit2,
+  Share2,
   Cpu,
-  BadgeCheck,
+  Key,
   FileText,
-  HelpCircle,
-  Sparkles,
   Phone,
   MapPin,
-  Youtube,
+  HelpCircle,
+  Shield,
+  Github,
   Gitlab,
+  Youtube,
   Radio,
-  FileSearch,
+  Server,
 } from 'lucide-react';
-import { ConfidenceBadge } from '../ui/ConfidenceBadge';
-import type { EntityType } from '@nexusgraph/shared';
 
-const ENTITY_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
-  SEED: Sparkles,
-  PERSON: UserRound,
-  USERNAME: AtSign,
-  EMAIL: Mail,
+const ENTITY_ICONS: Record<EntityType, React.ComponentType<{ className?: string }>> = {
+  SEED: Radio,
   DOMAIN: Globe2,
-  WEBSITE: Globe2,
-  URL: Link2,
   IP_ADDRESS: Network,
-  ORGANIZATION: Building2,
-  REPOSITORY: GitBranch,
-  SOCIAL_PROFILE: ContactRound,
+  EMAIL: Mail,
+  USERNAME: User,
+  URL: Link,
+  SOCIAL_PROFILE: Share2,
+  REPOSITORY: FolderGit2,
+  ORGANIZATION: Building,
+  CERTIFICATE: Key,
   TECHNOLOGY: Cpu,
-  CERTIFICATE: BadgeCheck,
+  PERSON: User,
   DOCUMENT: FileText,
   PHONE: Phone,
   ADDRESS: MapPin,
   LOCATION: MapPin,
-  GITHUB_PROFILE: GitBranch,
+  GITHUB_PROFILE: Github,
   GITLAB_PROFILE: Gitlab,
   YOUTUBE_CHANNEL: Youtube,
-  SUBDOMAIN: Network,
-  MX_RECORD: Mail,
-  NS_RECORD: Radio,
-  PUBLIC_MENTION: FileSearch,
+  SUBDOMAIN: Globe2,
+  MX_RECORD: Server,
+  NS_RECORD: Server,
+  PUBLIC_MENTION: Link,
+  WEBSITE: Globe2,
 };
 
-const ENTITY_COLORS: Record<string, { bg: string; text: string; border: string }> = {
-  SEED: { bg: 'bg-amber-950/60', text: 'text-amber-300', border: 'border-amber-500/70 border-dashed' },
-  DOMAIN: { bg: 'bg-indigo-950/40', text: 'text-indigo-400', border: 'border-indigo-500/40' },
-  WEBSITE: { bg: 'bg-emerald-950/40', text: 'text-emerald-400', border: 'border-emerald-500/40' },
-  IP_ADDRESS: { bg: 'bg-cyan-950/40', text: 'text-cyan-400', border: 'border-cyan-500/40' },
-  EMAIL: { bg: 'bg-emerald-950/40', text: 'text-emerald-400', border: 'border-emerald-500/40' },
-  USERNAME: { bg: 'bg-amber-950/40', text: 'text-amber-400', border: 'border-amber-500/40' },
-  URL: { bg: 'bg-blue-950/40', text: 'text-blue-400', border: 'border-blue-500/40' },
-  SOCIAL_PROFILE: { bg: 'bg-purple-950/40', text: 'text-purple-400', border: 'border-purple-500/40' },
-  REPOSITORY: { bg: 'bg-rose-950/40', text: 'text-rose-400', border: 'border-rose-500/40' },
-  ORGANIZATION: { bg: 'bg-teal-950/40', text: 'text-teal-400', border: 'border-teal-500/40' },
-  CERTIFICATE: { bg: 'bg-sky-950/40', text: 'text-sky-400', border: 'border-sky-500/40' },
-  TECHNOLOGY: { bg: 'bg-orange-950/40', text: 'text-orange-400', border: 'border-orange-500/40' },
-  PERSON: { bg: 'bg-fuchsia-950/40', text: 'text-fuchsia-400', border: 'border-fuchsia-500/40' },
-  DOCUMENT: { bg: 'bg-slate-900/40', text: 'text-slate-400', border: 'border-slate-500/40' },
-  PHONE: { bg: 'bg-lime-950/40', text: 'text-lime-400', border: 'border-lime-500/40' },
-  ADDRESS: { bg: 'bg-amber-950/40', text: 'text-amber-400', border: 'border-amber-500/40' },
-  LOCATION: { bg: 'bg-amber-950/40', text: 'text-amber-400', border: 'border-amber-500/40' },
-  GITHUB_PROFILE: { bg: 'bg-violet-950/40', text: 'text-violet-400', border: 'border-violet-500/40' },
-  GITLAB_PROFILE: { bg: 'bg-orange-950/40', text: 'text-orange-400', border: 'border-orange-500/40' },
-  YOUTUBE_CHANNEL: { bg: 'bg-red-950/40', text: 'text-red-400', border: 'border-red-500/40' },
-  SUBDOMAIN: { bg: 'bg-indigo-950/40', text: 'text-indigo-400', border: 'border-indigo-500/40' },
-  MX_RECORD: { bg: 'bg-teal-950/40', text: 'text-teal-400', border: 'border-teal-500/40' },
-  NS_RECORD: { bg: 'bg-cyan-950/40', text: 'text-cyan-400', border: 'border-cyan-500/40' },
-  PUBLIC_MENTION: { bg: 'bg-blue-950/40', text: 'text-blue-400', border: 'border-blue-500/40' },
+const ENTITY_ACCENTS: Record<string, { badge: string; iconBg: string; iconColor: string }> = {
+  SEED: { badge: 'text-amber-300 bg-amber-500/10 border-amber-500/20', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-400' },
+  DOMAIN: { badge: 'text-sky-300 bg-sky-500/10 border-sky-500/20', iconBg: 'bg-sky-500/10', iconColor: 'text-sky-400' },
+  IP_ADDRESS: { badge: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/20', iconBg: 'bg-cyan-500/10', iconColor: 'text-cyan-400' },
+  EMAIL: { badge: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-400' },
+  USERNAME: { badge: 'text-amber-300 bg-amber-500/10 border-amber-500/20', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-400' },
+  URL: { badge: 'text-blue-300 bg-blue-500/10 border-blue-500/20', iconBg: 'bg-blue-500/10', iconColor: 'text-blue-400' },
+  SOCIAL_PROFILE: { badge: 'text-purple-300 bg-purple-500/10 border-purple-500/20', iconBg: 'bg-purple-500/10', iconColor: 'text-purple-400' },
+  REPOSITORY: { badge: 'text-rose-300 bg-rose-500/10 border-rose-500/20', iconBg: 'bg-rose-500/10', iconColor: 'text-rose-400' },
+  ORGANIZATION: { badge: 'text-teal-300 bg-teal-500/10 border-teal-500/20', iconBg: 'bg-teal-500/10', iconColor: 'text-teal-400' },
+  CERTIFICATE: { badge: 'text-sky-300 bg-sky-500/10 border-sky-500/20', iconBg: 'bg-sky-500/10', iconColor: 'text-sky-400' },
+  TECHNOLOGY: { badge: 'text-amber-300 bg-amber-500/10 border-amber-500/20', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-400' },
+  PERSON: { badge: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20', iconBg: 'bg-indigo-500/10', iconColor: 'text-indigo-400' },
+  DOCUMENT: { badge: 'text-slate-300 bg-slate-500/10 border-slate-500/20', iconBg: 'bg-slate-500/10', iconColor: 'text-slate-400' },
+  PHONE: { badge: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-400' },
+  ADDRESS: { badge: 'text-amber-300 bg-amber-500/10 border-amber-500/20', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-400' },
+  LOCATION: { badge: 'text-amber-300 bg-amber-500/10 border-amber-500/20', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-400' },
+  GITHUB_PROFILE: { badge: 'text-violet-300 bg-violet-500/10 border-violet-500/20', iconBg: 'bg-violet-500/10', iconColor: 'text-violet-400' },
+  GITLAB_PROFILE: { badge: 'text-orange-300 bg-orange-500/10 border-orange-500/20', iconBg: 'bg-orange-500/10', iconColor: 'text-orange-400' },
+  YOUTUBE_CHANNEL: { badge: 'text-red-300 bg-red-500/10 border-red-500/20', iconBg: 'bg-red-500/10', iconColor: 'text-red-400' },
+  SUBDOMAIN: { badge: 'text-sky-300 bg-sky-500/10 border-sky-500/20', iconBg: 'bg-sky-500/10', iconColor: 'text-sky-400' },
+  MX_RECORD: { badge: 'text-teal-300 bg-teal-500/10 border-teal-500/20', iconBg: 'bg-teal-500/10', iconColor: 'text-teal-400' },
+  NS_RECORD: { badge: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/20', iconBg: 'bg-cyan-500/10', iconColor: 'text-cyan-400' },
+  PUBLIC_MENTION: { badge: 'text-blue-300 bg-blue-500/10 border-blue-500/20', iconBg: 'bg-blue-500/10', iconColor: 'text-blue-400' },
+  WEBSITE: { badge: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-400' },
 };
 
 export const EntityNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = (data || {}) as Record<string, any>;
   const entityType = (nodeData.entityType || 'DOMAIN') as EntityType;
-  const label = nodeData.label || 'Entity';
+  const value = nodeData.value || nodeData.label || 'Entity';
+  const title = nodeData.title;
   const confidence = nodeData.confidence || 50;
   const isSeed = nodeData.isSeed || entityType === 'SEED';
-  const discoveryStatus = nodeData.discoveryStatus || (isSeed ? 'seed' : 'discovered');
 
   const Icon = ENTITY_ICONS[entityType] || HelpCircle;
-  const style = ENTITY_COLORS[entityType] || {
-    bg: 'bg-surface-2',
-    text: 'text-text-secondary',
-    border: 'border-border-subtle',
+  const accent = ENTITY_ACCENTS[entityType] || {
+    badge: 'text-slate-300 bg-slate-500/10 border-slate-500/20',
+    iconBg: 'bg-slate-800/40',
+    iconColor: 'text-slate-400',
   };
+
+  const hasSubtitle = title && title !== value && !title.startsWith('Investigation Seed:');
 
   return (
     <div
-      className={`min-w-[200px] max-w-[290px] bg-surface rounded-graph-node border transition-all duration-micro shadow-lg select-none ${
+      className={`min-w-[210px] max-w-[280px] bg-[#0d121c] rounded-md border transition-all duration-150 shadow-md select-none ${
         isSeed
-          ? 'border-amber-500/80 border-2 ring-2 ring-amber-500/20 shadow-amber-500/10'
+          ? 'border-amber-500/50 bg-[#13151c] shadow-black/40'
           : selected
-            ? 'border-primary ring-2 ring-primary/40 bg-surface-2/90 shadow-primary/20'
-            : discoveryStatus === 'unverified'
-              ? 'border-border-subtle opacity-75 hover:opacity-100 hover:border-border'
-              : `${style.border} hover:border-border hover:bg-surface-2/60`
+            ? 'border-sky-500 ring-1 ring-sky-500/40 bg-[#111928] shadow-sky-950/30'
+            : 'border-[#1e293b] hover:border-slate-600 hover:bg-[#101724]'
       }`}
     >
       <Handle
         type="target"
         position={Position.Top}
-        className="w-2.5 h-2.5 bg-border-subtle border-2 border-surface"
+        className="!w-2 !h-2 !bg-slate-600 !border-2 !border-[#0d121c] !opacity-40 hover:!opacity-100 transition-opacity"
       />
 
-      <div className="p-3">
-        <div className="flex items-center justify-between gap-2 mb-2">
+      <div className="p-2.5">
+        {/* Header: Icon + Type Badge + Confidence */}
+        <div className="flex items-center justify-between gap-1.5 mb-1.5">
           <div className="flex items-center gap-1.5 min-w-0">
-            <div className={`p-1 rounded-md ${style.bg} ${style.text} shrink-0`}>
+            <div className={`p-1 rounded ${accent.iconBg} ${accent.iconColor} shrink-0`}>
               <Icon className="w-3.5 h-3.5" />
             </div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted truncate">
-              {isSeed ? 'INVESTIGATION SEED' : entityType.replace('_', ' ')}
+            <span className="text-[9px] font-mono uppercase tracking-wider text-slate-400 truncate font-medium">
+              {isSeed ? 'SEED TARGET' : entityType.replace('_', ' ')}
             </span>
           </div>
           {isSeed ? (
-            <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/40">
+            <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
               SEED
             </span>
           ) : (
@@ -131,31 +132,45 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
           )}
         </div>
 
+        {/* Primary Data Value (Actual handle, IP, domain, URL) */}
         <div
-          className={`font-mono text-xs font-medium truncate py-0.5 ${
-            isSeed ? 'text-amber-200 font-bold' : 'text-text'
+          className={`font-mono text-xs font-semibold leading-snug break-all ${
+            isSeed ? 'text-amber-200' : 'text-slate-100'
           }`}
-          title={label}
+          title={value}
         >
-          {label}
+          {value}
         </div>
 
-        <div className="flex items-center justify-between text-[10px] text-text-muted mt-2 pt-2 border-t border-border-subtle/60">
-          <span>
+        {/* Subtitle / Context description if present */}
+        {hasSubtitle && (
+          <div
+            className="text-[10px] text-slate-400 font-sans truncate mt-0.5"
+            title={title}
+          >
+            {title}
+          </div>
+        )}
+
+        {/* Footer: Confidence & Evidence / Relationship Counts */}
+        <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mt-1.5 pt-1.5 border-t border-[#1a2334]">
+          <span className="truncate">
             {isSeed ? (
-              <span className="text-amber-400/80 font-mono">Declared: {(nodeData.metadata?.declaredType as string || 'General')}</span>
+              <span className="text-amber-400/70 font-sans">
+                {String(nodeData.metadata?.declaredType || 'Target')}
+              </span>
             ) : (
-              `${Math.round(confidence)}% confidence`
+              <span className="text-slate-400">{Math.round(confidence)}% conf</span>
             )}
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0 text-slate-400">
             {typeof nodeData.evidenceCount === 'number' && nodeData.evidenceCount > 0 && (
-              <span title={`${nodeData.evidenceCount} evidence items`} className="text-emerald-400 font-mono">
+              <span title={`${nodeData.evidenceCount} evidence items`} className="text-emerald-400">
                 {nodeData.evidenceCount} ev
               </span>
             )}
             {typeof nodeData.relationshipCount === 'number' && nodeData.relationshipCount > 0 && (
-              <span title={`${nodeData.relationshipCount} relationships`} className="text-cyan-400 font-mono">
+              <span title={`${nodeData.relationshipCount} relationships`} className="text-sky-400">
                 {nodeData.relationshipCount} rel
               </span>
             )}
@@ -166,7 +181,7 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
       <Handle
         type="source"
         position={Position.Bottom}
-        className="w-2.5 h-2.5 bg-border-subtle border-2 border-surface"
+        className="!w-2 !h-2 !bg-slate-600 !border-2 !border-[#0d121c] !opacity-40 hover:!opacity-100 transition-opacity"
       />
     </div>
   );

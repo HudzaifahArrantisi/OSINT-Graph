@@ -140,7 +140,7 @@ export const dnsCollector: Collector = {
             entities.push({
               type: 'DOMAIN',
               value: mailServer,
-              title: `Mail server for ${domain}`,
+              title: `MX (${parts[0] || '10'}): ${mailServer}`,
               confidence: 90,
               metadata: {
                 recordType: 'MX',
@@ -179,7 +179,7 @@ export const dnsCollector: Collector = {
             entities.push({
               type: 'DOMAIN',
               value: nameserver,
-              title: `Name server for ${domain}`,
+              title: `NS: ${nameserver}`,
               confidence: 90,
               metadata: {
                 recordType: 'NS',

@@ -645,7 +645,9 @@ export const graphService = {
         id: entity.id,
         type: entity.type.toLowerCase(),
         data: {
-          label: entity.title || entity.value,
+          label: entity.value || entity.title,
+          value: entity.value,
+          title: entity.title,
           entityType: entity.type,
           confidence: entity.confidence,
           entityId: entity.id,

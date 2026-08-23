@@ -8,20 +8,21 @@
 /* ─── Base Styles ────────────────────────────────────────────────── */
 
 :root {
-  --bg: #0b0f14;
-  --surface: #111821;
-  --surface-2: #17202b;
-  --surface-3: #1d2733;
-  --border: #283442;
-  --text: #f3f6f9;
-  --text-secondary: #aeb9c6;
-  --text-muted: #74808d;
-  --primary: #7c6cff;
-  --primary-hover: #8b7dff;
-  --cyan: #35c9e8;
-  --success: #32c48d;
-  --warning: #f2b84b;
-  --danger: #ef6262;
+  --bg: #080c14;
+  --surface: #0d121c;
+  --surface-2: #121927;
+  --surface-3: #182234;
+  --border: #1e293b;
+  --border-subtle: #1a2334;
+  --text: #e2e8f0;
+  --text-secondary: #94a3b8;
+  --text-muted: #64748b;
+  --primary: #0284c7;
+  --primary-hover: #0369a1;
+  --cyan: #38bdf8;
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #f43f5e;
 }
 
 * {

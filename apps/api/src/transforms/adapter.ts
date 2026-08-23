@@ -1,6 +1,7 @@
 /**
  * Transform Adapter — wraps existing collectors as transforms.
- * Maps transform IDs → collector calls, filters seed echoes, and returns structured results with provenance.
+ * Maps transform IDs → collector calls, uses value analysis for smart input derivation,
+ * filters seed echoes, enforces provenance, and returns structured results.
  */
 
 import type {
@@ -14,80 +15,143 @@ import type {
 } from '@nexusgraph/shared';
 import { runCollector } from '../collectors/registry.js';
 import { logger } from '../lib/logger.js';
+import { analyzeValue } from '../discovery/value-analyzer.js';
+import type { ValueAnalysis } from '../discovery/value-analyzer.js';
 
-/** Mapping from transform ID → collector(s) + input derivation */
+/** Mapping from transform ID → collector(s) + value-aware input derivation */
 interface TransformHandler {
-  /** Derive the collector input from the entity value and seed context */
-  deriveInput(entityValue: string, seedType: SeedType): string | null;
+  /** Derive the collector input using value analysis for smart routing */
+  deriveInput(entityValue: string, seedType: SeedType, analysis: ValueAnalysis): string | null;
   /** Which collector(s) to invoke */
   collectors: Array<{
     name: string;
     /** Optional: override input derivation for this specific collector */
-    deriveInput?: (entityValue: string, seedType: SeedType) => string | null;
+    deriveInput?: (entityValue: string, seedType: SeedType, analysis: ValueAnalysis) => string | null;
   }>;
 }
 
 const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
   'web.discover-official-site': {
-    deriveInput: (v, st) => (st === 'ORGANIZATION' || st === 'PERSON' || st === 'NAME' ? v.trim() : null),
+    deriveInput: (v, st, analysis) => {
+      // Valid for: organizations, persons, names, and plain text queries
+      if (st === 'ORGANIZATION' || st === 'PERSON' || st === 'NAME') return v.trim();
+      // Also valid if the value is NOT a URL/domain/IP — it's a name to search
+      if (!analysis.isUrl && !analysis.isDomain && !analysis.isIpAddress && !analysis.isEmail) return v.trim();
+      return null;
+    },
     collectors: [{ name: 'web-search' }],
   },
   'domain.resolve-dns': {
-    deriveInput: (v) => extractDomain(v),
+    deriveInput: (v, _st, analysis) => {
+      // Extract domain from URL, email, or use directly if it's a domain
+      if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;
+      if (analysis.isEmail && analysis.extractedDomain) return analysis.extractedDomain;
+      if (analysis.isDomain) return v.trim();
+      if (analysis.isIpAddress) return v.trim(); // Reverse DNS
+      // Try to extract a domain from the raw value
+      const d = extractDomain(v);
+      return d && d.includes('.') ? d : null;
+    },
     collectors: [{ name: 'dns' }],
   },
   'domain.find-tls': {
-    deriveInput: (v) => extractDomain(v),
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;
+      if (analysis.isDomain) return v.trim();
+      if (analysis.isEmail && analysis.extractedDomain) return analysis.extractedDomain;
+      const d = extractDomain(v);
+      return d && d.includes('.') ? d : null;
+    },
     collectors: [{ name: 'tls-certificate' }],
   },
   'domain.webpage-metadata': {
-    deriveInput: (v) => {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl) return v.trim(); // Already a full URL
+      if (analysis.isDomain) return `https://${v.trim()}`;
+      if (analysis.isEmail && analysis.extractedDomain) return `https://${analysis.extractedDomain}`;
+      // For social profile URLs, pass them directly
       const trimmed = v.trim();
       if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
       const d = extractDomain(trimmed);
-      return d ? `https://${d}` : null;
+      return d && d.includes('.') ? `https://${d}` : null;
     },
     collectors: [{ name: 'url-metadata' }],
   },
   'social.discover-public-profiles': {
-    deriveInput: (v, st) => (st === 'USERNAME' ? v.trim().replace(/^@/, '') : null),
+    deriveInput: (v, st, analysis) => {
+      // Accept if value IS a username (regardless of declared seed type)
+      if (analysis.isUsername && analysis.extractedUsername) return analysis.extractedUsername;
+      // Accept if declared USERNAME
+      if (st === 'USERNAME') return v.trim().replace(/^@/, '');
+      // If it's a URL with an extracted username, use the extracted username
+      if (analysis.isUrl && analysis.extractedUsername) return analysis.extractedUsername;
+      return null;
+    },
     collectors: [{ name: 'username-presence' }],
   },
   'social.youtube-channel': {
-    deriveInput: (v, st) =>
-      st === 'USERNAME' || st === 'ORGANIZATION' || st === 'PERSON' || st === 'NAME'
-        ? v.trim().replace(/^@/, '')
-        : null,
+    deriveInput: (v, st, analysis) => {
+      // Username-based search
+      if (analysis.isUsername && analysis.extractedUsername) return analysis.extractedUsername;
+      if (st === 'USERNAME') return v.trim().replace(/^@/, '');
+      if (st === 'ORGANIZATION' || st === 'PERSON' || st === 'NAME') return v.trim();
+      // URL with extracted username
+      if (analysis.isUrl && analysis.extractedUsername) return analysis.extractedUsername;
+      return null;
+    },
     collectors: [{ name: 'youtube-public' }],
   },
   'developer.github-profile': {
-    deriveInput: (v, st) =>
-      st === 'USERNAME' || st === 'ORGANIZATION' || st === 'EMAIL' || st === 'PERSON' || st === 'NAME'
-        ? v.trim()
-        : null,
+    deriveInput: (v, st, analysis) => {
+      // Username-based lookup
+      if (analysis.isUsername && analysis.extractedUsername) return analysis.extractedUsername;
+      if (st === 'USERNAME') return v.trim();
+      if (st === 'ORGANIZATION') return v.trim();
+      if (st === 'EMAIL') return v.trim();
+      if (st === 'PERSON' || st === 'NAME') return v.trim();
+      // URL with extracted username
+      if (analysis.isUrl && analysis.extractedUsername) return analysis.extractedUsername;
+      return null;
+    },
     collectors: [{ name: 'github-public' }],
   },
   'developer.gitlab-profile': {
-    deriveInput: (v, st) =>
-      st === 'USERNAME' || st === 'ORGANIZATION' || st === 'PERSON' || st === 'NAME'
-        ? v.trim().replace(/^@/, '')
-        : null,
+    deriveInput: (v, st, analysis) => {
+      if (analysis.isUsername && analysis.extractedUsername) return analysis.extractedUsername;
+      if (st === 'USERNAME') return v.trim().replace(/^@/, '');
+      if (st === 'ORGANIZATION' || st === 'PERSON' || st === 'NAME') return v.trim();
+      // URL with extracted username
+      if (analysis.isUrl && analysis.extractedUsername) return analysis.extractedUsername;
+      return null;
+    },
     collectors: [{ name: 'gitlab-public' }],
   },
   'contact.find-official-contact': {
-    deriveInput: (v) => {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl) return v.trim();
+      if (analysis.isDomain) return `https://${v.trim()}`;
       const trimmed = v.trim();
       if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) return trimmed;
       const d = extractDomain(trimmed);
-      return d ? `https://${d}` : null;
+      return d && d.includes('.') ? `https://${d}` : null;
     },
     collectors: [{ name: 'url-metadata' }],
   },
   'mentions.search-public-web': {
-    deriveInput: (v, st) =>
-      st === 'ORGANIZATION' || st === 'USERNAME' || st === 'DOMAIN' || st === 'PERSON' || st === 'NAME'
-        ? v.trim()
-        : null,
+    deriveInput: (v, st, analysis) => {
+      // Web search works with any text-based query
+      if (st === 'ORGANIZATION' || st === 'USERNAME' || st === 'DOMAIN' || st === 'PERSON' || st === 'NAME') {
+        return v.trim();
+      }
+      // For SOCIAL_PROFILE, use the username if available, otherwise the raw value
+      if (st === 'SOCIAL_PROFILE') {
+        return analysis.extractedUsername || v.trim();
+      }
+      // For URLs, search by the domain or path
+      if (analysis.isUrl) return v.trim();
+      // Default: use the raw value
+      return v.trim();
+    },
     collectors: [{ name: 'web-search' }],
   },
 };
@@ -141,8 +205,38 @@ function filterSeedEchoes(
 }
 
 /**
+ * Ensure every entity candidate has provenance metadata.
+ * If provenance is missing, inject it from the transform context.
+ */
+function enforceProvenance(
+  entities: EntityCandidate[],
+  transformId: string,
+  collectorName: string,
+): EntityCandidate[] {
+  const now = new Date().toISOString();
+  return entities.map((e) => {
+    const meta = e.metadata || {};
+    if (!meta.source || typeof meta.source !== 'object') {
+      meta.source = {
+        collector: collectorName,
+        transform: transformId,
+        collectedAt: now,
+      };
+    } else {
+      // Ensure required fields exist
+      const source = meta.source as Record<string, unknown>;
+      if (!source.collector) source.collector = collectorName;
+      if (!source.transform) source.transform = transformId;
+      if (!source.collectedAt) source.collectedAt = now;
+    }
+    return { ...e, metadata: meta };
+  });
+}
+
+/**
  * Execute a transform by ID against an entity value.
- * Returns structured results with seed echoes filtered out and provenance attached.
+ * Uses value analysis for smart input derivation.
+ * Returns structured results with seed echoes filtered out, provenance enforced.
  */
 export async function executeTransform(
   transformId: string,
@@ -164,6 +258,9 @@ export async function executeTransform(
     };
   }
 
+  // Analyze the actual value to enable smart input derivation
+  const analysis = analyzeValue(entityValue);
+
   const allEntities: EntityCandidate[] = [];
   const allRelationships: RelationshipCandidate[] = [];
   const allEvidence: EvidenceCandidate[] = [];
@@ -171,11 +268,11 @@ export async function executeTransform(
 
   for (const col of handler.collectors) {
     const input = col.deriveInput
-      ? col.deriveInput(entityValue, seedType)
-      : handler.deriveInput(entityValue, seedType);
+      ? col.deriveInput(entityValue, seedType, analysis)
+      : handler.deriveInput(entityValue, seedType, analysis);
 
     if (!input) {
-      // Skipped because input type is not suitable for this transform
+      // Skipped because value analysis determined this transform is not applicable
       continue;
     }
 
@@ -185,7 +282,15 @@ export async function executeTransform(
         input,
         ctx,
       );
-      allEntities.push(...result.entities);
+
+      // Enforce provenance on all discovered entities
+      const entitiesWithProvenance = enforceProvenance(
+        result.entities,
+        transformId,
+        col.name,
+      );
+
+      allEntities.push(...entitiesWithProvenance);
       allRelationships.push(...result.relationships);
       allEvidence.push(...result.evidence);
       allWarnings.push(...result.warnings);
@@ -220,5 +325,4 @@ export async function executeTransform(
   };
 }
 
-export { filterSeedEchoes, extractDomain, extractUsername };
-
+export { filterSeedEchoes, extractDomain, extractUsername, enforceProvenance };

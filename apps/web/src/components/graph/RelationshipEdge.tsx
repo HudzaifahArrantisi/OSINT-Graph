@@ -55,9 +55,9 @@ export const RelationshipEdge = memo(
           markerEnd={markerEnd}
           style={{
             ...(style || {}),
-            stroke: selected ? '#7c6cff' : hovered ? '#9e92ff' : 'rgba(148, 163, 184, 0.25)',
-            strokeWidth: selected ? 2.5 : hovered ? 2 : 1.2,
-            opacity: selected ? 1 : hovered ? 0.9 : 0.45,
+            stroke: selected ? '#38bdf8' : hovered ? '#60a5fa' : 'rgba(100, 116, 139, 0.3)',
+            strokeWidth: selected ? 2 : hovered ? 1.8 : 1,
+            opacity: selected ? 1 : hovered ? 0.9 : 0.5,
             transition: 'stroke 0.15s ease, stroke-width 0.15s ease, opacity 0.15s ease',
           }}
         />
@@ -76,15 +76,15 @@ export const RelationshipEdge = memo(
               className="z-30 cursor-pointer animate-fade-in"
             >
               <div
-                className={`px-2.5 py-1 rounded-full text-[10px] font-mono font-medium border flex items-center gap-1.5 shadow-xl select-none backdrop-blur-md ${
+                className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium border flex items-center gap-1.5 shadow-lg select-none backdrop-blur-sm ${
                   selected
-                    ? 'bg-surface-2/95 border-primary text-primary shadow-primary/30'
-                    : 'bg-surface/95 border-border text-text shadow-black/50'
+                    ? 'bg-[#111827]/95 border-sky-500 text-sky-300 shadow-sky-950/40'
+                    : 'bg-[#0e1420]/95 border-slate-700 text-slate-200 shadow-black/50'
                 }`}
                 title={`${relType} · ${confidence}% confidence\n${edgeData.reason || ''}`}
               >
                 <span>{relType}</span>
-                <span className="text-[9px] text-text-muted">({confidence}%)</span>
+                <span className="text-[9px] text-slate-400">({confidence}%)</span>
               </div>
             </div>
           </EdgeLabelRenderer>

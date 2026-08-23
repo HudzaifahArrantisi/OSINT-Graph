@@ -23,7 +23,7 @@ import type {
 import { normalize } from '@nexusgraph/shared';
 import { buildDiscoveryPlan } from './planner.js';
 import { parseSeed } from './seed-classifier.js';
-import { executeTransform, extractDomain } from '../transforms/adapter.js';
+import { executeTransform } from '../transforms/adapter.js';
 import { correlateEntities } from '../correlation/engine.js';
 import {
   entityService,
@@ -219,7 +219,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
   emitProgress('scan', `Registered investigation seed node in dossier graph (Initial confidence: 30%)`);
   if (parsed.derivedEntities.length > 0) {
     for (const d of parsed.derivedEntities) {
-      emitProgress('found', `🎯 Deterministically extracted ${d.type}: "${d.value}"`);
+      emitProgress('found', `Extracted ${d.type}: "${d.value}"`);
     }
   }
   emitProgress(
@@ -268,15 +268,9 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
       const abortController = new AbortController();
       const timeout = setTimeout(() => abortController.abort(), 30_000);
 
-      // Determine the specific input for this transform
-      let transformInput = seedValue;
-      if (transformId.startsWith('domain.')) {
-        transformInput = extractDomain(seedValue) || seedValue;
-      }
-
       const result = await executeTransform(
         transformId,
-        transformInput,
+        seedValue,
         seedType,
         seedValue,
         {
@@ -319,7 +313,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
 
           emitProgress(
             'found',
-            `🎯 Discovered ${candidate.type}: "${candidate.value}" [${candidate.confidence || 50}% confidence]`,
+            `Discovered ${candidate.type}: "${candidate.value}" [${candidate.confidence || 50}% confidence]`,
             {
               transformId,
               transformName,
@@ -375,7 +369,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
 
             emitProgress(
               'found',
-              `🔗 Linked: "${rel.source_value}" ──[${rel.relationship_type}]──> "${rel.target_value}"`,
+              `Linked: "${rel.source_value}" -> "${rel.target_value}" [${rel.relationship_type}]`,
               {
                 transformId,
                 transformName,
@@ -455,7 +449,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
         completedCount++;
         emitProgress(
           'success',
-          `✅ [${transformName}] Finished — ${entityCount} entities, ${relCount} relationships found`,
+          `[${transformName}] Completed - ${entityCount} entities, ${relCount} relationships found`,
           {
             type: 'transform_complete',
             transformId,
@@ -468,7 +462,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
         notFoundCount++;
         emitProgress(
           'info',
-          `ℹ️ [${transformName}] Finished — 0 results found on this vector`,
+          `[${transformName}] Completed - 0 results found on this vector`,
           {
             type: 'transform_complete',
             transformId,
@@ -481,7 +475,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
         failedCount++;
         emitProgress(
           'warn',
-          `⚠️ [${transformName}] Finished with warning/error: ${result.error || 'Vector unavailable'}`,
+          `[${transformName}] Completed with warning: ${result.error || 'Vector unavailable'}`,
           {
             type: 'transform_failed',
             transformId,
@@ -526,7 +520,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
       });
 
       failedCount++;
-      emitProgress('warn', `❌ [${transformName}] Failed: ${message}`, {
+      emitProgress('warn', `[${transformName}] Failed: ${message}`, {
         type: 'transform_failed',
         transformId,
         transformName,
@@ -562,7 +556,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
     completed_at: new Date().toISOString(),
     completed_transforms: completedCount + failedCount + notFoundCount,
     found_entities: totalEntities,
-    foundRelationships: totalRelationships,
+    found_relationships: totalRelationships,
     found_evidence: totalEvidence,
     failed_transforms: failedCount,
   });
@@ -580,7 +574,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
 
   emitProgress(
     'success',
-    `✨ OSINT Discovery Complete! Total: ${totalEntities} entities, ${totalRelationships} relationships, ${totalEvidence} evidence items persisted.`,
+    `OSINT Discovery Complete: ${totalEntities} entities, ${totalRelationships} relationships, ${totalEvidence} evidence items persisted.`,
     {
       type: 'discovery_complete',
     },

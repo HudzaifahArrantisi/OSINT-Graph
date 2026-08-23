@@ -207,4 +207,59 @@ export const api = {
     markdown: (caseId: string) =>
       request<string>('GET', `/investigations/${caseId}/export/markdown`),
   },
+
+  // Real-time System & Server Dev Logs
+  system: {
+    getLogs: () => request<any[]>('GET', '/system/logs'),
+    clearLogs: () => request<any>('DELETE', '/system/logs'),
+    streamLogs: async (
+      onLog: (log: any) => void,
+      signal?: AbortSignal,
+    ) => {
+      const headers = await getAuthHeaders();
+      const response = await fetch(`${API_BASE}/api/v1/system/logs/stream`, {
+        method: 'GET',
+        headers,
+        signal,
+      });
+
+      if (!response.ok) {
+        throw new Error(`System log stream failed: HTTP ${response.status}`);
+      }
+
+      const reader = response.body?.getReader();
+      if (!reader) return;
+
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        if (signal?.aborted) break;
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const block of lines) {
+          if (!block.trim()) continue;
+          const dataMatch = block.match(/data:\s*(.+)/);
+          if (dataMatch) {
+            try {
+              const parsed = JSON.parse(dataMatch[1]);
+              if (Array.isArray(parsed)) {
+                parsed.forEach(onLog);
+              } else if (parsed && parsed.id) {
+                onLog(parsed);
+              }
+            } catch {
+              // Ignore partial JSON
+            }
+          }
+        }
+      }
+    },
+  },
 };
+

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { classifySeed, getEffectiveType } from '../discovery/seed-classifier.js';
+import { classifySeed, getEffectiveType, parseSeed } from '../discovery/seed-classifier.js';
 import { buildDiscoveryPlan } from '../discovery/planner.js';
 
 describe('Discovery & Seed Classification Tests', () => {
@@ -19,6 +19,7 @@ describe('Discovery & Seed Classification Tests', () => {
     expect(getEffectiveType('EMAIL')).toBe('EMAIL');
     expect(getEffectiveType('PERSON')).toBe('PERSON');
     expect(getEffectiveType('NAME')).toBe('PERSON');
+    expect(getEffectiveType('SOCIAL_PROFILE')).toBe('SOCIAL_PROFILE');
   });
 
   it('should produce multi-category transforms for username seed', () => {
@@ -29,6 +30,27 @@ describe('Discovery & Seed Classification Tests', () => {
     expect(transformIds).toContain('developer.gitlab-profile');
     expect(transformIds).toContain('social.discover-public-profiles');
     expect(transformIds).toContain('social.youtube-channel');
+  });
+
+  it('should produce smart transforms for SOCIAL_PROFILE seed with username value', () => {
+    const plan = buildDiscoveryPlan('SOCIAL_PROFILE', 'candalenaa');
+    const transformIds = plan.transforms.map((t) => t.id);
+
+    expect(transformIds).toContain('social.discover-public-profiles');
+    expect(transformIds).toContain('developer.github-profile');
+    expect(transformIds).toContain('developer.gitlab-profile');
+    expect(transformIds).toContain('social.youtube-channel');
+  });
+
+  it('should deterministically extract username & domain from SOCIAL_PROFILE URL', () => {
+    const parsed = parseSeed('SOCIAL_PROFILE', 'https://instagram.com/candalenaa');
+    expect(parsed.derivedEntities.length).toBeGreaterThanOrEqual(2);
+    
+    const domainEntity = parsed.derivedEntities.find((e) => e.type === 'DOMAIN');
+    const userEntity = parsed.derivedEntities.find((e) => e.type === 'USERNAME');
+
+    expect(domainEntity?.value).toBe('instagram.com');
+    expect(userEntity?.value).toBe('candalenaa');
   });
 
   it('should produce infrastructure transforms for domain seed', () => {

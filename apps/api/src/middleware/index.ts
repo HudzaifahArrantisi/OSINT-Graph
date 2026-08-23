@@ -33,13 +33,10 @@ export async function requestLogMiddleware(c: Context, next: Next) {
   await next();
 
   const duration = Date.now() - start;
-  logger.info(`${method} ${path} ${c.res.status}`, {
-    requestId,
-    method,
-    path,
-    status: c.res.status,
-    duration,
-  });
+  // Ignore SSE stream routes from flooding request logs if desired, or log them once
+  if (!path.includes('/system/logs/stream')) {
+    logger.http(method, path, c.res.status, duration, { requestId });
+  }
 }
 
 // ─── Auth Middleware ────────────────────────────────────────────────

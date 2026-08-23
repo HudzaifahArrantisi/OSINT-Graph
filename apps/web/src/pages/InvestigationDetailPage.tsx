@@ -268,9 +268,9 @@ export function InvestigationDetailPage() {
           <Button
             variant="primary"
             size="sm"
-            icon={<Sparkles className="w-3.5 h-3.5 text-amber-300" />}
+            icon={<Compass className="w-3.5 h-3.5" />}
             onClick={() => setDiscoveryModalOpen(true)}
-            className="shadow-md shadow-primary/20"
+            className="shadow-sm font-semibold"
           >
             <span>Start Discovery</span>
           </Button>
@@ -413,7 +413,7 @@ export function InvestigationDetailPage() {
                 variant="secondary"
                 size="sm"
                 className="w-full text-xs"
-                icon={<Sparkles className="w-3.5 h-3.5 text-primary" />}
+                icon={<Compass className="w-3.5 h-3.5 text-primary" />}
                 onClick={() => setDiscoveryModalOpen(true)}
               >
                 Start Discovery
