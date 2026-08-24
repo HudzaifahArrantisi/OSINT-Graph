@@ -198,28 +198,6 @@ function GraphViewInner({ graphData }: GraphViewProps) {
 
       {filterOpen && <GraphFilterBar onClose={() => setFilterOpen(false)} />}
 
-      {searchOpen && (
-        <div className="absolute top-4 left-64 z-10 w-72 bg-surface/95 backdrop-blur-md border border-border-subtle rounded-card shadow-2xl p-2 flex items-center gap-2 animate-slide-in-up">
-          <Search className="w-4 h-4 text-text-muted shrink-0" />
-          <input
-            type="text"
-            placeholder="Find in graph..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full bg-transparent text-xs text-text placeholder:text-text-muted focus:outline-none"
-            autoFocus
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="p-0.5 text-text-muted hover:text-text"
-            >
-              <X className="w-3.5 h-3.5" />
-            </button>
-          )}
-        </div>
-      )}
-
       <ReactFlow
         nodes={filteredNodes}
         edges={filteredEdges}

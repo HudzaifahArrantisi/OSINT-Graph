@@ -361,6 +361,8 @@ export interface DiscoveryProgressEvent {
 
 export interface GraphNodeData {
   label: string;
+  value?: string;
+  title?: string | null;
   entityType: EntityType;
   confidence: number;
   entityId: string;

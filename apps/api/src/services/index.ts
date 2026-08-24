@@ -331,6 +331,167 @@ export const entityService = {
     if (error && error.code !== 'PGRST116') throw new Error(error.message);
     return data;
   },
+
+  async deleteSeed(
+    caseId: string,
+    seedEntityId: string,
+    userId: string,
+  ): Promise<{
+    deletedEntitiesCount: number;
+    deletedRelationshipsCount: number;
+    deletedJobsCount: number;
+    seedValue: string;
+  }> {
+    if (!(await validateCaseOwnership(caseId, userId))) {
+      throw new Error('Investigation not found or access denied');
+    }
+
+    // 1. Get the target seed entity
+    const targetEntity = await this.getById(seedEntityId, caseId, userId);
+    if (!targetEntity) {
+      throw new Error('Seed entity not found');
+    }
+
+    // 2. Fetch all entities and relationships in the case
+    const [allEntities, allRelationships] = await Promise.all([
+      this.list(caseId, userId),
+      relationshipService.list(caseId, userId),
+    ]);
+
+    // 3. Find other seeds in the investigation
+    const otherSeeds = allEntities.filter(
+      (e) => e.id !== seedEntityId && (e.type === 'SEED' || (e.metadata as any)?.isSeed === true),
+    );
+
+    // 4. Build adjacency graph
+    const adj = new Map<string, Set<string>>();
+    for (const e of allEntities) {
+      adj.set(e.id, new Set());
+    }
+    for (const r of allRelationships) {
+      adj.get(r.source_entity_id)?.add(r.target_entity_id);
+      adj.get(r.target_entity_id)?.add(r.source_entity_id);
+    }
+
+    // 5. BFS from target seed to find all reachable nodes
+    const reachableFromTarget = new Set<string>();
+    const queue = [seedEntityId];
+    reachableFromTarget.add(seedEntityId);
+    while (queue.length > 0) {
+      const current = queue.shift()!;
+      const neighbors = adj.get(current) || new Set();
+      for (const neighbor of neighbors) {
+        if (!reachableFromTarget.has(neighbor)) {
+          reachableFromTarget.add(neighbor);
+          queue.push(neighbor);
+        }
+      }
+    }
+
+    // Also include entities whose metadata explicitly traces back to this seed
+    for (const e of allEntities) {
+      const meta = (e.metadata || {}) as Record<string, any>;
+      if (
+        meta.derivedFromSeed === targetEntity.value ||
+        meta.seedValue === targetEntity.value ||
+        meta.source?.derivedFrom === targetEntity.value
+      ) {
+        reachableFromTarget.add(e.id);
+      }
+    }
+
+    // 6. BFS from other seeds (if any) to protect nodes shared with / reachable from other seeds
+    const reachableFromOtherSeeds = new Set<string>();
+    if (otherSeeds.length > 0) {
+      const otherQueue = otherSeeds.map((s) => s.id);
+      for (const s of otherSeeds) reachableFromOtherSeeds.add(s.id);
+      while (otherQueue.length > 0) {
+        const current = otherQueue.shift()!;
+        const neighbors = adj.get(current) || new Set();
+        for (const neighbor of neighbors) {
+          if (!reachableFromOtherSeeds.has(neighbor)) {
+            reachableFromOtherSeeds.add(neighbor);
+            otherQueue.push(neighbor);
+          }
+        }
+      }
+    }
+
+    // 7. Entities to delete = reachableFromTarget EXCEPT reachableFromOtherSeeds (always including seedEntityId)
+    const entitiesToDelete = new Set<string>();
+    entitiesToDelete.add(seedEntityId);
+    for (const id of reachableFromTarget) {
+      if (!reachableFromOtherSeeds.has(id)) {
+        entitiesToDelete.add(id);
+      }
+    }
+
+    const idsToDelete = Array.from(entitiesToDelete);
+
+    // 8. Delete discovery jobs & transform runs matching this seed
+    let deletedJobsCount = 0;
+    const { data: jobs } = await db()
+      .from('discovery_jobs')
+      .select('id')
+      .eq('case_id', caseId)
+      .or(`seed_entity_id.eq.${seedEntityId},seed_value.eq.${targetEntity.value}`);
+
+    if (jobs && jobs.length > 0) {
+      const jobIds = jobs.map((j) => j.id);
+      deletedJobsCount = jobIds.length;
+      await db().from('transform_runs').delete().in('discovery_job_id', jobIds);
+      await db().from('discovery_jobs').delete().in('id', jobIds);
+    }
+
+    // 9. Delete collector runs for this seed
+    await db()
+      .from('collector_runs')
+      .delete()
+      .eq('case_id', caseId)
+      .eq('input_summary', targetEntity.value);
+
+    // 10. Delete connected relationships, evidence, timeline, notes, entities
+    let deletedRelationshipsCount = 0;
+    if (idsToDelete.length > 0) {
+      const relsToDelete = allRelationships.filter(
+        (r) => entitiesToDelete.has(r.source_entity_id) || entitiesToDelete.has(r.target_entity_id),
+      );
+      deletedRelationshipsCount = relsToDelete.length;
+
+      await db()
+        .from('relationships')
+        .delete()
+        .eq('case_id', caseId)
+        .in('source_entity_id', idsToDelete);
+
+      await db()
+        .from('relationships')
+        .delete()
+        .eq('case_id', caseId)
+        .in('target_entity_id', idsToDelete);
+
+      await db().from('evidence').delete().eq('case_id', caseId).in('entity_id', idsToDelete);
+      await db().from('timeline_events').delete().eq('case_id', caseId).in('entity_id', idsToDelete);
+      await db().from('notes').delete().eq('case_id', caseId).in('entity_id', idsToDelete);
+
+      const { error: delError } = await db()
+        .from('entities')
+        .delete()
+        .eq('case_id', caseId)
+        .in('id', idsToDelete);
+
+      if (delError) {
+        throw new Error(`Failed to delete entities: ${delError.message}`);
+      }
+    }
+
+    return {
+      deletedEntitiesCount: idsToDelete.length,
+      deletedRelationshipsCount,
+      deletedJobsCount,
+      seedValue: targetEntity.value,
+    };
+  },
 };
 
 // ─── Relationship Service ───────────────────────────────────────────

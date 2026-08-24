@@ -32,6 +32,8 @@ import {
   Trash2,
   Sparkles,
   Terminal,
+  Radio,
+  Target,
 } from 'lucide-react';
 import type { Investigation, GraphPayload, CollectorRun, Note, DiscoveryJob } from '@nexusgraph/shared';
 
@@ -139,6 +141,67 @@ export function InvestigationDetailPage() {
       addToast('Note deleted', 'info');
     } catch (err: any) {
       addToast(err.message || 'Failed to delete note', 'error');
+    }
+  };
+
+  // Compute active Seed Targets and their connected subgraph sizes
+  const seedTargets = React.useMemo(() => {
+    if (!graphData?.nodes) return [];
+    const seeds = graphData.nodes.filter(
+      (n) => n.data?.isSeed || n.data?.entityType === 'SEED' || n.type === 'seed',
+    );
+
+    const adj = new Map<string, Set<string>>();
+    for (const n of graphData.nodes) adj.set(n.id, new Set());
+    for (const e of graphData.edges || []) {
+      adj.get(e.source)?.add(e.target);
+      adj.get(e.target)?.add(e.source);
+    }
+
+    return seeds.map((seed) => {
+      const visited = new Set<string>([seed.id]);
+      const queue = [seed.id];
+      while (queue.length > 0) {
+        const curr = queue.shift()!;
+        const neighbors = adj.get(curr) || new Set();
+        for (const n of neighbors) {
+          if (!visited.has(n)) {
+            visited.add(n);
+            queue.push(n);
+          }
+        }
+      }
+      return {
+        id: seed.id,
+        label: seed.data?.label || seed.data?.value || 'Seed Target',
+        type: seed.data?.entityType || 'SEED',
+        connectedCount: visited.size,
+        data: seed.data,
+      };
+    });
+  }, [graphData]);
+
+  const handleDeleteSeed = async (seedId: string, seedLabel: string, count: number) => {
+    if (!caseId) return;
+    const confirmMsg =
+      count > 1
+        ? `Hapus Seed Target "${seedLabel}" beserta seluruh ${count} node graf yang terhubung dengannya?`
+        : `Hapus Seed Target "${seedLabel}" dari investigasi ini?`;
+
+    if (window.confirm(confirmMsg)) {
+      try {
+        const res = await api.seeds.delete(caseId, seedId);
+        handleRefresh();
+        if (selectedNodeId === seedId) {
+          setSelectedNodeId(null);
+        }
+        addToast(
+          `Seed target "${res.seedValue}" dan ${res.deletedEntitiesCount} node terhubung berhasil dihapus`,
+          'info',
+        );
+      } catch (err: any) {
+        addToast(err.message || 'Gagal menghapus seed target', 'error');
+      }
     }
   };
 
@@ -309,6 +372,92 @@ export function InvestigationDetailPage() {
                   </div>
                   <div className="text-[10px] text-text-muted">Relationships</div>
                 </div>
+              </div>
+
+              {/* Seed Targets Panel */}
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-semibold text-text-secondary flex items-center gap-1.5">
+                    <Radio className="w-3 h-3 text-amber-400" />
+                    <span>Seed Targets ({seedTargets.length})</span>
+                  </span>
+                  <button
+                    onClick={() => setDiscoveryModalOpen(true)}
+                    className="text-[10px] text-primary hover:underline flex items-center gap-0.5 font-medium"
+                  >
+                    <Plus className="w-2.5 h-2.5" />
+                    <span>Add</span>
+                  </button>
+                </div>
+
+                {seedTargets.length === 0 ? (
+                  <div className="bg-surface-2 p-2.5 rounded-card border border-border-subtle text-center text-[11px] text-text-muted">
+                    <p>No seed targets active</p>
+                    <button
+                      onClick={() => setDiscoveryModalOpen(true)}
+                      className="mt-1.5 text-xs text-primary font-medium hover:underline inline-flex items-center gap-1"
+                    >
+                      <Sparkles className="w-3 h-3 text-amber-300" />
+                      <span>Start Discovery</span>
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5 max-h-48 overflow-y-auto">
+                    {seedTargets.map((seed) => (
+                      <div
+                        key={seed.id}
+                        className={`bg-surface-2 p-2 rounded-input border transition-all ${
+                          selectedNodeId === seed.id
+                            ? 'border-amber-500/60 bg-amber-500/5'
+                            : 'border-border-subtle hover:border-border'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-1.5">
+                          <button
+                            onClick={() => {
+                              setSelectedNodeId(seed.id);
+                              setSelectedEdgeId(null);
+                            }}
+                            className="min-w-0 flex-1 text-left"
+                            title={`Focus "${seed.label}" in graph`}
+                          >
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="text-[9px] font-mono uppercase text-amber-400 bg-amber-500/15 border border-amber-500/30 px-1 py-0.2 rounded font-semibold">
+                                {seed.type === 'SEED' ? 'SEED' : seed.type}
+                              </span>
+                              <span className="text-[10px] text-text-muted font-mono">
+                                {seed.connectedCount} {seed.connectedCount === 1 ? 'node' : 'nodes'}
+                              </span>
+                            </div>
+                            <div className="font-mono text-[11px] font-semibold text-text truncate">
+                              {seed.label}
+                            </div>
+                          </button>
+
+                          <div className="flex items-center gap-0.5 shrink-0">
+                            <button
+                              onClick={() => {
+                                setSelectedNodeId(seed.id);
+                                setSelectedEdgeId(null);
+                              }}
+                              className="p-1 text-text-muted hover:text-primary rounded hover:bg-surface-3 transition-colors"
+                              title="Focus node on graph"
+                            >
+                              <Target className="w-3.5 h-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteSeed(seed.id, seed.label, seed.connectedCount)}
+                              className="p-1 text-status-danger/70 hover:text-status-danger hover:bg-status-danger/10 rounded transition-colors"
+                              title={`Hapus Seed Target "${seed.label}" dan ${seed.connectedCount} node graf terhubung`}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Breakdown: Entities by Category */}

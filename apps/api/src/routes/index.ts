@@ -218,6 +218,19 @@ api.delete('/investigations/:id/entities/:entityId', async (c) => {
   }
 });
 
+api.delete('/investigations/:id/seeds/:seedEntityId', async (c) => {
+  const userId = c.get('userId');
+  const caseId = c.req.param('id');
+  const seedEntityId = c.req.param('seedEntityId');
+
+  try {
+    const result = await entityService.deleteSeed(caseId, seedEntityId, userId);
+    return c.json({ data: result });
+  } catch (err: any) {
+    return c.json({ error: 'Error', message: err.message || 'Failed to delete seed and connected graph', statusCode: 400 }, 400);
+  }
+});
+
 // ─── Relationships ──────────────────────────────────────────────────
 
 api.get('/investigations/:id/relationships', async (c) => {

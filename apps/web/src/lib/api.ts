@@ -75,6 +75,17 @@ export const api = {
       request<{ deletedCount: number }>('DELETE', `/investigations/${caseId}/entities/by-type/${type}`),
   },
 
+  // Seeds
+  seeds: {
+    delete: (caseId: string, seedEntityId: string) =>
+      request<{
+        deletedEntitiesCount: number;
+        deletedRelationshipsCount: number;
+        deletedJobsCount: number;
+        seedValue: string;
+      }>('DELETE', `/investigations/${caseId}/seeds/${seedEntityId}`),
+  },
+
   // Relationships
   relationships: {
     list: (caseId: string) => request<any[]>('GET', `/investigations/${caseId}/relationships`),

@@ -66,6 +66,78 @@ export function EntityDetailPanel({ caseId, onClose }: EntityDetailPanelProps) {
   // If edge selected instead of node
   const selectedRelationship = relationships.find((r) => r.id === selectedEdgeId);
 
+  const isSeed = selectedEntity?.type === 'SEED' || !!(selectedEntity?.metadata as any)?.isSeed;
+
+  // Compute connected graph nodes count for this entity
+  const connectedCount = React.useMemo(() => {
+    if (!selectedEntity) return 0;
+    const adj = new Map<string, Set<string>>();
+    for (const e of entities) adj.set(e.id, new Set());
+    for (const r of relationships) {
+      adj.get(r.source_entity_id)?.add(r.target_entity_id);
+      adj.get(r.target_entity_id)?.add(r.source_entity_id);
+    }
+    const visited = new Set<string>([selectedEntity.id]);
+    const queue = [selectedEntity.id];
+    while (queue.length > 0) {
+      const curr = queue.shift()!;
+      const neighbors = adj.get(curr) || new Set();
+      for (const n of neighbors) {
+        if (!visited.has(n)) {
+          visited.add(n);
+          queue.push(n);
+        }
+      }
+    }
+    return visited.size;
+  }, [selectedEntity, entities, relationships]);
+
+  const handleDeleteSeed = async () => {
+    if (!selectedEntity) return;
+    const confirmMessage =
+      connectedCount > 1
+        ? `Hapus Seed Target "${selectedEntity.value}" beserta seluruh ${connectedCount} entitas dan graph yang terhubung dengannya?`
+        : `Hapus Seed Target "${selectedEntity.value}" dari investigasi ini?`;
+
+    if (window.confirm(confirmMessage)) {
+      try {
+        const res = await api.seeds.delete(caseId, selectedEntity.id);
+        queryClient.invalidateQueries({ queryKey: ['graph', caseId] });
+        queryClient.invalidateQueries({ queryKey: ['entities', caseId] });
+        queryClient.invalidateQueries({ queryKey: ['relationships', caseId] });
+        queryClient.invalidateQueries({ queryKey: ['evidence', caseId] });
+        queryClient.invalidateQueries({ queryKey: ['timeline', caseId] });
+        queryClient.invalidateQueries({ queryKey: ['discoveries', caseId] });
+        queryClient.invalidateQueries({ queryKey: ['collector-runs', caseId] });
+        addToast(
+          `Seed target "${res.seedValue}" dan ${res.deletedEntitiesCount} node terhubung berhasil dihapus`,
+          'info',
+        );
+        setSelectedNodeId(null);
+        onClose();
+      } catch (err: any) {
+        addToast(err.message || 'Failed to delete seed and connected graph', 'error');
+      }
+    }
+  };
+
+  const handleDeleteIndividualEntity = async () => {
+    if (!selectedEntity) return;
+    if (window.confirm(`Delete entity "${selectedEntity.value}" from this investigation?`)) {
+      try {
+        await api.entities.delete(caseId, selectedEntity.id);
+        queryClient.invalidateQueries({ queryKey: ['graph', caseId] });
+        queryClient.invalidateQueries({ queryKey: ['entities', caseId] });
+        queryClient.invalidateQueries({ queryKey: ['relationships', caseId] });
+        addToast(`Deleted entity "${selectedEntity.value}"`, 'info');
+        setSelectedNodeId(null);
+        onClose();
+      } catch (err: any) {
+        addToast(err.message || 'Failed to delete entity', 'error');
+      }
+    }
+  };
+
   if (!selectedEntity && !selectedRelationship) return null;
 
   return (
@@ -76,13 +148,21 @@ export function EntityDetailPanel({ caseId, onClose }: EntityDetailPanelProps) {
           {selectedEntity ? (
             <>
               <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
-                  {selectedEntity.type}
-                </span>
+                {isSeed ? (
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-amber-400 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded font-mono">
+                    SEED TARGET
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-semibold uppercase tracking-wider text-text-muted">
+                    {selectedEntity.type}
+                  </span>
+                )}
                 <ConfidenceBadge score={selectedEntity.confidence || 50} size="sm" />
               </div>
               <h3
-                className="text-base font-semibold font-mono text-text truncate"
+                className={`text-base font-semibold font-mono truncate ${
+                  isSeed ? 'text-amber-200' : 'text-text'
+                }`}
                 title={selectedEntity.value}
               >
                 {selectedEntity.value}
@@ -110,22 +190,8 @@ export function EntityDetailPanel({ caseId, onClose }: EntityDetailPanelProps) {
         <div className="flex items-center gap-1 shrink-0">
           {selectedEntity && (
             <button
-              onClick={async () => {
-                if (window.confirm(`Delete entity "${selectedEntity.value}" from this investigation?`)) {
-                  try {
-                    await api.entities.delete(caseId, selectedEntity.id);
-                    queryClient.invalidateQueries({ queryKey: ['graph', caseId] });
-                    queryClient.invalidateQueries({ queryKey: ['entities', caseId] });
-                    queryClient.invalidateQueries({ queryKey: ['relationships', caseId] });
-                    addToast(`Deleted entity "${selectedEntity.value}"`, 'info');
-                    setSelectedNodeId(null);
-                    onClose();
-                  } catch (err: any) {
-                    addToast(err.message || 'Failed to delete entity', 'error');
-                  }
-                }
-              }}
-              title="Delete this node from graph"
+              onClick={isSeed ? handleDeleteSeed : handleDeleteIndividualEntity}
+              title={isSeed ? 'Hapus Seed Target & Graf Terhubung' : 'Delete this node from graph'}
               className="p-1 rounded-button text-status-danger/70 hover:text-status-danger hover:bg-status-danger/10 transition-colors"
             >
               <Trash2 className="w-4 h-4" />
@@ -167,6 +233,30 @@ export function EntityDetailPanel({ caseId, onClose }: EntityDetailPanelProps) {
             {/* OVERVIEW TAB */}
             {activeTab === 'overview' && (
               <div className="space-y-4">
+                {isSeed && (
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-card p-3 space-y-2.5">
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-1.5 font-semibold text-amber-300">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Investigation Seed Target</span>
+                      </div>
+                      <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">
+                        {connectedCount} Nodes
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-amber-200/80 leading-relaxed">
+                      Titik awal investigasi ini terhubung dengan {connectedCount} entitas pada graf. Anda dapat menghapus seluruh cabang subgraf dari seed ini secara instan.
+                    </p>
+                    <button
+                      onClick={handleDeleteSeed}
+                      className="w-full flex items-center justify-center gap-1.5 py-2 px-3 text-xs font-semibold text-status-danger bg-status-danger/10 hover:bg-status-danger/20 border border-status-danger/30 rounded-button transition-colors shadow-sm"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Hapus Seed Target & Subgraf ({connectedCount} Node)</span>
+                    </button>
+                  </div>
+                )}
+
                 <div className="bg-surface-2 rounded-card p-3 border border-border-subtle space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-text-muted">Type:</span>
