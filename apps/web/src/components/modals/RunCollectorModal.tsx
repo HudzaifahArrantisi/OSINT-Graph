@@ -3,7 +3,7 @@ import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { SEED_TYPES, SeedType, CollectorName, COLLECTOR_NAMES } from '@nexusgraph/shared';
-import { Play, ShieldAlert, Check, Globe2, Mail, User, Network, Link, Building } from 'lucide-react';
+import { Play, ShieldAlert, Check, Globe2, Mail, User, Network, Link, Building, Phone } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAppStore } from '../../stores/appStore';
 
@@ -24,6 +24,7 @@ const SEED_ICONS: Record<SeedType, React.ComponentType<{ className?: string }>> 
   SOCIAL_PROFILE: User,
   PERSON: User,
   NAME: User,
+  PHONE: Phone,
 };
 
 export function RunCollectorModal({

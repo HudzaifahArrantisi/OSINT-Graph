@@ -12,6 +12,12 @@ import { usernamePresenceCollector } from './username-presence.js';
 import { gitlabCollector } from './gitlab.js';
 import { youtubeCollector } from './youtube.js';
 import { webSearchCollector } from './web-search.js';
+import { phoneGeoCollector } from './phone-geo.js';
+import { usernameSweepCollector } from './username-sweep.js';
+import { dorkGeneratorCollector } from './dork-generator.js';
+import { emailLookupCollector } from './email-lookup.js';
+import { websiteReconCollector } from './website-recon.js';
+import { mrholmesEngineCollector } from './mrholmes-engine.js';
 import { logger } from '../lib/logger.js';
 
 // Collector registry
@@ -25,6 +31,12 @@ collectors.set('username-presence', usernamePresenceCollector);
 collectors.set('gitlab-public', gitlabCollector);
 collectors.set('youtube-public', youtubeCollector);
 collectors.set('web-search', webSearchCollector);
+collectors.set('phone-geo', phoneGeoCollector);
+collectors.set('username-sweep', usernameSweepCollector);
+collectors.set('dork-generator', dorkGeneratorCollector);
+collectors.set('email-lookup', emailLookupCollector);
+collectors.set('website-recon', websiteReconCollector);
+collectors.set('mrholmes-engine', mrholmesEngineCollector);
 
 export function getCollector(name: CollectorName): Collector | undefined {
   return collectors.get(name);

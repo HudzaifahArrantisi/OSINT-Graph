@@ -11,6 +11,7 @@ import {
   Globe2,
   Mail,
   User,
+  Phone,
   Network,
   Link,
   Building,
@@ -42,6 +43,7 @@ const SEED_ICONS: Record<SeedType, React.ComponentType<{ className?: string }>> 
   IP_ADDRESS: Network,
   URL: Link,
   SOCIAL_PROFILE: User,
+  PHONE: Phone,
 };
 
 export function StartDiscoveryModal({
@@ -97,12 +99,11 @@ export function StartDiscoveryModal({
     setDiscoveryState('running');
     setDiscoveryResult(null);
 
-    // Auto-open live logs sidebar on the right
     clearLiveLogs();
-    setLiveLogsOpen(true);
     setIsDiscovering(true);
+    addToast('Discovery started in background...', 'info');
 
-    // Close modal after triggering so user immediately sees live sidebar and graph updating!
+    // Close modal after triggering so user immediately sees graph/map updating
     onClose();
 
     try {

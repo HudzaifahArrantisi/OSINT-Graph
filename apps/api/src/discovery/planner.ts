@@ -25,6 +25,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'domain.resolve-dns',
     'domain.find-tls',
     'contact.find-official-contact',
+    'intelligence.generate-dorks',
   ],
   DOMAIN: [
     'domain.resolve-dns',
@@ -32,14 +33,19 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'domain.webpage-metadata',
     'contact.find-official-contact',
     'mentions.search-public-web',
+    'domain.website-recon',
+    'intelligence.generate-dorks',
   ],
   EMAIL: [
     'domain.resolve-dns',
     'developer.github-profile',
     'mentions.search-public-web',
+    'contact.email-breach-lookup',
   ],
   USERNAME: [
     'social.discover-public-profiles',
+    'social.username-sweep',
+    'social.mrholmes-engine',
     'developer.github-profile',
     'developer.gitlab-profile',
     'social.youtube-channel',
@@ -54,6 +60,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   ],
   PERSON: [
     'web.discover-official-site',
+    'social.mrholmes-engine',
     'mentions.search-public-web',
     'social.youtube-channel',
     'developer.github-profile',
@@ -61,6 +68,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   ],
   NAME: [
     'web.discover-official-site',
+    'social.mrholmes-engine',
     'mentions.search-public-web',
     'social.youtube-channel',
     'developer.github-profile',
@@ -76,6 +84,11 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'social.youtube-channel',
     'mentions.search-public-web',
     'domain.webpage-metadata',
+  ],
+  PHONE: [
+    'phone.geo-metadata',
+    'contact.mrholmes-phone',
+    'mentions.search-public-web',
   ],
 };
 

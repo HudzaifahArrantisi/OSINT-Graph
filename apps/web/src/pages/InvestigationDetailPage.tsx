@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Navbar } from '../components/layout/Navbar';
 import { GraphView } from '../components/graph/GraphView';
+import { PhoneMapPanel } from '../components/map/PhoneMapPanel';
 import { EntityDetailPanel } from '../components/detail/EntityDetailPanel';
 import { DiscoveryLogsPanel } from '../components/detail/DiscoveryLogsPanel';
 import { StartDiscoveryModal } from '../components/modals/StartDiscoveryModal';
@@ -34,6 +35,7 @@ import {
   Terminal,
   Radio,
   Target,
+  MapPin,
 } from 'lucide-react';
 import type { Investigation, GraphPayload, CollectorRun, Note, DiscoveryJob } from '@nexusgraph/shared';
 
@@ -56,7 +58,7 @@ export function InvestigationDetailPage() {
     liveDiscoveryLogs,
   } = useAppStore();
 
-  const [activeWorkspaceView, setActiveWorkspaceView] = useState<'graph' | 'timeline' | 'evidence' | 'notes'>('graph');
+  const [activeWorkspaceView, setActiveWorkspaceView] = useState<'graph' | 'map' | 'timeline' | 'evidence' | 'notes'>('graph');
   const [discoveryModalOpen, setDiscoveryModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState('');
@@ -267,6 +269,7 @@ export function InvestigationDetailPage() {
             {(
               [
                 { id: 'graph', label: 'Graph', icon: Network },
+                { id: 'map', label: 'Geo Map', icon: MapPin },
                 { id: 'notes', label: 'Notes', icon: FileText },
               ] as const
             ).map((v) => {
@@ -378,7 +381,6 @@ export function InvestigationDetailPage() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-[11px] font-semibold text-text-secondary flex items-center gap-1.5">
-                    <Radio className="w-3 h-3 text-amber-400" />
                     <span>Seed Targets ({seedTargets.length})</span>
                   </span>
                   <button
@@ -397,7 +399,6 @@ export function InvestigationDetailPage() {
                       onClick={() => setDiscoveryModalOpen(true)}
                       className="mt-1.5 text-xs text-primary font-medium hover:underline inline-flex items-center gap-1"
                     >
-                      <Sparkles className="w-3 h-3 text-amber-300" />
                       <span>Start Discovery</span>
                     </button>
                   </div>
@@ -646,6 +647,12 @@ export function InvestigationDetailPage() {
               </div>
             ) : (
               <GraphView graphData={graphData!} onRefresh={handleRefresh} />
+            )
+          ) : activeWorkspaceView === 'map' ? (
+            graphData ? (
+              <PhoneMapPanel graphData={graphData} />
+            ) : (
+              <LoadingState message="Loading geolocation data..." />
             )
           ) : (
             /* Analyst Notes View */

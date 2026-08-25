@@ -31,6 +31,14 @@ interface TransformHandler {
 }
 
 const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
+  'phone.geo-metadata': {
+    deriveInput: (v, st) => {
+      // Only meaningful for phone seeds with international context
+      if (st === 'PHONE') return v.trim();
+      return null;
+    },
+    collectors: [{ name: 'phone-geo' }],
+  },
   'web.discover-official-site': {
     deriveInput: (v, st, analysis) => {
       // Valid for: organizations, persons, names, and plain text queries
@@ -136,6 +144,51 @@ const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
       return d && d.includes('.') ? `https://${d}` : null;
     },
     collectors: [{ name: 'url-metadata' }],
+  },
+  'social.username-sweep': {
+    deriveInput: (v, st, analysis) => {
+      if (st === 'USERNAME') return v.trim().replace(/^@/, '');
+      if (analysis.isUsername && analysis.extractedUsername) return analysis.extractedUsername;
+      if (analysis.isUrl && analysis.extractedUsername) return analysis.extractedUsername;
+      return null;
+    },
+    collectors: [{ name: 'username-sweep' }],
+  },
+  'intelligence.generate-dorks': {
+    deriveInput: (v) => v.trim(),
+    collectors: [{ name: 'dork-generator' }],
+  },
+  'contact.email-breach-lookup': {
+    deriveInput: (v, st, analysis) => {
+      if (st !== 'EMAIL' && !analysis.isEmail) return null;
+      return v.trim();
+    },
+    collectors: [{ name: 'email-lookup' }, { name: 'mrholmes-engine' }],
+  },
+  'domain.website-recon': {
+    deriveInput: (_v, _st, analysis) => {
+      if (analysis.isDomain || analysis.isIpAddress) return _v.trim();
+      if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;
+      return null;
+    },
+    collectors: [{ name: 'website-recon' }, { name: 'mrholmes-engine' }],
+  },
+  'social.mrholmes-engine': {
+    deriveInput: (v, st, analysis) => {
+      // (1) SOCIAL-ACCOUNT-OSINT for usernames, (10) PEOPLE-OSINT for names
+      if (st === 'USERNAME' || st === 'PERSON' || st === 'NAME') return v.trim().replace(/^@/, '');
+      if (analysis.isUsername && analysis.extractedUsername) return analysis.extractedUsername;
+      if (analysis.isUrl && analysis.extractedUsername) return analysis.extractedUsername;
+      return null;
+    },
+    collectors: [{ name: 'mrholmes-engine' }],
+  },
+  'contact.mrholmes-phone': {
+    deriveInput: (v, st) => {
+      if (st !== 'PHONE') return null;
+      return v.trim();
+    },
+    collectors: [{ name: 'mrholmes-engine' }],
   },
   'mentions.search-public-web': {
     deriveInput: (v, st, analysis) => {

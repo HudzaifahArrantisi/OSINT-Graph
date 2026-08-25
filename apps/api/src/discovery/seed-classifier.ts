@@ -58,6 +58,8 @@ export function parseSeed(seedType: SeedType, seedValue: string): ParsedSeed {
         });
       }
     }
+  } else if (seedType === 'PHONE') {
+    // Phone normalization and geo attribution are handled by the phone-geo collector
   } else if (seedType === 'SOCIAL_PROFILE') {
     if (analysis.isUrl) {
       if (analysis.extractedDomain) {
@@ -129,6 +131,7 @@ export function getEffectiveType(seedType: SeedType): EntityType {
     SOCIAL_PROFILE: 'SOCIAL_PROFILE',
     PERSON: 'PERSON',
     NAME: 'PERSON',
+    PHONE: 'PHONE',
   };
   return mapping[seedType] || 'SEED';
 }

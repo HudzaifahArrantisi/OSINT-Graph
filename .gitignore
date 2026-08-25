@@ -39,3 +39,6 @@ supabase/.temp/
 
 # Misc
 *.tsbuildinfo
+
+# Vendored Mr.Holmes engine (cloned, not committed)
+vendor/Mr.Holmes/

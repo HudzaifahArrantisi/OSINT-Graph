@@ -116,6 +116,22 @@ export function normalizeOrganization(input: string): string {
   return input.trim().toLowerCase();
 }
 
+// ─── Phone Normalizer ───────────────────────────────────────────────
+
+export function normalizePhone(input: string): string {
+  let phone = input.trim();
+
+  // Preserve '+' international indicator anywhere in the raw string
+  const hasPlus = phone.includes('+') || phone.startsWith('00');
+  phone = phone.replace(/[^\d]/g, '');
+
+  if (phone.startsWith('00')) {
+    return `+${phone.slice(2)}`;
+  }
+
+  return hasPlus ? `+${phone}` : phone;
+}
+
 // ─── Generic Normalizer Router ──────────────────────────────────────
 
 import type { EntityType, SeedType } from '../constants/index.js';
@@ -138,6 +154,8 @@ export function normalize(type: NormalizableType, value: string): string {
       return normalizeIpAddress(value);
     case 'ORGANIZATION':
       return normalizeOrganization(value);
+    case 'PHONE':
+      return normalizePhone(value);
     default:
       return value.trim().toLowerCase();
   }

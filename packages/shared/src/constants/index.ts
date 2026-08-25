@@ -74,6 +74,7 @@ export const SEED_TYPES = [
   'SOCIAL_PROFILE',
   'PERSON',
   'NAME',
+  'PHONE',
 ] as const;
 
 export type SeedType = (typeof SEED_TYPES)[number];
@@ -153,6 +154,11 @@ export const EVIDENCE_SOURCE_TYPES = [
   'YOUTUBE_API',
   'WHOIS_RDAP',
   'WEBPAGE_SCRAPE',
+  'PHONE_METADATA',
+  'DORK_TEMPLATE',
+  'ROBOTS_TXT',
+  'EMAIL_LOOKUP',
+  'IP_GEOLOCATION',
 ] as const;
 
 export type EvidenceSourceType = (typeof EVIDENCE_SOURCE_TYPES)[number];
@@ -167,6 +173,12 @@ export const COLLECTOR_NAMES = [
   'gitlab-public',
   'youtube-public',
   'web-search',
+  'phone-geo',
+  'username-sweep',
+  'dork-generator',
+  'email-lookup',
+  'website-recon',
+  'mrholmes-engine',
 ] as const;
 
 export type CollectorName = (typeof COLLECTOR_NAMES)[number];
