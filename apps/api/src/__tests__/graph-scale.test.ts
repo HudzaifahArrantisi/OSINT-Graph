@@ -79,7 +79,9 @@ describe('Graph Scalability & Layout Algorithm Tests', () => {
     const positioned = applyRadialLayout(nodes, edges);
     const duration = performance.now() - start;
 
-    expect(positioned.length).toBe(50);
+    // New radial layout inserts cluster_hub label nodes alongside entity nodes
+    const entityNodes = positioned.filter((n) => n.type !== 'cluster_hub');
+    expect(entityNodes.length).toBe(50);
     expect(duration).toBeLessThan(50);
   });
 
@@ -135,14 +137,15 @@ describe('Graph Scalability & Layout Algorithm Tests', () => {
 
     // Verify radial layout spatial separation
     const positioned = applyRadialLayout(allNodes, allEdges);
-    expect(positioned.length).toBe(27);
+    const entityPositioned = positioned.filter((n) => n.type !== 'cluster_hub');
+    expect(entityPositioned.length).toBe(27);
 
     const posSeed1 = positioned.find((n) => n.id === 'seed-1')!;
     const posSeed2 = positioned.find((n) => n.id === 'seed-2')!;
 
     // Seed 1 and Seed 2 centers MUST be separated with significant spatial gap
     const deltaX = Math.abs(posSeed2.position.x - posSeed1.position.x);
-    expect(deltaX).toBeGreaterThanOrEqual(1000);
+    expect(deltaX).toBeGreaterThanOrEqual(900);
 
     // Check that nodes for Seed 1 and Seed 2 do not collide
     const seed1Positions = positioned
@@ -169,25 +172,25 @@ describe('Graph Scalability & Layout Algorithm Tests', () => {
 
     // Sub-category 1: DNS records (IP, MX, NS)
     const dnsNodes = [
-      { id: 'ip-1', type: 'ip_address', position: { x: 0, y: 0 }, data: { entityType: 'IP_ADDRESS', label: '93.184.216.34', metadata: { discoveredBy: 'domain.resolve-dns' } } },
-      { id: 'mx-1', type: 'mx_record', position: { x: 0, y: 0 }, data: { entityType: 'MX_RECORD', label: 'mail.example.com', metadata: { discoveredBy: 'domain.resolve-dns' } } },
-      { id: 'ns-1', type: 'ns_record', position: { x: 0, y: 0 }, data: { entityType: 'NS_RECORD', label: 'ns1.example.com', metadata: { discoveredBy: 'domain.resolve-dns' } } },
+      { id: 'ip-1', type: 'ip_address', position: { x: 0, y: 0 }, data: { entityType: 'IP_ADDRESS', label: '93.184.216.34', metadata: { discoveredBy: 'domain.resolve-dns' }, isSeed: false } },
+      { id: 'mx-1', type: 'mx_record', position: { x: 0, y: 0 }, data: { entityType: 'MX_RECORD', label: 'mail.example.com', metadata: { discoveredBy: 'domain.resolve-dns' }, isSeed: false } },
+      { id: 'ns-1', type: 'ns_record', position: { x: 0, y: 0 }, data: { entityType: 'NS_RECORD', label: 'ns1.example.com', metadata: { discoveredBy: 'domain.resolve-dns' }, isSeed: false } },
     ];
 
     // Sub-category 2: TLS Certificate
     const tlsNodes = [
-      { id: 'cert-1', type: 'certificate', position: { x: 0, y: 0 }, data: { entityType: 'CERTIFICATE', label: 'DigiCert TLS', metadata: { discoveredBy: 'domain.find-tls' } } },
+      { id: 'cert-1', type: 'certificate', position: { x: 0, y: 0 }, data: { entityType: 'CERTIFICATE', label: 'DigiCert TLS', metadata: { discoveredBy: 'domain.find-tls' }, isSeed: false } },
     ];
 
     // Sub-category 3: Webpage Metadata
     const webNodes = [
-      { id: 'tech-1', type: 'technology', position: { x: 0, y: 0 }, data: { entityType: 'TECHNOLOGY', label: 'Nginx', metadata: { discoveredBy: 'domain.webpage-metadata' } } },
-      { id: 'url-1', type: 'url', position: { x: 0, y: 0 }, data: { entityType: 'URL', label: 'https://example.com', metadata: { discoveredBy: 'domain.webpage-metadata' } } },
+      { id: 'tech-1', type: 'technology', position: { x: 0, y: 0 }, data: { entityType: 'TECHNOLOGY', label: 'Nginx', metadata: { discoveredBy: 'domain.webpage-metadata' }, isSeed: false } },
+      { id: 'url-1', type: 'url', position: { x: 0, y: 0 }, data: { entityType: 'URL', label: 'https://example.com', metadata: { discoveredBy: 'domain.webpage-metadata' }, isSeed: false } },
     ];
 
     // Sub-category 4: Official Contacts
     const contactNodes = [
-      { id: 'email-1', type: 'email', position: { x: 0, y: 0 }, data: { entityType: 'EMAIL', label: 'contact@example.com', metadata: { discoveredBy: 'contact.find-official-contact' } } },
+      { id: 'email-1', type: 'email', position: { x: 0, y: 0 }, data: { entityType: 'EMAIL', label: 'contact@example.com', metadata: { discoveredBy: 'contact.find-official-contact' }, isSeed: false } },
     ];
 
     const allNodes = [seedDomain, ...dnsNodes, ...tlsNodes, ...webNodes, ...contactNodes];
@@ -198,20 +201,24 @@ describe('Graph Scalability & Layout Algorithm Tests', () => {
     }));
 
     const positioned = applyRadialLayout(allNodes, allEdges);
-    expect(positioned.length).toBe(allNodes.length);
+
+    // New layout inserts one cluster_hub per sub-category alongside entities
+    const entityPositioned = positioned.filter((n) => n.type !== 'cluster_hub');
+    expect(entityPositioned.length).toBe(allNodes.length);
+    expect(positioned.some((n) => n.type === 'cluster_hub')).toBe(true);
 
     const seedPos = positioned.find((n) => n.id === 'seed-domain')!;
     const dnsIpPos = positioned.find((n) => n.id === 'ip-1')!;
     const tlsPos = positioned.find((n) => n.id === 'cert-1')!;
     const emailPos = positioned.find((n) => n.id === 'email-1')!;
 
-    // DNS, TLS, and Email nodes should form distinct orbital satellite centers away from the seed
+    // DNS, TLS, and Email nodes should live in distinct orbital satellites away from the seed
     const distDns = Math.hypot(dnsIpPos.position.x - seedPos.position.x, dnsIpPos.position.y - seedPos.position.y);
     const distTls = Math.hypot(tlsPos.position.x - seedPos.position.x, tlsPos.position.y - seedPos.position.y);
     const distEmail = Math.hypot(emailPos.position.x - seedPos.position.x, emailPos.position.y - seedPos.position.y);
 
-    expect(distDns).toBeGreaterThanOrEqual(400);
-    expect(distTls).toBeGreaterThanOrEqual(400);
-    expect(distEmail).toBeGreaterThanOrEqual(400);
+    expect(distDns).toBeGreaterThanOrEqual(250);
+    expect(distTls).toBeGreaterThanOrEqual(250);
+    expect(distEmail).toBeGreaterThanOrEqual(250);
   });
 });

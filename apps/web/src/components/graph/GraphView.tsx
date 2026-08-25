@@ -15,6 +15,7 @@ import {
 import '@xyflow/react/dist/style.css';
 
 import { EntityNode } from './EntityNode';
+import { ClusterHubNode } from './ClusterHubNode';
 import { RelationshipEdge } from './RelationshipEdge';
 import { GraphToolbar } from './GraphToolbar';
 import { GraphFilterBar } from './GraphFilterBar';
@@ -29,6 +30,8 @@ import type { GraphPayload } from '@nexusgraph/shared';
 
 const nodeTypes = {
   entity: EntityNode,
+  cluster_hub: ClusterHubNode,
+  group_badge: ClusterHubNode,
   seed: EntityNode,
   domain: EntityNode,
   website: EntityNode,
@@ -80,6 +83,60 @@ function GraphViewInner({ graphData }: GraphViewProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSeedFilter, setSelectedSeedFilter] = useState<string | null>(null);
 
+  // Performance & Level-of-Detail states
+  const rawNodeCount = (graphData.nodes || []).length;
+  const isLargeGraph = rawNodeCount > 50;
+
+  const [clusterMode, setClusterMode] = useState<boolean>(() => rawNodeCount > 60);
+  const [collapsedCategories, setCollapsedCategories] = useState<Set<string>>(() => {
+    // By default, if large graph, collapse large categories initially
+    return rawNodeCount > 60 ? new Set(['subcat_subdomain', 'subcat_url']) : new Set();
+  });
+  const [labelMode, setLabelMode] = useState<'auto' | 'always' | 'hover'>('auto');
+
+  const handleToggleCollapse = useCallback((catKey: string) => {
+    setCollapsedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(catKey)) {
+        next.delete(catKey);
+      } else {
+        next.add(catKey);
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleClusterMode = useCallback(() => {
+    setClusterMode((prev) => {
+      const next = !prev;
+      if (next) {
+        // Collapse large categories
+        setCollapsedCategories(new Set(['subcat_subdomain', 'subcat_url', 'subcat_dorks']));
+      } else {
+        // Expand all
+        setCollapsedCategories(new Set());
+      }
+      return next;
+    });
+    setTimeout(() => {
+      fitView({ duration: 400 });
+    }, 100);
+  }, [fitView]);
+
+  const handleToggleLabelMode = useCallback(() => {
+    setLabelMode((prev) => {
+      if (prev === 'auto') return 'always';
+      if (prev === 'always') return 'hover';
+      return 'auto';
+    });
+  }, []);
+
+  const hideLabels = useMemo(() => {
+    if (labelMode === 'hover') return true;
+    if (labelMode === 'always') return false;
+    return isLargeGraph; // 'auto' mode
+  }, [labelMode, isLargeGraph]);
+
   const initialNodes: Node[] = useMemo(() => {
     return (graphData.nodes || []).map((n) => ({
       id: n.id,
@@ -98,9 +155,11 @@ function GraphViewInner({ graphData }: GraphViewProps) {
         relationshipCount: n.data.relationshipCount,
         evidenceCount: n.data.evidenceCount,
         isSeed: n.data.isSeed || n.type === 'seed' || n.data.entityType === 'SEED',
+        hideLabelByDefault: hideLabels,
+        isLargeGraph,
       },
     }));
-  }, [graphData.nodes]);
+  }, [graphData.nodes, hideLabels, isLargeGraph]);
 
   const initialEdges: Edge[] = useMemo(() => {
     return (graphData.edges || []).map((e) => ({
@@ -170,24 +229,73 @@ function GraphViewInner({ graphData }: GraphViewProps) {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
   const applyLayout = useCallback(
-    (layout: 'force' | 'hierarchical' | 'radial', currentNodes = nodes, currentEdges = edges) => {
+    (
+      layout: 'force' | 'hierarchical' | 'radial',
+      currentNodes = initialNodes,
+      currentEdges = initialEdges,
+      activeCollapsedCategories = collapsedCategories,
+    ) => {
       let layouted: Node[] = [];
       if (layout === 'hierarchical') {
         layouted = applyHierarchicalLayout(currentNodes, currentEdges);
       } else if (layout === 'radial') {
-        layouted = applyRadialLayout(currentNodes, currentEdges);
+        layouted = applyRadialLayout(currentNodes, currentEdges, {
+          collapsedCategories: Array.from(activeCollapsedCategories),
+        });
       } else {
         layouted = applyForceLayout(currentNodes, currentEdges);
       }
+
+      // Automatically construct edges to Hub nodes if any were created
+      const hubNodes = layouted.filter((n) => n.type === 'cluster_hub' || (n.data as any)?.isHub);
+      const seedNodes = layouted.filter((n) => (n.data as any)?.isSeed || n.type === 'seed');
+      const edgeList = [...currentEdges];
+
+      // Inject onToggleCollapse into hub nodes data
+      layouted = layouted.map((n) => {
+        if (n.type === 'cluster_hub' || (n.data as any)?.isHub) {
+          return {
+            ...n,
+            data: {
+              ...n.data,
+              onToggleCollapse: handleToggleCollapse,
+            },
+          };
+        }
+        return n;
+      });
+
+      if (hubNodes.length > 0 && seedNodes.length > 0) {
+        const defaultSeed = seedNodes[0];
+        hubNodes.forEach((hub) => {
+          const edgeId = `edge-to-${hub.id}`;
+          if (!edgeList.some((e) => e.id === edgeId)) {
+            edgeList.push({
+              id: edgeId,
+              source: defaultSeed.id,
+              target: hub.id,
+              type: 'relationship',
+              data: {
+                relationshipType: 'EXECUTES_TRANSFORM',
+                confidence: 100,
+                reason: `Discovery cluster module: ${hub.data?.label || 'Sub-Category'}`,
+                evidenceCount: 0,
+                relationshipId: edgeId,
+              },
+            });
+          }
+        });
+      }
+
       setNodes(layouted);
+      setEdges(edgeList);
     },
-    [nodes, edges, setNodes],
+    [initialNodes, initialEdges, collapsedCategories, handleToggleCollapse, setNodes, setEdges],
   );
 
   useEffect(() => {
-    applyLayout(graphLayout, initialNodes, initialEdges);
-    setEdges(initialEdges);
-  }, [initialNodes, initialEdges, graphLayout]);
+    applyLayout(graphLayout, initialNodes, initialEdges, collapsedCategories);
+  }, [initialNodes, initialEdges, graphLayout, collapsedCategories]);
 
   const handleSelectSeedFilter = (seedId: string | null) => {
     setSelectedSeedFilter(seedId);
@@ -199,6 +307,9 @@ function GraphViewInner({ graphData }: GraphViewProps) {
   const filteredNodes = useMemo(() => {
     return nodes.filter((node) => {
       const data = (node.data || {}) as Record<string, any>;
+
+      // Always show cluster hub nodes
+      if (node.type === 'cluster_hub' || data.isHub) return true;
 
       // Filter by Seed Target Subgraph isolation if active
       if (selectedSeedFilter) {
@@ -240,9 +351,16 @@ function GraphViewInner({ graphData }: GraphViewProps) {
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
+      if (node.type === 'cluster_hub' || (node.data as any)?.isHub) {
+        const catKey = (node.data as any)?.categoryKey;
+        if (catKey) {
+          handleToggleCollapse(catKey);
+        }
+        return;
+      }
       setSelectedNodeId(node.id);
     },
-    [setSelectedNodeId],
+    [setSelectedNodeId, handleToggleCollapse],
   );
 
   const onEdgeClick = useCallback(
@@ -265,11 +383,16 @@ function GraphViewInner({ graphData }: GraphViewProps) {
         onToggleSearch={() => setSearchOpen((prev) => !prev)}
         searchOpen={searchOpen}
         onApplyLayout={(layout) => applyLayout(layout)}
+        clusterMode={clusterMode}
+        onToggleClusterMode={handleToggleClusterMode}
+        labelMode={labelMode}
+        onToggleLabelMode={handleToggleLabelMode}
+        totalNodeCount={rawNodeCount}
       />
 
       {/* Target Seed Isolation & Subgraph Switcher */}
       {seedTargets.length > 1 && (
-        <div className="absolute top-4 left-[340px] z-10 hidden md:flex items-center gap-1 p-1 bg-surface/90 backdrop-blur-md border border-border-subtle rounded-card shadow-xl max-w-[calc(100vw-700px)] overflow-x-auto scrollbar-none">
+        <div className="absolute top-4 left-[380px] z-10 hidden md:flex items-center gap-1 p-1 bg-surface/90 backdrop-blur-md border border-border-subtle rounded-card shadow-xl max-w-[calc(100vw-740px)] overflow-x-auto scrollbar-none">
           <div className="flex items-center gap-1 text-[11px] font-mono text-text-muted px-2 py-0.5 border-r border-border-subtle shrink-0">
             <Layers className="w-3.5 h-3.5 text-primary" />
             <span className="font-semibold text-slate-300">Target Clusters:</span>
@@ -331,19 +454,21 @@ function GraphViewInner({ graphData }: GraphViewProps) {
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
         fitView
-        minZoom={0.1}
-        maxZoom={2.5}
+        onlyRenderVisibleElements={true}
+        elevateNodesOnSelect={true}
+        minZoom={0.04}
+        maxZoom={3}
         defaultEdgeOptions={{ type: 'relationship' }}
       >
         <Background
           variant={BackgroundVariant.Dots}
-          gap={20}
+          gap={24}
           size={1}
           color="rgba(255, 255, 255, 0.05)"
         />
         <Controls showInteractive={false} position="bottom-left" />
         <MiniMap
-          nodeColor={() => '#7c6cff'}
+          nodeColor={(node) => (node.type === 'cluster_hub' ? '#38bdf8' : '#7c6cff')}
           maskColor="rgba(11, 15, 20, 0.7)"
           position="bottom-right"
           className="!bg-surface !border !border-border-subtle"

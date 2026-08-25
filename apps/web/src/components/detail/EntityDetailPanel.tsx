@@ -18,18 +18,56 @@ import {
   ArrowRight,
   Trash2,
   Sparkles,
+  Copy,
+  Check,
+  Compass,
 } from 'lucide-react';
 import type { Entity, Relationship, Evidence, TimelineEvent } from '@nexusgraph/shared';
 
 interface EntityDetailPanelProps {
   caseId: string;
   onClose: () => void;
+  width?: number;
+  onResizeStart?: (e: React.MouseEvent) => void;
 }
 
-export function EntityDetailPanel({ caseId, onClose }: EntityDetailPanelProps) {
+export function getNavigableUrl(entity?: { type?: string; value: string; metadata?: any }): string | null {
+  if (!entity || !entity.value) return null;
+  const val = String(entity.value).trim();
+  const meta = entity.metadata || {};
+  const metaUrl = meta.url || meta.href || meta.link;
+
+  if (val.startsWith('http://') || val.startsWith('https://')) return val;
+  if (metaUrl && (String(metaUrl).startsWith('http://') || String(metaUrl).startsWith('https://'))) return String(metaUrl);
+
+  const t = String(entity.type || '').toUpperCase();
+  if (['DOMAIN', 'WEBSITE', 'SUBDOMAIN'].includes(t)) {
+    return `https://${val}`;
+  }
+  if (['URL'].includes(t)) {
+    return val.startsWith('http') ? val : `https://${val}`;
+  }
+  if (['SOCIAL_PROFILE', 'GITHUB_PROFILE', 'GITLAB_PROFILE', 'YOUTUBE_CHANNEL'].includes(t)) {
+    if (val.startsWith('http')) return val;
+    if (t === 'GITHUB_PROFILE') return `https://github.com/${val.replace('@', '')}`;
+    if (t === 'GITLAB_PROFILE') return `https://gitlab.com/${val.replace('@', '')}`;
+    if (t === 'YOUTUBE_CHANNEL') return `https://youtube.com/${val}`;
+    return `https://${val}`;
+  }
+  if (['EMAIL'].includes(t)) {
+    return `mailto:${val}`;
+  }
+  if (['PHONE'].includes(t)) {
+    return `tel:${val}`;
+  }
+  return null;
+}
+
+export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: EntityDetailPanelProps) {
   const queryClient = useQueryClient();
   const { selectedNodeId, selectedEdgeId, setSelectedNodeId, addToast } = useAppStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'transforms' | 'relationships' | 'evidence' | 'timeline' | 'raw'>('overview');
+  const [copied, setCopied] = useState(false);
 
   // Fetch entities, relationships, evidence, and timeline for this case
   const { data: entities = [] } = useQuery<Entity[]>({
@@ -67,6 +105,18 @@ export function EntityDetailPanel({ caseId, onClose }: EntityDetailPanelProps) {
   const selectedRelationship = relationships.find((r) => r.id === selectedEdgeId);
 
   const isSeed = selectedEntity?.type === 'SEED' || !!(selectedEntity?.metadata as any)?.isSeed;
+  const navUrl = getNavigableUrl(selectedEntity);
+
+  const handleCopyValue = (textToCopy: string) => {
+    navigator.clipboard.writeText(textToCopy);
+    setCopied(true);
+    addToast('URL/Nilai berhasil disalin ke clipboard', 'success');
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleOpenUrl = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
   // Compute connected graph nodes count for this entity
   const connectedCount = React.useMemo(() => {
@@ -141,7 +191,21 @@ export function EntityDetailPanel({ caseId, onClose }: EntityDetailPanelProps) {
   if (!selectedEntity && !selectedRelationship) return null;
 
   return (
-    <aside className="w-80 sm:w-96 h-full bg-surface border-l border-border-subtle flex flex-col z-20 shadow-2xl animate-slide-in-right">
+    <aside
+      style={{ width: width ? `${width}px` : undefined }}
+      className="w-80 sm:w-96 h-full bg-surface border-l border-border-subtle flex flex-col z-20 shadow-2xl animate-slide-in-right relative shrink-0 select-text"
+    >
+      {/* Resizing Handle on Left Edge */}
+      {onResizeStart && (
+        <div
+          onMouseDown={onResizeStart}
+          className="absolute left-0 top-0 w-1.5 h-full cursor-col-resize hover:bg-primary/50 transition-colors z-30 group"
+          title="Drag to resize panel"
+        >
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r bg-border group-hover:bg-primary transition-colors" />
+        </div>
+      )}
+
       {/* Header */}
       <div className="p-4 border-b border-border-subtle flex items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
@@ -160,7 +224,7 @@ export function EntityDetailPanel({ caseId, onClose }: EntityDetailPanelProps) {
                 <ConfidenceBadge score={selectedEntity.confidence || 50} size="sm" />
               </div>
               <h3
-                className={`text-base font-semibold font-mono truncate ${
+                className={`text-base font-semibold font-mono break-all ${
                   isSeed ? 'text-amber-200' : 'text-text'
                 }`}
                 title={selectedEntity.value}
@@ -168,7 +232,7 @@ export function EntityDetailPanel({ caseId, onClose }: EntityDetailPanelProps) {
                 {selectedEntity.value}
               </h3>
               {selectedEntity.title && (
-                <p className="text-xs text-text-muted truncate mt-0.5">{selectedEntity.title}</p>
+                <p className="text-xs text-text-muted break-all mt-0.5">{selectedEntity.title}</p>
               )}
             </>
           ) : (
@@ -205,6 +269,28 @@ export function EntityDetailPanel({ caseId, onClose }: EntityDetailPanelProps) {
           </button>
         </div>
       </div>
+
+      {/* Direct Navigation & Action Bar for URLs / Domains / Social Profiles */}
+      {selectedEntity && navUrl && (
+        <div className="p-3 bg-[#0d1627] border-b border-border-subtle flex items-center gap-2">
+          <button
+            onClick={() => handleOpenUrl(navUrl)}
+            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-button bg-primary hover:bg-primary-hover text-white text-xs font-semibold shadow-md shadow-primary/20 transition-all cursor-pointer"
+            title={`Buka langsung di tab baru: ${navUrl}`}
+          >
+            <ExternalLink className="w-3.5 h-3.5 shrink-0" />
+            <span className="truncate">Kunjungi Target / Buka URL</span>
+          </button>
+
+          <button
+            onClick={() => handleCopyValue(navUrl)}
+            className="p-1.5 rounded-button bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text border border-border-subtle transition-colors"
+            title="Salin URL ke clipboard"
+          >
+            {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex items-center border-b border-border-subtle bg-surface-2/40 px-2 overflow-x-auto">
@@ -254,6 +340,27 @@ export function EntityDetailPanel({ caseId, onClose }: EntityDetailPanelProps) {
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>Hapus Seed Target & Subgraf ({connectedCount} Node)</span>
                     </button>
+                  </div>
+                )}
+
+                {/* Direct Link Banner */}
+                {navUrl && (
+                  <div className="p-2.5 rounded-card bg-[#0e1628] border border-sky-500/30 space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-sky-300 font-semibold font-mono">
+                      <div className="flex items-center gap-1">
+                        <Compass className="w-3.5 h-3.5 text-sky-400" />
+                        <span>Direct Target Link</span>
+                      </div>
+                      <span className="text-[10px] text-sky-400/80">External Target</span>
+                    </div>
+                    <a
+                      href={navUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="block text-xs font-mono text-sky-300 hover:text-sky-200 hover:underline break-all"
+                    >
+                      {navUrl}
+                    </a>
                   </div>
                 )}
 
@@ -349,14 +456,14 @@ export function EntityDetailPanel({ caseId, onClose }: EntityDetailPanelProps) {
                           </span>
                           <ConfidenceBadge score={rel.confidence} size="sm" />
                         </div>
-                        <div className="flex items-center gap-1.5 text-xs text-text font-mono truncate">
-                          <ArrowRight className="w-3 h-3 text-text-muted shrink-0" />
-                          <span className="truncate">{otherEntity?.value || otherEntityId}</span>
+                        <div className="flex items-center gap-1.5 text-xs">
+                          <span className="text-text-muted">{isSource ? '→' : '←'}</span>
+                          <span className="font-mono text-text font-medium truncate">
+                            {otherEntity?.value || otherEntityId}
+                          </span>
                         </div>
                         {rel.reason && (
-                          <p className="text-[11px] text-text-muted mt-1.5 leading-tight">
-                            {rel.reason}
-                          </p>
+                          <p className="text-[11px] text-text-muted mt-1 truncate">{rel.reason}</p>
                         )}
                       </div>
                     );
@@ -367,10 +474,10 @@ export function EntityDetailPanel({ caseId, onClose }: EntityDetailPanelProps) {
 
             {/* EVIDENCE TAB */}
             {activeTab === 'evidence' && (
-              <div className="space-y-3">
+              <div className="space-y-2">
                 {linkedEvidence.length === 0 ? (
                   <p className="text-xs text-text-muted text-center py-6">
-                    No direct evidence items attached.
+                    No evidence records attached to this entity.
                   </p>
                 ) : (
                   linkedEvidence.map((ev) => <EvidenceCard key={ev.id} evidence={ev} />)
@@ -380,37 +487,75 @@ export function EntityDetailPanel({ caseId, onClose }: EntityDetailPanelProps) {
 
             {/* TIMELINE TAB */}
             {activeTab === 'timeline' && (
-              <div className="space-y-3 border-l-2 border-border-subtle pl-3 ml-2">
+              <div className="space-y-3">
                 {timelineEvents.length === 0 ? (
                   <p className="text-xs text-text-muted text-center py-6">
                     No timeline events recorded.
                   </p>
                 ) : (
                   timelineEvents.map((evt) => (
-                    <div key={evt.id} className="relative">
-                      <div className="absolute -left-[19px] top-1 w-2.5 h-2.5 rounded-full bg-primary border-2 border-surface" />
-                      <div className="text-[10px] text-text-muted font-mono">
-                        {new Date(evt.event_at).toLocaleString()}
+                    <div
+                      key={evt.id}
+                      className="bg-surface-2 border border-border-subtle rounded-card p-2.5 text-xs"
+                    >
+                      <div className="flex items-center justify-between text-text-muted mb-1">
+                        <span className="font-mono uppercase text-[10px]">{evt.title}</span>
+                        <span>{new Date(evt.event_at).toLocaleDateString()}</span>
                       </div>
-                      <div className="text-xs font-medium text-text mt-0.5">{evt.title}</div>
-                      {evt.description && (
-                        <div className="text-[11px] text-text-muted mt-0.5">
-                          {evt.description}
-                        </div>
-                      )}
+                      {evt.description && <p className="text-text font-medium">{evt.description}</p>}
                     </div>
                   ))
                 )}
               </div>
             )}
 
-            {/* RAW DATA TAB */}
+            {/* RAW JSON TAB */}
             {activeTab === 'raw' && (
-              <div className="bg-surface-2 p-3 rounded-card border border-border-subtle font-mono text-[11px] text-text-secondary overflow-x-auto">
-                <pre>{JSON.stringify(selectedEntity, null, 2)}</pre>
-              </div>
+              <pre className="bg-surface-2 p-3 rounded-card text-[11px] font-mono text-text-secondary overflow-x-auto border border-border-subtle">
+                {JSON.stringify(selectedEntity, null, 2)}
+              </pre>
             )}
           </>
+        )}
+
+        {/* RELATIONSHIP SELECTED */}
+        {selectedRelationship && !selectedEntity && (
+          <div className="space-y-4">
+            <div className="bg-surface-2 rounded-card p-3 border border-border-subtle space-y-2 text-xs">
+              <div className="flex justify-between">
+                <span className="text-text-muted">Type:</span>
+                <span className="font-mono text-text font-medium">
+                  {selectedRelationship.relationship_type}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-text-muted">Confidence:</span>
+                <span className="font-mono text-text">{selectedRelationship.confidence}%</span>
+              </div>
+              {selectedRelationship.reason && (
+                <div className="pt-2 border-t border-border-subtle">
+                  <span className="text-text-muted block mb-1">Reason:</span>
+                  <p className="text-text font-sans leading-relaxed">
+                    {selectedRelationship.reason}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* Evidence for this relationship */}
+            <div className="space-y-2">
+              <h4 className="text-xs font-semibold text-text uppercase tracking-wider">
+                Attached Evidence
+              </h4>
+              {linkedEvidence.length === 0 ? (
+                <p className="text-xs text-text-muted text-center py-4">
+                  No evidence attached to this relationship.
+                </p>
+              ) : (
+                linkedEvidence.map((ev) => <EvidenceCard key={ev.id} evidence={ev} />)
+              )}
+            </div>
+          </div>
         )}
       </div>
     </aside>

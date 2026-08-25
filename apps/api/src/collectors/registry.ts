@@ -18,6 +18,7 @@ import { dorkGeneratorCollector } from './dork-generator.js';
 import { emailLookupCollector } from './email-lookup.js';
 import { websiteReconCollector } from './website-recon.js';
 import { mrholmesEngineCollector } from './mrholmes-engine.js';
+import { subdomainCrtCollector } from './subdomain-crt.js';
 import { logger } from '../lib/logger.js';
 
 // Collector registry
@@ -37,6 +38,7 @@ collectors.set('dork-generator', dorkGeneratorCollector);
 collectors.set('email-lookup', emailLookupCollector);
 collectors.set('website-recon', websiteReconCollector);
 collectors.set('mrholmes-engine', mrholmesEngineCollector);
+collectors.set('subdomain-crt', subdomainCrtCollector);
 
 export function getCollector(name: CollectorName): Collector | undefined {
   return collectors.get(name);

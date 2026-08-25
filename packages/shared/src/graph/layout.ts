@@ -47,22 +47,29 @@ function getSubCategoryKey<T extends Record<string, unknown>>(node: SimpleNode<T
 
   if (discoveredBy) {
     const s = String(discoveredBy).toLowerCase();
+    if (s.includes('subdomain') || s.includes('crt')) return 'subcat_subdomain';
     if (s.includes('dns') || s.includes('resolve-dns')) return 'subcat_dns';
     if (s.includes('tls') || s.includes('cert') || s.includes('find-tls')) return 'subcat_tls';
-    if (s.includes('webpage') || s.includes('metadata') || s.includes('recon')) return 'subcat_webpage';
+    if (s.includes('webpage') || s.includes('metadata')) return 'subcat_webpage';
+    if (s.includes('recon') || s.includes('website-recon')) return 'subcat_recon';
     if (s.includes('contact') || s.includes('breach') || s.includes('email-lookup')) return 'subcat_contact';
     if (s.includes('phone') || s.includes('geo')) return 'subcat_phone_geo';
     if (s.includes('social') || s.includes('username') || s.includes('mrholmes')) return 'subcat_social';
     if (s.includes('github') || s.includes('gitlab') || s.includes('developer')) return 'subcat_dev';
+    if (s.includes('dork') || s.includes('generate-dorks')) return 'subcat_dorks';
     if (s.includes('mention')) return 'subcat_mentions';
     return `subcat_${discoveredBy}`;
   }
 
   // Fallback categorization based on entityType
   const entityType = String(d.entityType || node.type || '').toUpperCase();
-  if (['IP_ADDRESS', 'MX_RECORD', 'NS_RECORD', 'SUBDOMAIN'].includes(entityType)) return 'subcat_dns';
+  if (['SUBDOMAIN'].includes(entityType)) return 'subcat_subdomain';
+  if (['IP_ADDRESS'].includes(entityType)) return 'subcat_ip';
+  if (['MX_RECORD', 'NS_RECORD'].includes(entityType)) return 'subcat_dns';
   if (['CERTIFICATE'].includes(entityType)) return 'subcat_tls';
-  if (['TECHNOLOGY', 'WEBSITE', 'URL', 'DOCUMENT'].includes(entityType)) return 'subcat_webpage';
+  if (['TECHNOLOGY'].includes(entityType)) return 'subcat_tech';
+  if (['DOMAIN', 'WEBSITE'].includes(entityType)) return 'subcat_domain';
+  if (['URL', 'DOCUMENT'].includes(entityType)) return 'subcat_url';
   if (['EMAIL', 'PERSON', 'ORGANIZATION'].includes(entityType)) return 'subcat_contact';
   if (['PHONE', 'LOCATION', 'ADDRESS'].includes(entityType)) return 'subcat_phone_geo';
   if (['SOCIAL_PROFILE', 'GITHUB_PROFILE', 'GITLAB_PROFILE', 'YOUTUBE_CHANNEL', 'USERNAME'].includes(entityType)) return 'subcat_social';
@@ -79,13 +86,15 @@ export function partitionGraphClusters<T extends Record<string, unknown>>(
   nodes: SimpleNode<T>[],
   edges: SimpleEdge[],
 ): GraphCluster<T>[] {
-  if (nodes.length === 0) return [];
+  // Filter out any existing hub nodes to avoid re-clustering them
+  const actualNodes = nodes.filter((n) => !(n.data as any)?.isHub && n.type !== 'cluster_hub');
+  if (actualNodes.length === 0) return [];
 
   const nodeMap = new Map<string, SimpleNode<T>>();
-  nodes.forEach((n) => nodeMap.set(n.id, n));
+  actualNodes.forEach((n) => nodeMap.set(n.id, n));
 
   const adj = new Map<string, string[]>();
-  nodes.forEach((n) => adj.set(n.id, []));
+  actualNodes.forEach((n) => adj.set(n.id, []));
 
   edges.forEach((e) => {
     if (adj.has(e.source) && adj.has(e.target)) {
@@ -94,7 +103,7 @@ export function partitionGraphClusters<T extends Record<string, unknown>>(
     }
   });
 
-  const seeds = nodes.filter(isSeedNode);
+  const seeds = actualNodes.filter(isSeedNode);
 
   // If we have multiple seeds, partition nodes by multi-source BFS / nearest seed
   if (seeds.length > 1) {
@@ -127,7 +136,7 @@ export function partitionGraphClusters<T extends Record<string, unknown>>(
 
     const unassignedNodes: SimpleNode<T>[] = [];
 
-    for (const node of nodes) {
+    for (const node of actualNodes) {
       if (seedIds.includes(node.id)) continue;
       const rec = nodeToSeedDist.get(node.id);
       if (rec && seedClusters.has(rec.seedId)) {
@@ -199,8 +208,8 @@ export function partitionGraphClusters<T extends Record<string, unknown>>(
   const clusters: GraphCluster<T>[] = [];
 
   const orderedNodes = seeds.length === 1
-    ? [seeds[0], ...nodes.filter((n) => n.id !== seeds[0].id)]
-    : nodes;
+    ? [seeds[0], ...actualNodes.filter((n) => n.id !== seeds[0].id)]
+    : actualNodes;
 
   for (const node of orderedNodes) {
     if (visited.has(node.id)) continue;
@@ -241,6 +250,53 @@ export function partitionGraphClusters<T extends Record<string, unknown>>(
   return clusters;
 }
 
+/**
+ * Helper to layout a list of nodes in a Maltego-style 360° concentric starburst/dandelion around a central hub
+ */
+function layoutStarburst<T extends Record<string, unknown>>(
+  centerPos: { x: number; y: number },
+  nodes: SimpleNode<T>[],
+  startRadius = 120,
+): SimpleNode<T>[] {
+  if (nodes.length === 0) return [];
+  if (nodes.length === 1) {
+    return [{ ...nodes[0], position: { x: centerPos.x + startRadius, y: centerPos.y } }];
+  }
+
+  const result: SimpleNode<T>[] = [];
+  let nodeIndex = 0;
+  let ringIndex = 0;
+  const RING_STEP = Math.max(75, Math.min(95, 75 + Math.floor(nodes.length / 40)));
+
+  while (nodeIndex < nodes.length) {
+    const currentRadius = startRadius + ringIndex * RING_STEP;
+    // Calculate how many nodes fit on circle perimeter with at least 80px spacing
+    const perimeter = 2 * Math.PI * currentRadius;
+    const maxNodesInRing = Math.max(6, Math.floor(perimeter / 80));
+
+    const remaining = nodes.length - nodeIndex;
+    const countInRing = Math.min(remaining, maxNodesInRing);
+    const ringNodes = nodes.slice(nodeIndex, nodeIndex + countInRing);
+    const phaseOffset = (ringIndex * 0.42) % (2 * Math.PI);
+
+    ringNodes.forEach((node, i) => {
+      const angle = (2 * Math.PI * i) / countInRing + phaseOffset;
+      result.push({
+        ...node,
+        position: {
+          x: Math.round(centerPos.x + Math.cos(angle) * currentRadius),
+          y: Math.round(centerPos.y + Math.sin(angle) * currentRadius),
+        },
+      });
+    });
+
+    nodeIndex += countInRing;
+    ringIndex++;
+  }
+
+  return result;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // 1. Force / Grid Layout (Cluster-Aware)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -256,7 +312,7 @@ export function applyForceLayout<T extends Record<string, unknown>>(
 
   let currentOffsetX = 0;
   const result: SimpleNode<T>[] = [];
-  const CLUSTER_GAP = 600;
+  const CLUSTER_GAP = 400;
 
   for (const cluster of clusters) {
     const cNodes = cluster.nodes;
@@ -277,16 +333,16 @@ export function applyForceLayout<T extends Record<string, unknown>>(
     nodeDegrees.sort((a, b) => b.degree - a.degree);
 
     const cols = Math.max(3, Math.ceil(Math.sqrt(cNodes.length * 1.5)));
-    const xSpacing = 280;
-    const ySpacing = 160;
+    const xSpacing = 130;
+    const ySpacing = 110;
 
     const clusterWidth = cols * xSpacing;
 
     nodeDegrees.forEach((item, index) => {
       const row = Math.floor(index / cols);
       const col = index % cols;
-      const jitterX = ((index * 37) % 30) - 15;
-      const jitterY = ((index * 23) % 20) - 10;
+      const jitterX = ((index * 37) % 20) - 10;
+      const jitterY = ((index * 23) % 16) - 8;
 
       result.push({
         ...item.node,
@@ -304,7 +360,7 @@ export function applyForceLayout<T extends Record<string, unknown>>(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 2. Hierarchical / Tree Layout (Cluster-Aware)
+// 2. Hierarchical / Tree Layout (Maltego-style Branching Tree)
 // ─────────────────────────────────────────────────────────────────────────────
 export function applyHierarchicalLayout<T extends Record<string, unknown>>(
   nodes: SimpleNode<T>[],
@@ -316,7 +372,7 @@ export function applyHierarchicalLayout<T extends Record<string, unknown>>(
   const clusters = partitionGraphClusters(nodes, edges);
   let currentOffsetX = 0;
   const result: SimpleNode<T>[] = [];
-  const CLUSTER_GAP = 600;
+  const CLUSTER_GAP = 500;
 
   for (const cluster of clusters) {
     const cNodes = cluster.nodes;
@@ -341,7 +397,6 @@ export function applyHierarchicalLayout<T extends Record<string, unknown>>(
     const layers = new Map<string, number>();
     const queue: string[] = [];
 
-    // Root is the seed node if present, or zero in-degree nodes
     if (cluster.seedNode) {
       layers.set(cluster.seedNode.id, 0);
       queue.push(cluster.seedNode.id);
@@ -372,7 +427,6 @@ export function applyHierarchicalLayout<T extends Record<string, unknown>>(
       });
     }
 
-    // Catch any node that was not reached by directed BFS
     cNodes.forEach((n) => {
       if (!layers.has(n.id)) {
         layers.set(n.id, 1);
@@ -388,8 +442,8 @@ export function applyHierarchicalLayout<T extends Record<string, unknown>>(
       layerGroups.get(layer)!.push(n);
     });
 
-    const xSpacing = 280;
-    const ySpacing = 180;
+    const xSpacing = 130;
+    const ySpacing = 140;
     let maxLayerWidth = 0;
 
     layerGroups.forEach((groupNodes) => {
@@ -414,28 +468,32 @@ export function applyHierarchicalLayout<T extends Record<string, unknown>>(
       });
     });
 
-    currentOffsetX += Math.max(maxLayerWidth, 300) + CLUSTER_GAP;
+    currentOffsetX += Math.max(maxLayerWidth, 200) + CLUSTER_GAP;
   }
 
   return result;
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. Radial Layout (Sub-Category & Transform Satellite Constellations)
+// 3. Radial Layout (Maltego-style Dandelion Starburst with Sub-Category Hubs)
 // ─────────────────────────────────────────────────────────────────────────────
 export function applyRadialLayout<T extends Record<string, unknown>>(
   nodes: SimpleNode<T>[],
   edges: SimpleEdge[],
+  options?: {
+    collapsedCategories?: string[];
+  },
 ): SimpleNode<T>[] {
   if (nodes.length === 0) return [];
   if (nodes.length === 1) {
     return [{ ...nodes[0], position: { x: 0, y: 0 } }];
   }
 
+  const collapsedSet = new Set(options?.collapsedCategories || []);
   const clusters = partitionGraphClusters(nodes, edges);
   let currentOffsetX = 0;
   const result: SimpleNode<T>[] = [];
-  const CLUSTER_GAP = 800;
+  const CLUSTER_GAP = 550;
 
   for (const cluster of clusters) {
     const cNodes = cluster.nodes;
@@ -446,7 +504,7 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
         ...cNodes[0],
         position: { x: currentOffsetX, y: 0 },
       });
-      currentOffsetX += 300 + CLUSTER_GAP;
+      currentOffsetX += 150 + CLUSTER_GAP;
       continue;
     }
 
@@ -457,7 +515,7 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
       degrees.set(e.target, (degrees.get(e.target) || 0) + 1);
     });
 
-    // Determine the focal center of this specific cluster
+    // Focal center node of this cluster
     let center: SimpleNode<T>;
     let others: SimpleNode<T>[];
 
@@ -472,7 +530,7 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
       others = sorted.slice(1);
     }
 
-    // Partition children into Sub-Category Satellites (DNS, TLS, Webpage Metadata, Contacts, Social, etc.)
+    // Partition children into Sub-Category Satellites (DNS, TLS, Webpage, Contacts, Social, Dorks, etc.)
     const subCategoryGroups = new Map<string, SimpleNode<T>[]>();
     others.forEach((node) => {
       const subCat = getSubCategoryKey(node);
@@ -484,111 +542,67 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
 
     const subCategories = Array.from(subCategoryGroups.entries());
 
-    // If multiple sub-categories exist, organize them as Satellite Constellations
-    if (subCategories.length > 1) {
+    // If sub-categories exist, organize them as Starburst Satellites with Hubs
+    if (subCategories.length > 0) {
       const numSubCats = subCategories.length;
-      const orbitRadius = Math.max(550, 380 + Math.sqrt(others.length) * 50);
 
-      // Estimate max extent of each satellite mini-circle
-      let maxSubCatRadius = 180;
-      subCategories.forEach(([, catNodes]) => {
-        const catRadius = 150 + Math.floor(catNodes.length / 6) * 120;
-        if (catRadius > maxSubCatRadius) maxSubCatRadius = catRadius;
+      // Estimate satellite radius requirements
+      let maxSatExtent = 140;
+      subCategories.forEach(([catKey, catNodes]) => {
+        const isCollapsed = collapsedSet.has(catKey);
+        if (isCollapsed) return;
+        const ringsNeeded = Math.ceil(Math.sqrt(catNodes.length * 1.5));
+        const extent = 120 + ringsNeeded * 80;
+        if (extent > maxSatExtent) maxSatExtent = extent;
       });
 
-      const totalClusterRadius = orbitRadius + maxSubCatRadius;
+      const orbitRadius = Math.max(380, 240 + maxSatExtent + Math.sqrt(others.length) * 16);
+      const totalClusterRadius = orbitRadius + maxSatExtent + 60;
       const clusterCenterX = currentOffsetX + totalClusterRadius;
 
-      // Place central seed node
+      // Place central seed node at center of the universe
       result.push({
         ...center,
         position: { x: clusterCenterX, y: 0 },
       });
 
-      // Place each sub-category satellite at its own orbit angle
+      // Place each sub-category as a full 360° starburst at its orbit angle
       subCategories.forEach(([catKey, catNodes], catIndex) => {
+        const isCollapsed = collapsedSet.has(catKey);
         const angle = (2 * Math.PI * catIndex) / numSubCats - Math.PI / 2;
         const satCenterX = clusterCenterX + Math.cos(angle) * orbitRadius;
         const satCenterY = Math.sin(angle) * orbitRadius;
 
-        if (catNodes.length === 1) {
-          result.push({
-            ...catNodes[0],
-            position: { x: satCenterX, y: satCenterY },
-          });
-        } else {
-          // Distribute mini-circle around satellite center
-          const localRingRadius = Math.max(160, 45 * Math.min(catNodes.length, 6));
-          catNodes.forEach((node, idx) => {
-            const localAngle = (2 * Math.PI * idx) / catNodes.length;
-            const ringOffset = Math.floor(idx / 6) * 140;
-            const finalRadius = localRingRadius + ringOffset;
+        // Place the Sub-Category Hub Label Node at the center of the satellite
+        const hubId = `hub_${cluster.seedNode ? cluster.seedNode.id : 'root'}_${catKey}`;
+        result.push({
+          id: hubId,
+          type: 'cluster_hub',
+          data: {
+            isHub: true,
+            categoryKey: catKey,
+            label: catKey,
+            count: catNodes.length,
+            isCollapsed,
+          } as any,
+          position: { x: satCenterX, y: satCenterY },
+        });
 
-            result.push({
-              ...node,
-              position: {
-                x: satCenterX + Math.cos(localAngle) * finalRadius,
-                y: satCenterY + Math.sin(localAngle) * finalRadius,
-              },
-            });
-          });
+        // If not collapsed, place leaf nodes in 360° starburst around the Hub node
+        if (!isCollapsed) {
+          const starburstNodes = layoutStarburst({ x: satCenterX, y: satCenterY }, catNodes, 120);
+          starburstNodes.forEach((node) => result.push(node));
         }
       });
 
       currentOffsetX += totalClusterRadius * 2 + CLUSTER_GAP;
     } else {
-      // Single sub-category: standard radial concentric rings
-      others.sort((a, b) => (degrees.get(b.id) || 0) - (degrees.get(a.id) || 0));
-
-      const ringPlacements: Array<{ radius: number; nodes: SimpleNode<T>[] }> = [];
-      let nodeIndex = 0;
-      let ringNumber = 1;
-
-      while (nodeIndex < others.length) {
-        const ringRadius = 320 * ringNumber;
-        const maxNodesInRing = Math.max(6, Math.floor((2 * Math.PI * ringRadius) / 280));
-        const sliceCount = Math.min(others.length - nodeIndex, maxNodesInRing);
-        const ringNodes = others.slice(nodeIndex, nodeIndex + sliceCount);
-
-        ringPlacements.push({
-          radius: ringRadius,
-          nodes: ringNodes,
-        });
-
-        nodeIndex += sliceCount;
-        ringNumber++;
-      }
-
-      const maxRadius = ringPlacements.length > 0
-        ? ringPlacements[ringPlacements.length - 1].radius
-        : 300;
-
-      const clusterCenterX = currentOffsetX + maxRadius;
-
-      // Place center node
+      // Direct center node only
       result.push({
         ...center,
-        position: { x: clusterCenterX, y: 0 },
+        position: { x: currentOffsetX + 150, y: 0 },
       });
-
-      // Place nodes in each ring
-      ringPlacements.forEach((ring, rIdx) => {
-        const count = ring.nodes.length;
-        const phaseOffset = (rIdx * 0.43) % (2 * Math.PI);
-
-        ring.nodes.forEach((node, i) => {
-          const angle = (2 * Math.PI * i) / count + phaseOffset;
-          result.push({
-            ...node,
-            position: {
-              x: clusterCenterX + Math.cos(angle) * ring.radius,
-              y: Math.sin(angle) * ring.radius,
-            },
-          });
-        });
-      });
-
-      currentOffsetX += maxRadius * 2 + CLUSTER_GAP;
+      currentOffsetX += 300 + CLUSTER_GAP;
     }
   }
 

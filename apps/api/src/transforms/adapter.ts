@@ -62,6 +62,20 @@ const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
     },
     collectors: [{ name: 'dns' }],
   },
+  'domain.find-subdomains-crt': {
+    deriveInput: (_v, st, analysis) => {
+      if (st === 'ORGANIZATION') {
+        // Only meaningful when the organization value is itself a domain
+        return analysis.isDomain ? _v.trim() : null;
+      }
+      if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname.replace(/^www\./, '');
+      if (analysis.isDomain) return _v.trim();
+      if (analysis.isEmail && analysis.extractedDomain) return analysis.extractedDomain;
+      const d = extractDomain(_v);
+      return d && d.includes('.') ? d : null;
+    },
+    collectors: [{ name: 'subdomain-crt' }],
+  },
   'domain.find-tls': {
     deriveInput: (v, _st, analysis) => {
       if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;

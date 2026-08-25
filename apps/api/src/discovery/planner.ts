@@ -24,12 +24,14 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'domain.webpage-metadata',
     'domain.resolve-dns',
     'domain.find-tls',
+    'domain.find-subdomains-crt',
     'contact.find-official-contact',
     'intelligence.generate-dorks',
   ],
   DOMAIN: [
     'domain.resolve-dns',
     'domain.find-tls',
+    'domain.find-subdomains-crt',
     'domain.webpage-metadata',
     'contact.find-official-contact',
     'mentions.search-public-web',
@@ -57,6 +59,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'developer.gitlab-profile',
     'social.youtube-channel',
     'mentions.search-public-web',
+    'domain.find-subdomains-crt',
   ],
   PERSON: [
     'web.discover-official-site',

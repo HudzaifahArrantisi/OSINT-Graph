@@ -1,13 +1,14 @@
-import React, { memo } from 'react';
-import { Handle, Position, NodeProps } from '@xyflow/react';
-import { ConfidenceBadge } from '../ui/ConfidenceBadge';
+import React, { memo, useState } from 'react';
+import { Handle, Position, NodeProps, NodeToolbar } from '@xyflow/react';
 import { EntityType } from '@nexusgraph/shared';
+import { ConfidenceBadge } from '../ui/ConfidenceBadge';
+import { getNavigableUrl } from '../detail/EntityDetailPanel';
 import {
   Globe2,
   Mail,
   User,
   Network,
-  Link,
+  Link as LinkIcon,
   Building,
   FolderGit2,
   Share2,
@@ -17,12 +18,15 @@ import {
   Phone,
   MapPin,
   HelpCircle,
-  Shield,
   Github,
   Gitlab,
   Youtube,
   Radio,
   Server,
+  Layers,
+  ExternalLink,
+  Copy,
+  Check,
 } from 'lucide-react';
 
 const ENTITY_ICONS: Record<EntityType, React.ComponentType<{ className?: string }>> = {
@@ -31,7 +35,7 @@ const ENTITY_ICONS: Record<EntityType, React.ComponentType<{ className?: string 
   IP_ADDRESS: Network,
   EMAIL: Mail,
   USERNAME: User,
-  URL: Link,
+  URL: LinkIcon,
   SOCIAL_PROFILE: Share2,
   REPOSITORY: FolderGit2,
   ORGANIZATION: Building,
@@ -48,141 +52,419 @@ const ENTITY_ICONS: Record<EntityType, React.ComponentType<{ className?: string 
   SUBDOMAIN: Globe2,
   MX_RECORD: Server,
   NS_RECORD: Server,
-  PUBLIC_MENTION: Link,
+  PUBLIC_MENTION: LinkIcon,
   WEBSITE: Globe2,
 };
 
-const ENTITY_ACCENTS: Record<string, { badge: string; iconBg: string; iconColor: string }> = {
-  SEED: { badge: 'text-amber-300 bg-amber-500/10 border-amber-500/20', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-400' },
-  DOMAIN: { badge: 'text-sky-300 bg-sky-500/10 border-sky-500/20', iconBg: 'bg-sky-500/10', iconColor: 'text-sky-400' },
-  IP_ADDRESS: { badge: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/20', iconBg: 'bg-cyan-500/10', iconColor: 'text-cyan-400' },
-  EMAIL: { badge: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-400' },
-  USERNAME: { badge: 'text-amber-300 bg-amber-500/10 border-amber-500/20', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-400' },
-  URL: { badge: 'text-blue-300 bg-blue-500/10 border-blue-500/20', iconBg: 'bg-blue-500/10', iconColor: 'text-blue-400' },
-  SOCIAL_PROFILE: { badge: 'text-purple-300 bg-purple-500/10 border-purple-500/20', iconBg: 'bg-purple-500/10', iconColor: 'text-purple-400' },
-  REPOSITORY: { badge: 'text-rose-300 bg-rose-500/10 border-rose-500/20', iconBg: 'bg-rose-500/10', iconColor: 'text-rose-400' },
-  ORGANIZATION: { badge: 'text-teal-300 bg-teal-500/10 border-teal-500/20', iconBg: 'bg-teal-500/10', iconColor: 'text-teal-400' },
-  CERTIFICATE: { badge: 'text-sky-300 bg-sky-500/10 border-sky-500/20', iconBg: 'bg-sky-500/10', iconColor: 'text-sky-400' },
-  TECHNOLOGY: { badge: 'text-amber-300 bg-amber-500/10 border-amber-500/20', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-400' },
-  PERSON: { badge: 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20', iconBg: 'bg-indigo-500/10', iconColor: 'text-indigo-400' },
-  DOCUMENT: { badge: 'text-slate-300 bg-slate-500/10 border-slate-500/20', iconBg: 'bg-slate-500/10', iconColor: 'text-slate-400' },
-  PHONE: { badge: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-400' },
-  ADDRESS: { badge: 'text-amber-300 bg-amber-500/10 border-amber-500/20', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-400' },
-  LOCATION: { badge: 'text-amber-300 bg-amber-500/10 border-amber-500/20', iconBg: 'bg-amber-500/10', iconColor: 'text-amber-400' },
-  GITHUB_PROFILE: { badge: 'text-violet-300 bg-violet-500/10 border-violet-500/20', iconBg: 'bg-violet-500/10', iconColor: 'text-violet-400' },
-  GITLAB_PROFILE: { badge: 'text-orange-300 bg-orange-500/10 border-orange-500/20', iconBg: 'bg-orange-500/10', iconColor: 'text-orange-400' },
-  YOUTUBE_CHANNEL: { badge: 'text-red-300 bg-red-500/10 border-red-500/20', iconBg: 'bg-red-500/10', iconColor: 'text-red-400' },
-  SUBDOMAIN: { badge: 'text-sky-300 bg-sky-500/10 border-sky-500/20', iconBg: 'bg-sky-500/10', iconColor: 'text-sky-400' },
-  MX_RECORD: { badge: 'text-teal-300 bg-teal-500/10 border-teal-500/20', iconBg: 'bg-teal-500/10', iconColor: 'text-teal-400' },
-  NS_RECORD: { badge: 'text-cyan-300 bg-cyan-500/10 border-cyan-500/20', iconBg: 'bg-cyan-500/10', iconColor: 'text-cyan-400' },
-  PUBLIC_MENTION: { badge: 'text-blue-300 bg-blue-500/10 border-blue-500/20', iconBg: 'bg-blue-500/10', iconColor: 'text-blue-400' },
-  WEBSITE: { badge: 'text-emerald-300 bg-emerald-500/10 border-emerald-500/20', iconBg: 'bg-emerald-500/10', iconColor: 'text-emerald-400' },
+const ENTITY_THEMES: Record<
+  string,
+  {
+    border: string;
+    bg: string;
+    iconColor: string;
+    glow: string;
+    badge: string;
+    labelColor: string;
+    accentColor: string;
+  }
+> = {
+  SEED: {
+    border: 'border-amber-400',
+    bg: 'bg-amber-950/90',
+    iconColor: 'text-amber-300',
+    glow: 'shadow-[0_0_18px_rgba(245,158,11,0.45)] ring-2 ring-amber-400/50',
+    badge: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
+    labelColor: 'text-amber-300 font-semibold',
+    accentColor: 'border-t-amber-400',
+  },
+  DOMAIN: {
+    border: 'border-sky-400',
+    bg: 'bg-[#0b172a]',
+    iconColor: 'text-sky-400',
+    glow: 'shadow-[0_0_12px_rgba(56,189,248,0.35)]',
+    badge: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+    labelColor: 'text-sky-200',
+    accentColor: 'border-t-sky-400',
+  },
+  SUBDOMAIN: {
+    border: 'border-sky-400',
+    bg: 'bg-[#09182a]',
+    iconColor: 'text-sky-400',
+    glow: 'shadow-[0_0_12px_rgba(56,189,248,0.35)]',
+    badge: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
+    labelColor: 'text-sky-200',
+    accentColor: 'border-t-sky-400',
+  },
+  IP_ADDRESS: {
+    border: 'border-cyan-400',
+    bg: 'bg-[#081b24]',
+    iconColor: 'text-cyan-400',
+    glow: 'shadow-[0_0_12px_rgba(6,182,212,0.35)]',
+    badge: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+    labelColor: 'text-cyan-200',
+    accentColor: 'border-t-cyan-400',
+  },
+  EMAIL: {
+    border: 'border-emerald-400',
+    bg: 'bg-[#091e17]',
+    iconColor: 'text-emerald-400',
+    glow: 'shadow-[0_0_12px_rgba(16,185,129,0.35)]',
+    badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    labelColor: 'text-emerald-200',
+    accentColor: 'border-t-emerald-400',
+  },
+  USERNAME: {
+    border: 'border-amber-400',
+    bg: 'bg-[#1e1708]',
+    iconColor: 'text-amber-400',
+    glow: 'shadow-[0_0_12px_rgba(245,158,11,0.35)]',
+    badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+    labelColor: 'text-amber-200',
+    accentColor: 'border-t-amber-400',
+  },
+  URL: {
+    border: 'border-blue-400',
+    bg: 'bg-[#0a152d]',
+    iconColor: 'text-blue-400',
+    glow: 'shadow-[0_0_12px_rgba(96,165,250,0.35)]',
+    badge: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    labelColor: 'text-blue-200',
+    accentColor: 'border-t-blue-400',
+  },
+  SOCIAL_PROFILE: {
+    border: 'border-purple-400',
+    bg: 'bg-[#1b0d2d]',
+    iconColor: 'text-purple-400',
+    glow: 'shadow-[0_0_12px_rgba(192,132,252,0.35)]',
+    badge: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
+    labelColor: 'text-purple-200',
+    accentColor: 'border-t-purple-400',
+  },
+  CERTIFICATE: {
+    border: 'border-teal-400',
+    bg: 'bg-[#081d1d]',
+    iconColor: 'text-teal-400',
+    glow: 'shadow-[0_0_12px_rgba(45,212,191,0.35)]',
+    badge: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
+    labelColor: 'text-teal-200',
+    accentColor: 'border-t-teal-400',
+  },
+  TECHNOLOGY: {
+    border: 'border-amber-400',
+    bg: 'bg-[#1c1409]',
+    iconColor: 'text-amber-400',
+    glow: 'shadow-[0_0_12px_rgba(251,191,36,0.35)]',
+    badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
+    labelColor: 'text-amber-200',
+    accentColor: 'border-t-amber-400',
+  },
+  PERSON: {
+    border: 'border-indigo-400',
+    bg: 'bg-[#11122e]',
+    iconColor: 'text-indigo-400',
+    glow: 'shadow-[0_0_12px_rgba(129,140,248,0.35)]',
+    badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
+    labelColor: 'text-indigo-200',
+    accentColor: 'border-t-indigo-400',
+  },
+  DOCUMENT: {
+    border: 'border-slate-400',
+    bg: 'bg-[#10141e]',
+    iconColor: 'text-slate-300',
+    glow: 'shadow-[0_0_12px_rgba(148,163,184,0.3)]',
+    badge: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+    labelColor: 'text-slate-200',
+    accentColor: 'border-t-slate-400',
+  },
+  PHONE: {
+    border: 'border-emerald-400',
+    bg: 'bg-[#0a2016]',
+    iconColor: 'text-emerald-400',
+    glow: 'shadow-[0_0_12px_rgba(52,211,153,0.35)]',
+    badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    labelColor: 'text-emerald-200',
+    accentColor: 'border-t-emerald-400',
+  },
+  LOCATION: {
+    border: 'border-orange-400',
+    bg: 'bg-[#221008]',
+    iconColor: 'text-orange-400',
+    glow: 'shadow-[0_0_12px_rgba(251,146,60,0.35)]',
+    badge: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+    labelColor: 'text-orange-200',
+    accentColor: 'border-t-orange-400',
+  },
+  ADDRESS: {
+    border: 'border-orange-400',
+    bg: 'bg-[#221008]',
+    iconColor: 'text-orange-400',
+    glow: 'shadow-[0_0_12px_rgba(251,146,60,0.35)]',
+    badge: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+    labelColor: 'text-orange-200',
+    accentColor: 'border-t-orange-400',
+  },
+  GITHUB_PROFILE: {
+    border: 'border-violet-400',
+    bg: 'bg-[#150d28]',
+    iconColor: 'text-violet-400',
+    glow: 'shadow-[0_0_12px_rgba(167,139,250,0.35)]',
+    badge: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
+    labelColor: 'text-violet-200',
+    accentColor: 'border-t-violet-400',
+  },
+  GITLAB_PROFILE: {
+    border: 'border-orange-400',
+    bg: 'bg-[#200e08]',
+    iconColor: 'text-orange-400',
+    glow: 'shadow-[0_0_12px_rgba(251,146,60,0.35)]',
+    badge: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
+    labelColor: 'text-orange-200',
+    accentColor: 'border-t-orange-400',
+  },
+  YOUTUBE_CHANNEL: {
+    border: 'border-red-400',
+    bg: 'bg-[#200a0a]',
+    iconColor: 'text-red-400',
+    glow: 'shadow-[0_0_12px_rgba(248,113,113,0.35)]',
+    badge: 'bg-red-500/20 text-red-300 border-red-500/30',
+    labelColor: 'text-red-200',
+    accentColor: 'border-t-red-400',
+  },
+  MX_RECORD: {
+    border: 'border-teal-400',
+    bg: 'bg-[#091c1a]',
+    iconColor: 'text-teal-400',
+    glow: 'shadow-[0_0_12px_rgba(45,212,191,0.35)]',
+    badge: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
+    labelColor: 'text-teal-200',
+    accentColor: 'border-t-teal-400',
+  },
+  NS_RECORD: {
+    border: 'border-cyan-400',
+    bg: 'bg-[#081c22]',
+    iconColor: 'text-cyan-400',
+    glow: 'shadow-[0_0_12px_rgba(6,182,212,0.35)]',
+    badge: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
+    labelColor: 'text-cyan-200',
+    accentColor: 'border-t-cyan-400',
+  },
+  PUBLIC_MENTION: {
+    border: 'border-blue-400',
+    bg: 'bg-[#0a152d]',
+    iconColor: 'text-blue-400',
+    glow: 'shadow-[0_0_12px_rgba(96,165,250,0.35)]',
+    badge: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
+    labelColor: 'text-blue-200',
+    accentColor: 'border-t-blue-400',
+  },
 };
 
 export const EntityNode = memo(({ data, selected }: NodeProps) => {
+  const [isHovered, setIsHovered] = useState(false);
+  const [copied, setCopied] = useState(false);
+
   const nodeData = (data || {}) as Record<string, any>;
   const entityType = (nodeData.entityType || 'DOMAIN') as EntityType;
-  const value = nodeData.value || nodeData.label || 'Entity';
+  const value = String(nodeData.value || nodeData.label || 'Entity');
   const title = nodeData.title;
   const confidence = nodeData.confidence || 50;
   const isSeed = nodeData.isSeed || entityType === 'SEED';
 
   const Icon = ENTITY_ICONS[entityType] || HelpCircle;
-  const accent = ENTITY_ACCENTS[entityType] || {
-    badge: 'text-slate-300 bg-slate-500/10 border-slate-500/20',
-    iconBg: 'bg-slate-800/40',
-    iconColor: 'text-slate-400',
+  const theme = ENTITY_THEMES[entityType] || {
+    border: 'border-slate-500',
+    bg: 'bg-[#0f172a]',
+    iconColor: 'text-slate-300',
+    glow: 'shadow-[0_0_10px_rgba(148,163,184,0.25)]',
+    badge: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+    labelColor: 'text-slate-300',
+    accentColor: 'border-t-slate-400',
   };
 
-  const hasSubtitle = title && title !== value && !title.startsWith('Investigation Seed:');
+  const isLargeGraph = Boolean(nodeData.isLargeGraph);
+  const hideLabel = Boolean(nodeData.hideLabelByDefault) && !isHovered && !selected && !isSeed;
+
+  const nodeSize = isSeed ? 'w-14 h-14' : isLargeGraph ? 'w-9 h-9' : 'w-10 h-10';
+  const iconSize = isSeed ? 'w-6 h-6' : isLargeGraph ? 'w-4 h-4' : 'w-4 h-4';
+
+  const provenance =
+    nodeData.metadata?.discoveredBy ||
+    nodeData.metadata?.source?.transform ||
+    nodeData.metadata?.source?.collector ||
+    (isSeed ? 'Investigation Target Seed' : null);
+
+  const navUrl = getNavigableUrl({
+    type: entityType,
+    value,
+    metadata: nodeData.metadata,
+  });
+
+  const handleCopy = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    navigator.clipboard.writeText(value);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+    setIsHovered(true);
+    const parentNodeEl = e.currentTarget.closest('.react-flow__node') as HTMLElement | null;
+    if (parentNodeEl) {
+      parentNodeEl.style.zIndex = '99999';
+    }
+  };
+
+  const handleMouseLeave = (e: React.MouseEvent<HTMLDivElement>) => {
+    setIsHovered(false);
+    const parentNodeEl = e.currentTarget.closest('.react-flow__node') as HTMLElement | null;
+    if (parentNodeEl) {
+      parentNodeEl.style.zIndex = selected ? '100' : '';
+    }
+  };
 
   return (
     <div
-      className={`min-w-[210px] max-w-[280px] bg-[#0d121c] rounded-md border transition-all duration-150 shadow-md select-none ${
-        isSeed
-          ? 'border-amber-500/50 bg-[#13151c] shadow-black/40'
-          : selected
-            ? 'border-sky-500 ring-1 ring-sky-500/40 bg-[#111928] shadow-sky-950/30'
-            : 'border-[#1e293b] hover:border-slate-600 hover:bg-[#101724]'
+      className={`relative flex flex-col items-center select-none group ${
+        isHovered || selected ? 'z-[99999]' : 'z-10'
       }`}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
-      <Handle
-        type="target"
+      {/* NodeToolbar from @xyflow/react — Guaranteed Highest Stacking Layer Above All Nodes */}
+      <NodeToolbar
+        isVisible={isHovered}
         position={Position.Top}
-        className="!w-2 !h-2 !bg-slate-600 !border-2 !border-[#0d121c] !opacity-40 hover:!opacity-100 transition-opacity"
-      />
-
-      <div className="p-2.5">
-        {/* Header: Icon + Type Badge + Confidence */}
-        <div className="flex items-center justify-between gap-1.5 mb-1.5">
-          <div className="flex items-center gap-1.5 min-w-0">
-            <div className={`p-1 rounded ${accent.iconBg} ${accent.iconColor} shrink-0`}>
-              <Icon className="w-3.5 h-3.5" />
-            </div>
-            <span className="text-[9px] font-mono uppercase tracking-wider text-slate-400 truncate font-medium">
-              {isSeed ? 'SEED TARGET' : entityType.replace('_', ' ')}
-            </span>
-          </div>
-          {isSeed ? (
-            <span className="text-[9px] font-mono font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-300 border border-amber-500/30">
-              SEED
-            </span>
-          ) : (
-            <ConfidenceBadge score={confidence} size="sm" showScore={false} />
-          )}
-        </div>
-
-        {/* Primary Data Value (Actual handle, IP, domain, URL) */}
+        offset={14}
+        className="!z-[99999] pointer-events-auto"
+      >
         <div
-          className={`font-mono text-xs font-semibold leading-snug break-all ${
-            isSeed ? 'text-amber-200' : 'text-slate-100'
-          }`}
-          title={value}
+          className="w-72 sm:w-80 bg-[#0d1422]/98 backdrop-blur-xl border border-[#22334d] rounded-lg shadow-[0_16px_40px_rgba(0,0,0,0.95)] p-3 text-left animate-in fade-in zoom-in-95 duration-100 relative"
+          onClick={(e) => e.stopPropagation()}
         >
-          {value}
-        </div>
-
-        {/* Subtitle / Context description if present */}
-        {hasSubtitle && (
-          <div
-            className="text-[10px] text-slate-400 font-sans truncate mt-0.5"
-            title={title}
-          >
-            {title}
-          </div>
-        )}
-
-        {/* Footer: Confidence & Evidence / Relationship Counts */}
-        <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mt-1.5 pt-1.5 border-t border-[#1a2334]">
-          <span className="truncate">
-            {isSeed ? (
-              <span className="text-amber-400/70 font-sans">
-                {String(nodeData.metadata?.declaredType || 'Target')}
+          {/* Top Category Badge & Confidence Indicator */}
+          <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-[#1b2a40]">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <Icon className={`w-3.5 h-3.5 ${theme.iconColor} shrink-0`} />
+              <span
+                className={`text-[9px] font-mono uppercase px-1.5 py-0.5 rounded font-bold border truncate ${
+                  isSeed
+                    ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+                    : theme.badge
+                }`}
+              >
+                {isSeed ? 'SEED TARGET' : entityType.replace('_', ' ')}
               </span>
-            ) : (
-              <span className="text-slate-400">{Math.round(confidence)}% conf</span>
+            </div>
+
+            {!isSeed && (
+              <ConfidenceBadge score={confidence} size="sm" showScore={true} />
             )}
+          </div>
+
+          {/* Entity Canonical Value */}
+          <div className="flex items-start justify-between gap-1.5">
+            <div className="font-mono text-xs font-semibold text-slate-100 break-all leading-snug">
+              {value}
+            </div>
+            <button
+              onClick={handleCopy}
+              className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors shrink-0"
+              title="Salin nilai entitas"
+            >
+              {copied ? (
+                <Check className="w-3 h-3 text-emerald-400" />
+              ) : (
+                <Copy className="w-3 h-3" />
+              )}
+            </button>
+          </div>
+
+          {/* Additional Title / Label if different */}
+          {title && title !== value && (
+            <div className="text-[10.5px] text-slate-400 mt-1 line-clamp-2 leading-tight">
+              {title}
+            </div>
+          )}
+
+          {/* Direct URL Action Link */}
+          {navUrl && (
+            <a
+              href={navUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2.5 flex items-center justify-between gap-1.5 text-[11px] font-mono text-sky-300 bg-sky-500/15 hover:bg-sky-500/25 border border-sky-500/40 px-2 py-1 rounded transition-all shadow-sm group/link cursor-pointer"
+              title={`Kunjungi ${navUrl}`}
+            >
+              <span className="truncate font-semibold">Buka URL / Target ↗</span>
+              <ExternalLink className="w-3 h-3 shrink-0 group-hover/link:translate-x-0.5 transition-transform" />
+            </a>
+          )}
+
+          {/* Provenance Trail */}
+          {provenance && (
+            <div className="flex items-center gap-1.5 mt-2 text-[10px] font-mono text-slate-400 bg-[#121c2d] px-2 py-1 rounded border border-[#1b2a40]">
+              <Layers className="w-3 h-3 text-sky-400 shrink-0" />
+              <span className="truncate">Source: {provenance}</span>
+            </div>
+          )}
+
+          {/* Metrics Footer */}
+          <div className="flex items-center justify-between text-[10px] font-mono text-slate-400 mt-2 pt-2 border-t border-[#1b2a40]">
+            <span className="text-slate-500">{Math.round(confidence)}% confidence</span>
+            <div className="flex items-center gap-2">
+              {typeof nodeData.evidenceCount === 'number' && nodeData.evidenceCount > 0 && (
+                <span className="text-emerald-400 font-semibold">{nodeData.evidenceCount} evidence</span>
+              )}
+              {typeof nodeData.relationshipCount === 'number' && nodeData.relationshipCount > 0 && (
+                <span className="text-sky-400 font-semibold">{nodeData.relationshipCount} rel</span>
+              )}
+            </div>
+          </div>
+
+          {/* Pointer Triangle Arrow down to circle */}
+          <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#0d1422] border-b border-r border-[#22334d] rotate-45" />
+        </div>
+      </NodeToolbar>
+
+      {/* Main Circular Node Badge */}
+      <div
+        className={`rounded-full flex items-center justify-center border-2 transition-all duration-200 cursor-pointer ${nodeSize} ${
+          theme.bg
+        } ${theme.border} ${
+          selected
+            ? 'ring-4 ring-sky-400/80 border-sky-300 scale-110 shadow-[0_0_24px_rgba(56,189,248,0.6)]'
+            : isHovered
+              ? 'scale-110 ' + theme.glow
+              : theme.glow
+        }`}
+      >
+        <Icon className={`${iconSize} ${theme.iconColor} transition-transform duration-200 group-hover:scale-110`} />
+
+        {/* Seed Target Indicator Badge */}
+        {isSeed && (
+          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500 border border-black text-[7px] text-black font-extrabold items-center justify-center">
+              ★
+            </span>
           </span>
-          <div className="flex items-center gap-1.5 shrink-0 text-slate-400">
-            {typeof nodeData.evidenceCount === 'number' && nodeData.evidenceCount > 0 && (
-              <span title={`${nodeData.evidenceCount} evidence items`} className="text-emerald-400">
-                {nodeData.evidenceCount} ev
-              </span>
-            )}
-            {typeof nodeData.relationshipCount === 'number' && nodeData.relationshipCount > 0 && (
-              <span title={`${nodeData.relationshipCount} relationships`} className="text-sky-400">
-                {nodeData.relationshipCount} rel
-              </span>
-            )}
-          </div>
-        </div>
+        )}
       </div>
 
-      <Handle
-        type="source"
-        position={Position.Bottom}
-        className="!w-2 !h-2 !bg-slate-600 !border-2 !border-[#0d121c] !opacity-40 hover:!opacity-100 transition-opacity"
-      />
+      {/* Underneath Text Label & Category */}
+      {!hideLabel && (
+        <div className="mt-1.5 flex flex-col items-center max-w-[130px] pointer-events-none text-center animate-in fade-in duration-100">
+          <span
+            className={`font-mono text-[9.5px] leading-tight truncate w-full px-1 py-0.5 rounded ${theme.labelColor} drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]`}
+            title={value}
+          >
+            {value}
+          </span>
+          <span className="text-[7.5px] font-mono uppercase tracking-wider text-slate-400/80 -mt-0.5 scale-90">
+            {isSeed ? 'SEED' : entityType.replace('_', ' ')}
+          </span>
+        </div>
+      )}
     </div>
   );
 });

@@ -30,6 +30,16 @@ export const TRANSFORM_DEFINITIONS: TransformDefinition[] = [
     enabled: true,
   },
   {
+    id: 'domain.find-subdomains-crt',
+    name: 'Subdomain Enumeration (crt.name)',
+    description: 'Enumerate subdomains of an apex domain from public Certificate Transparency logs via crt.name',
+    inputTypes: ['DOMAIN', 'WEBSITE', 'URL', 'ORGANIZATION'],
+    outputTypes: ['SUBDOMAIN', 'DOMAIN'],
+    category: 'infrastructure',
+    riskLevel: 'low',
+    enabled: true,
+  },
+  {
     id: 'domain.find-tls',
     name: 'TLS Certificate Lookup',
     description: 'Find TLS certificates and Subject Alternative Names via Certificate Transparency logs',

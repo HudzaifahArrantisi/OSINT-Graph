@@ -159,6 +159,7 @@ export const EVIDENCE_SOURCE_TYPES = [
   'ROBOTS_TXT',
   'EMAIL_LOOKUP',
   'IP_GEOLOCATION',
+  'SUBDOMAIN_ENUM',
 ] as const;
 
 export type EvidenceSourceType = (typeof EVIDENCE_SOURCE_TYPES)[number];
@@ -179,6 +180,7 @@ export const COLLECTOR_NAMES = [
   'email-lookup',
   'website-recon',
   'mrholmes-engine',
+  'subdomain-crt',
 ] as const;
 
 export type CollectorName = (typeof COLLECTOR_NAMES)[number];

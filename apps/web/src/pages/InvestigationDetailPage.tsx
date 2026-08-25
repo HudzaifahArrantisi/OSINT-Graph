@@ -64,6 +64,81 @@ export function InvestigationDetailPage() {
   const [newNoteContent, setNewNoteContent] = useState('');
   const [submittingNote, setSubmittingNote] = useState(false);
 
+  // Resizable sidebar dimensions with persistent storage
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nexusgraph_left_sidebar_width');
+      return saved ? Math.max(180, Math.min(600, parseInt(saved, 10))) : 260;
+    } catch {
+      return 260;
+    }
+  });
+
+  const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nexusgraph_right_sidebar_width');
+      return saved ? Math.max(320, Math.min(850, parseInt(saved, 10))) : 480;
+    } catch {
+      return 480;
+    }
+  });
+
+  const handleLeftResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = leftSidebarWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const newWidth = Math.max(180, Math.min(600, startWidth + (moveEvent.clientX - startX)));
+      setLeftSidebarWidth(newWidth);
+    };
+
+    const onMouseUp = (upEvent: MouseEvent) => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      const finalWidth = Math.max(180, Math.min(600, startWidth + (upEvent.clientX - startX)));
+      try {
+        localStorage.setItem('nexusgraph_left_sidebar_width', finalWidth.toString());
+      } catch {}
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
+  const handleRightResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = rightSidebarWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const maxAllowed = Math.max(400, window.innerWidth - 300);
+      const newWidth = Math.max(320, Math.min(maxAllowed, startWidth - (moveEvent.clientX - startX)));
+      setRightSidebarWidth(newWidth);
+    };
+
+    const onMouseUp = (upEvent: MouseEvent) => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      const maxAllowed = Math.max(400, window.innerWidth - 300);
+      const finalWidth = Math.max(320, Math.min(maxAllowed, startWidth - (upEvent.clientX - startX)));
+      try {
+        localStorage.setItem('nexusgraph_right_sidebar_width', finalWidth.toString());
+      } catch {}
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
   // Fetch Investigation metadata
   const {
     data: investigation,
@@ -347,7 +422,19 @@ export function InvestigationDetailPage() {
       <div className="flex-1 flex overflow-hidden relative">
         {/* Left Sidebar: Case metadata & Collector runs */}
         {sidebarOpen ? (
-          <aside className="w-64 bg-surface border-r border-border-subtle flex flex-col shrink-0 z-10 transition-all">
+          <aside
+            style={{ width: `${leftSidebarWidth}px` }}
+            className="bg-surface border-r border-border-subtle flex flex-col shrink-0 z-10 relative select-text"
+          >
+            {/* Drag Handle on right border of left sidebar */}
+            <div
+              onMouseDown={handleLeftResizeStart}
+              className="absolute right-0 top-0 w-1.5 h-full cursor-col-resize hover:bg-primary/60 transition-colors z-30 group"
+              title="Drag to resize sidebar"
+            >
+              <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-l bg-border group-hover:bg-primary transition-colors" />
+            </div>
+
             <div className="p-3 border-b border-border-subtle flex items-center justify-between">
               <span className="text-xs font-semibold text-text uppercase tracking-wider">
                 Case Activity
@@ -355,6 +442,7 @@ export function InvestigationDetailPage() {
               <button
                 onClick={() => setSidebarOpen(false)}
                 className="p-1 rounded-button text-text-muted hover:text-text"
+                title="Collapse sidebar"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
               </button>
@@ -721,7 +809,11 @@ export function InvestigationDetailPage() {
 
         {/* Right Panel: Live Discovery Logs OR Entity Details */}
         {liveLogsOpen ? (
-          <DiscoveryLogsPanel onClose={() => setLiveLogsOpen(false)} />
+          <DiscoveryLogsPanel
+            onClose={() => setLiveLogsOpen(false)}
+            width={rightSidebarWidth}
+            onResizeStart={handleRightResizeStart}
+          />
         ) : isDetailOpen && caseId ? (
           <EntityDetailPanel
             caseId={caseId}
@@ -729,6 +821,8 @@ export function InvestigationDetailPage() {
               setSelectedNodeId(null);
               setSelectedEdgeId(null);
             }}
+            width={rightSidebarWidth}
+            onResizeStart={handleRightResizeStart}
           />
         ) : null}
       </div>

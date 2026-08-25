@@ -2,7 +2,7 @@ import { memo, useState } from 'react';
 import {
   BaseEdge,
   EdgeLabelRenderer,
-  getBezierPath,
+  getStraightPath,
   EdgeProps,
 } from '@xyflow/react';
 
@@ -13,19 +13,15 @@ export const RelationshipEdge = memo(
     sourceY,
     targetX,
     targetY,
-    sourcePosition,
-    targetPosition,
     style = {},
     markerEnd,
     selected,
     data,
   }: EdgeProps) => {
     const [hovered, setHovered] = useState(false);
-    const [edgePath, labelX, labelY] = getBezierPath({
+    const [edgePath, labelX, labelY] = getStraightPath({
       sourceX,
       sourceY,
-      sourcePosition,
-      targetPosition,
       targetX,
       targetY,
     });
@@ -42,22 +38,22 @@ export const RelationshipEdge = memo(
           d={edgePath}
           fill="none"
           stroke="transparent"
-          strokeWidth={16}
+          strokeWidth={14}
           className="cursor-pointer"
           onMouseEnter={() => setHovered(true)}
           onMouseLeave={() => setHovered(false)}
         />
 
-        {/* Visible clean connection edge */}
+        {/* Visible clean straight ray edge */}
         <BaseEdge
           id={id}
           path={edgePath}
           markerEnd={markerEnd}
           style={{
             ...(style || {}),
-            stroke: selected ? '#38bdf8' : hovered ? '#60a5fa' : 'rgba(100, 116, 139, 0.3)',
-            strokeWidth: selected ? 2 : hovered ? 1.8 : 1,
-            opacity: selected ? 1 : hovered ? 0.9 : 0.5,
+            stroke: selected ? '#38bdf8' : hovered ? '#60a5fa' : 'rgba(56, 189, 248, 0.28)',
+            strokeWidth: selected ? 2.2 : hovered ? 1.8 : 1,
+            opacity: selected ? 1 : hovered ? 0.95 : 0.6,
             transition: 'stroke 0.15s ease, stroke-width 0.15s ease, opacity 0.15s ease',
           }}
         />
