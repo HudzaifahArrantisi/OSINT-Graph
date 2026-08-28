@@ -45,8 +45,17 @@ export async function queryGetContact(e164: string, requestId?: string): Promise
     return null;
   }
 
-  const credPath = path.join(os.homedir(), '.config', 'gtc', 'credentials.json');
-  if (!fs.existsSync(credPath)) {
+  const customConfigDir = process.env.GTC_CONFIG_DIR;
+  const credPaths = [
+    customConfigDir ? path.join(customConfigDir, 'credentials.json') : null,
+    path.join(os.homedir(), '.config', 'gtc', 'credentials.json'),
+    path.resolve(process.cwd(), '.config', 'gtc', 'credentials.json'),
+    path.resolve('c:/laragon/www/OSINT Investigation Graph/.config/gtc/credentials.json'),
+  ].filter(Boolean) as string[];
+
+  const credPath = credPaths.find((p) => fs.existsSync(p));
+  if (!credPath) {
+    logger.info('GetContact lookup skipped: no credentials.json found', { requestId });
     return null;
   }
 
@@ -61,11 +70,13 @@ export async function queryGetContact(e164: string, requestId?: string): Promise
     return null;
   }
 
+  const activeConfigDir = path.dirname(credPath);
+
   try {
     // Execute ONLY -t tags search as requested by user
     const { stdout: tagsOut } = await execFileAsync('python', [gtcScript, 'search', e164, '-t', 'tags', '--json'], {
       timeout: 15000,
-      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+      env: { ...process.env, GTC_CONFIG_DIR: activeConfigDir, PYTHONIOENCODING: 'utf-8' },
     });
 
     const tagsData = JSON.parse(tagsOut);
@@ -544,28 +555,35 @@ export const phoneGeoCollector: Collector = {
     logger.info('Phone-geo collector started', { requestId: ctx.requestId, input: raw });
 
     let parsed;
-    if (hasIntlContext) {
+    // 1. Direct or prepended '+' international attempt (e.g. +628... or 628...)
+    const intlCandidate = raw.startsWith('+') ? raw : `+${digitsOnly}`;
+    try {
+      const candidateParsed = parsePhoneNumberWithError(intlCandidate);
+      if (candidateParsed.isValid() || candidateParsed.isPossible()) {
+        parsed = candidateParsed;
+      }
+    } catch {
+      // continue to trunk/local fallback
+    }
+
+    // 2. Trunk '0' prefix local format (e.g. 0852...)
+    if (!parsed && raw.startsWith('0')) {
+      parsed = resolveLocalNumber(digitsOnly);
+    }
+
+    // 3. Fallback: try normalizePhone
+    if (!parsed) {
       try {
         parsed = parsePhoneNumberWithError(normalizePhone(raw));
       } catch {
-        throw new Error(`Unparseable phone number "${raw}"`);
+        // ignore
       }
-    } else {
-      // Local/trunk format (e.g. Indonesian 08...) lacks country context.
-      // Resolve deterministically: accept ONLY numbers with a trunk '0' prefix
-      // AND only if the number is VALID under a known national plan — never guess silently.
-      parsed = raw.startsWith('0') ? resolveLocalNumber(digitsOnly) : null;
-      if (!parsed) {
-        throw new Error(
-          `"${raw}" has no country code context (+). It does not match any known national numbering plan. Please include the country code, e.g. +62...`,
-        );
-      }
-      logger.info('Phone-geo: resolved local-format number via numbering plan validation', {
-        requestId: ctx.requestId,
-        input: raw,
-        resolvedCountry: parsed.country,
-        e164: parsed.number,
-      });
+    }
+
+    if (!parsed) {
+      throw new Error(
+        `"${raw}" has no valid country context. Please include the country calling code, e.g. +628... or local format 08...`,
+      );
     }
 
     const e164 = parsed.number;

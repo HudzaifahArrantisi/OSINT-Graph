@@ -11,7 +11,8 @@ import {
   ChevronRight,
   ChevronDown,
   Filter,
-  Sparkles,
+  Activity,
+  Code2,
 } from 'lucide-react';
 import type { DiscoveryLogEntry } from '@nexusgraph/shared';
 import { api } from '../../lib/api';
@@ -36,19 +37,12 @@ export function cleanLogMessage(msg: string): string {
     .trim();
 }
 
-/** Formatter for PowerShell-style terminal line export */
-export function formatPowerShellLogLine(l: DiscoveryLogEntry): string {
+/** Formatter for standard console log line export */
+export function formatLogLine(l: DiscoveryLogEntry): string {
   const cleanMsg = cleanLogMessage(l.message);
-  let prefix = '[i] INFO';
-  if (l.level === 'found' || l.level === 'success') prefix = '[+] FOUND';
-  else if (l.level === 'error') prefix = '[-] ERROR';
-  else if (l.level === 'warn') prefix = '[!] WARN';
-  else if (l.level === 'http' || l.tag === 'HTTP') prefix = '[>] HTTP';
-  else if (l.level === 'transform' || l.tag === 'SCAN') prefix = '[*] EXEC';
-  else if (l.level === 'collector') prefix = '[#] COLLECT';
-  else if (l.tag) prefix = `[${l.tag.toUpperCase()}]`;
-
-  return `${prefix.padEnd(11)} ${cleanMsg}`;
+  const ts = l.timestamp ? new Date(l.timestamp).toISOString() : new Date().toISOString();
+  const level = (l.level || 'info').toUpperCase().padEnd(7);
+  return `[${ts}] ${level} ${cleanMsg}`;
 }
 
 export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryLogsPanelProps) {
@@ -66,7 +60,7 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
   const logEndRef = useRef<HTMLDivElement>(null);
   const [autoScroll, setAutoScroll] = useState(true);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<'ACTIVITY' | 'HTTP' | 'ALL' | 'ERRORS'>('ACTIVITY');
+  const [activeTab, setActiveTab] = useState<'ALL' | 'ACTIVITY' | 'HTTP' | 'ERRORS'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedLogIds, setExpandedLogIds] = useState<Record<string, boolean>>({});
 
@@ -119,42 +113,33 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
   }, [liveDiscoveryLogs.length, autoScroll]);
 
   const handleCopyLogs = () => {
-    const banner = [
-      '# Windows PowerShell [NexusGraph OSINT Engine]',
-      '# Output Stream Log',
-      '# ---------------------------------------------',
-    ];
     const lines = liveDiscoveryLogs.map((l) => {
-      const line = formatPowerShellLogLine(l);
-      const meta = l.data && Object.keys(l.data).length > 0 ? `\n    DATA: ${JSON.stringify(l.data)}` : '';
+      const line = formatLogLine(l);
+      const meta = l.data && Object.keys(l.data).length > 0 ? `\n  DATA: ${JSON.stringify(l.data)}` : '';
       return `${line}${meta}`;
     });
-    const text = [...banner, ...lines].join('\n');
+    const text = lines.join('\n');
 
     navigator.clipboard.writeText(text);
     setCopied(true);
-    addToast('Copied PowerShell logs to clipboard', 'info');
+    addToast('Copied logs to clipboard', 'info');
     setTimeout(() => setCopied(false), 2000);
   };
 
   const handleDownloadLogs = () => {
-    const banner = [
-      '# Windows PowerShell [NexusGraph OSINT Engine]',
-      '# Investigation Discovery Transcript',
-      '# ---------------------------------------------',
-    ];
+    const header = `# NexusGraph Investigation Discovery Logs\n# Exported: ${new Date().toISOString()}\n# Total Events: ${liveDiscoveryLogs.length}\n# --------------------------------------------------\n`;
     const lines = liveDiscoveryLogs.map((l) => {
-      const line = formatPowerShellLogLine(l);
-      const meta = l.data && Object.keys(l.data).length > 0 ? `\n    DATA: ${JSON.stringify(l.data, null, 2)}` : '';
+      const line = formatLogLine(l);
+      const meta = l.data && Object.keys(l.data).length > 0 ? `\n  DATA: ${JSON.stringify(l.data, null, 2)}` : '';
       return `${line}${meta}`;
     });
-    const text = [...banner, ...lines].join('\n');
+    const text = header + lines.join('\n');
 
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `nexusgraph-transcript-${new Date().toISOString().slice(0, 10)}.log`;
+    link.download = `nexusgraph-logs-${new Date().toISOString().slice(0, 10)}.log`;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -167,7 +152,7 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
     try {
       await api.system.clearLogs();
     } catch {}
-    addToast('Cleared console buffer', 'info');
+    addToast('Console buffer cleared', 'info');
   };
 
   const toggleExpand = (id: string) => {
@@ -178,7 +163,6 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
   };
 
   const filteredLogs = liveDiscoveryLogs.filter((l) => {
-    // Tab filter
     if (activeTab === 'ACTIVITY') {
       if (l.level === 'http' || l.tag === 'HTTP') return false;
     } else if (activeTab === 'HTTP') {
@@ -187,7 +171,6 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
       if (l.level !== 'warn' && l.level !== 'error') return false;
     }
 
-    // Search filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       const matchMsg = cleanLogMessage(l.message).toLowerCase().includes(q);
@@ -213,58 +196,53 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
   return (
     <aside
       style={{ width: width ? `${width}px` : undefined }}
-      className="w-80 sm:w-[480px] bg-[#0b0f17] border-l border-border-subtle flex flex-col h-full shrink-0 z-20 select-text font-mono relative shadow-2xl"
+      className="w-80 sm:w-[480px] bg-[#0c1017] border-l border-[#1e293b] flex flex-col h-full shrink-0 z-20 select-text font-mono relative shadow-xl"
     >
       {/* Resizing Handle on Left Edge */}
       {onResizeStart && (
         <div
           onMouseDown={onResizeStart}
-          className="absolute left-0 top-0 w-1.5 h-full cursor-col-resize hover:bg-primary/60 transition-colors z-30 group"
-          title="Drag to resize terminal window"
+          className="absolute left-0 top-0 w-1.5 h-full cursor-col-resize hover:bg-primary/50 transition-colors z-30 group"
+          title="Drag to resize console"
         >
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r bg-border group-hover:bg-primary transition-colors" />
+          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 rounded-r bg-slate-700 group-hover:bg-primary transition-colors" />
         </div>
       )}
 
-      {/* PowerShell Window Header */}
-      <div className="px-3.5 py-2.5 border-b border-[#1e293b] flex items-center justify-between bg-[#0e1420]">
-        <div className="flex items-center gap-2 min-w-0">
-          <div className="flex items-center gap-1.5">
-            <span className="w-2.5 h-2.5 rounded-full bg-rose-500/80 inline-block" />
-            <span className="w-2.5 h-2.5 rounded-full bg-amber-500/80 inline-block" />
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
+      {/* Clean Console Header */}
+      <div className="px-3.5 py-2.5 border-b border-[#1e293b] flex items-center justify-between bg-[#101622]">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="flex items-center gap-1.5 text-slate-300">
+            <Terminal className="w-3.5 h-3.5 text-slate-400" />
+            <span className="text-xs font-semibold font-sans text-slate-200">Execution Console</span>
           </div>
-          <div className="flex items-center gap-1.5 ml-2 min-w-0">
-            <Terminal className="w-3.5 h-3.5 text-primary shrink-0" />
-            <span className="text-xs font-semibold font-mono text-slate-200 truncate">
-              PowerShell <span className="text-text-muted text-[10px]">&gt;_ NexusGraph</span>
-            </span>
-          </div>
+
           {isDiscovering ? (
-            <span className="flex items-center gap-1 text-[9px] px-2 py-0.5 rounded bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 animate-pulse font-semibold">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-              RUNNING
+            <span className="flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-sans font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              Active
             </span>
           ) : (
-            <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#162032] text-slate-400 border border-[#233149]">
-              IDLE
+            <span className="flex items-center gap-1.5 text-[10px] px-2 py-0.5 rounded-full bg-slate-800/80 text-slate-400 border border-slate-700/60 font-sans">
+              <span className="w-1.5 h-1.5 rounded-full bg-slate-500" />
+              Idle
             </span>
           )}
         </div>
 
-        {/* Header Action Buttons */}
-        <div className="flex items-center gap-1">
+        {/* Action Buttons */}
+        <div className="flex items-center gap-0.5">
           <button
             onClick={handleCopyLogs}
-            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-[#182338] rounded transition-colors"
-            title="Copy logs transcript (PowerShell format)"
+            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition-colors"
+            title="Copy logs to clipboard"
           >
             {copied ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
           </button>
           <button
             onClick={handleDownloadLogs}
-            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-[#182338] rounded transition-colors"
-            title="Export log transcript (.log)"
+            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition-colors"
+            title="Export log file (.log)"
           >
             <Download className="w-3.5 h-3.5" />
           </button>
@@ -277,103 +255,104 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
           </button>
           <button
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-[#182338] rounded transition-colors ml-1"
-            title="Close terminal"
+            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded transition-colors ml-1"
+            title="Close console"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
       </div>
 
-      {/* Execution Progress Bar (PowerShell style) */}
+      {/* Progress Bar */}
       {isDiscovering && totalTransforms > 0 && (
-        <div className="px-3.5 py-2 bg-[#090d14] border-b border-[#1b263b] font-mono text-[10.5px]">
-          <div className="flex items-center justify-between text-slate-400 mb-1">
-            <span className="text-cyan-400 font-semibold">&gt; Processing Transforms:</span>
-            <span className="text-slate-300">
-              {completedTransforms}/{totalTransforms} [{progressPercent}%]
+        <div className="px-3.5 py-2 bg-[#090d14] border-b border-[#1b263b] font-sans text-xs">
+          <div className="flex items-center justify-between text-slate-400 mb-1.5">
+            <span className="text-slate-300 font-medium">Running Transforms</span>
+            <span className="font-mono text-slate-400 text-[11px]">
+              {completedTransforms} / {totalTransforms} ({progressPercent}%)
             </span>
           </div>
-          <div className="w-full h-1.5 bg-[#162032] rounded overflow-hidden">
+          <div className="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
             <div
-              className="h-full bg-gradient-to-r from-cyan-500 to-primary transition-all duration-300 rounded"
+              className="h-full bg-primary transition-all duration-300 rounded-full"
               style={{ width: `${progressPercent}%` }}
             />
           </div>
         </div>
       )}
 
-      {/* Terminal Stream Tabs & Search Filter */}
-      <div className="p-2.5 border-b border-[#1b263b] bg-[#0c111a] space-y-2">
+      {/* Tabs & Search Controls */}
+      <div className="p-2.5 border-b border-[#1e293b] bg-[#0e131d] space-y-2 font-sans">
         <div className="flex items-center justify-between gap-1">
-          <div className="flex items-center gap-1 font-mono">
+          {/* Segmented Filter Pills */}
+          <div className="flex items-center gap-1 bg-[#080c14] p-0.5 rounded-lg border border-[#1e293b]">
             <button
-              onClick={() => setActiveTab('ACTIVITY')}
-              className={`px-2 py-0.5 rounded text-[10.5px] transition-colors ${
-                activeTab === 'ACTIVITY'
-                  ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#162032]'
+              onClick={() => setActiveTab('ALL')}
+              className={`px-2 py-1 rounded text-xs transition-colors ${
+                activeTab === 'ALL'
+                  ? 'bg-slate-800 text-slate-100 font-medium shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Activity ({activityCount})
+              All <span className="font-mono text-[10px] text-slate-500 ml-0.5">({liveDiscoveryLogs.length})</span>
+            </button>
+            <button
+              onClick={() => setActiveTab('ACTIVITY')}
+              className={`px-2 py-1 rounded text-xs transition-colors ${
+                activeTab === 'ACTIVITY'
+                  ? 'bg-slate-800 text-slate-100 font-medium shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              Activity <span className="font-mono text-[10px] text-slate-500 ml-0.5">({activityCount})</span>
             </button>
             <button
               onClick={() => setActiveTab('HTTP')}
-              className={`px-2 py-0.5 rounded text-[10.5px] transition-colors ${
+              className={`px-2 py-1 rounded text-xs transition-colors ${
                 activeTab === 'HTTP'
-                  ? 'bg-sky-500/20 text-sky-300 border border-sky-500/40 font-semibold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#162032]'
+                  ? 'bg-slate-800 text-slate-100 font-medium shadow-sm'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              HTTP ({httpCount})
+              HTTP <span className="font-mono text-[10px] text-slate-500 ml-0.5">({httpCount})</span>
             </button>
             <button
               onClick={() => setActiveTab('ERRORS')}
-              className={`px-2 py-0.5 rounded text-[10.5px] transition-colors ${
+              className={`px-2 py-1 rounded text-xs transition-colors ${
                 activeTab === 'ERRORS'
-                  ? 'bg-rose-500/20 text-rose-300 border border-rose-500/40 font-semibold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#162032]'
+                  ? 'bg-rose-950/40 text-rose-300 border border-rose-800/40 font-medium'
+                  : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              Issues ({warnErrCount})
-            </button>
-            <button
-              onClick={() => setActiveTab('ALL')}
-              className={`px-2 py-0.5 rounded text-[10.5px] transition-colors ${
-                activeTab === 'ALL'
-                  ? 'bg-primary/20 text-primary border border-primary/40 font-semibold'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-[#162032]'
-              }`}
-            >
-              All ({liveDiscoveryLogs.length})
+              Issues <span className="font-mono text-[10px] text-slate-500 ml-0.5">({warnErrCount})</span>
             </button>
           </div>
 
-          <label className="flex items-center gap-1.5 text-[10px] text-slate-400 cursor-pointer select-none font-mono">
+          <label className="flex items-center gap-1.5 text-xs text-slate-400 cursor-pointer select-none font-sans">
             <input
               type="checkbox"
               checked={autoScroll}
               onChange={(e) => setAutoScroll(e.target.checked)}
-              className="rounded bg-[#162032] border-[#2a3b55] text-cyan-500 focus:ring-0 w-3 h-3"
+              className="rounded bg-slate-800 border-slate-700 text-primary focus:ring-0 w-3.5 h-3.5"
             />
             <span>Follow</span>
           </label>
         </div>
 
-        {/* PowerShell-style Prompt Search Input */}
-        <div className="relative flex items-center bg-[#070a10] border border-[#1b263b] rounded px-2 py-1 font-mono text-[11px]">
-          <span className="text-cyan-400 shrink-0 select-none mr-1.5 font-semibold">PS Search:\&gt;</span>
+        {/* Clean Search Input */}
+        <div className="relative flex items-center bg-[#080c14] border border-[#1e293b] rounded-md px-2.5 py-1.5 text-xs">
+          <Search className="w-3.5 h-3.5 text-slate-500 mr-2 shrink-0" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="filter output text or tags..."
-            className="flex-1 bg-transparent text-slate-200 placeholder:text-slate-600 focus:outline-none text-[11px]"
+            placeholder="Search output, collectors, or tags..."
+            className="flex-1 bg-transparent text-slate-200 placeholder:text-slate-600 focus:outline-none text-xs"
           />
           {searchQuery && (
             <button
               onClick={() => setSearchQuery('')}
-              className="text-slate-500 hover:text-slate-200 text-xs px-1"
+              className="text-slate-500 hover:text-slate-300 text-xs px-1"
             >
               ✕
             </button>
@@ -381,20 +360,14 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
         </div>
       </div>
 
-      {/* Pure Terminal Log Feed */}
-      <div className="flex-1 overflow-y-auto p-3 font-mono text-[11px] bg-[#070a10] text-slate-300 select-text space-y-1">
-        {/* Terminal Header Banner */}
-        <div className="text-[10px] text-slate-500 pb-2 mb-2 border-b border-[#162032] select-none leading-relaxed">
-          <div>Windows PowerShell [NexusGraph OSINT Engine v2.4]</div>
-          <div>Dossier stream active. Zero fake data mode enabled.</div>
-        </div>
-
+      {/* Log Feed */}
+      <div className="flex-1 overflow-y-auto p-2.5 font-mono text-[11.5px] bg-[#080c14] text-slate-300 select-text space-y-0.5">
         {filteredLogs.length === 0 ? (
-          <div className="py-8 flex flex-col items-center justify-center text-center text-slate-500 space-y-2 font-mono">
+          <div className="py-12 flex flex-col items-center justify-center text-center text-slate-500 space-y-2 font-sans">
             <Filter className="w-5 h-5 text-slate-600" />
-            <p className="text-xs text-slate-400">No matching terminal output records.</p>
-            <p className="text-[10px] text-slate-600 max-w-[240px]">
-              Active discovery collectors and graph transform operations will output directly to this console.
+            <p className="text-xs text-slate-400 font-medium">No matching log entries</p>
+            <p className="text-[11px] text-slate-600 max-w-[220px]">
+              Logs from collectors and transform jobs will appear here in real-time.
             </p>
           </div>
         ) : (
@@ -408,73 +381,81 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
             const isErr = log.level === 'error';
             const isHttp = log.level === 'http' || log.tag === 'HTTP';
             const isExec = log.level === 'transform' || log.tag === 'SCAN';
-            const isCollect = log.level === 'collector';
 
-            // Prefix formatting purely like PowerShell
-            let prefixTag = '[i] INFO';
-            let prefixColor = 'text-slate-400';
-            let msgColor = 'text-slate-200';
+            let badgeLabel = 'INFO';
+            let badgeStyle = 'text-slate-400 bg-slate-800/80 border-slate-700/60';
+            let msgStyle = 'text-slate-300';
 
             if (isFound) {
-              prefixTag = '[+] FOUND';
-              prefixColor = 'text-emerald-400 font-bold';
-              msgColor = 'text-emerald-300 font-semibold';
+              badgeLabel = 'SUCCESS';
+              badgeStyle = 'text-emerald-400 bg-emerald-950/40 border-emerald-800/40';
+              msgStyle = 'text-emerald-200';
             } else if (isErr) {
-              prefixTag = '[-] ERROR';
-              prefixColor = 'text-rose-400 font-bold';
-              msgColor = 'text-rose-300';
+              badgeLabel = 'ERROR';
+              badgeStyle = 'text-rose-400 bg-rose-950/50 border-rose-800/40';
+              msgStyle = 'text-rose-200';
             } else if (isWarn) {
-              prefixTag = '[!] WARN';
-              prefixColor = 'text-amber-400 font-bold';
-              msgColor = 'text-amber-200';
+              badgeLabel = 'WARN';
+              badgeStyle = 'text-amber-300 bg-amber-950/40 border-amber-800/40';
+              msgStyle = 'text-amber-200';
             } else if (isHttp) {
-              prefixTag = '[>] HTTP';
-              prefixColor = 'text-sky-400 font-semibold';
-              msgColor = 'text-sky-200/90';
+              badgeLabel = 'HTTP';
+              badgeStyle = 'text-sky-400 bg-sky-950/40 border-sky-800/40';
+              msgStyle = 'text-slate-300';
             } else if (isExec) {
-              prefixTag = '[*] EXEC';
-              prefixColor = 'text-amber-300 font-semibold';
-              msgColor = 'text-slate-200';
-            } else if (isCollect) {
-              prefixTag = '[#] COLLECT';
-              prefixColor = 'text-cyan-400 font-semibold';
-              msgColor = 'text-slate-200';
+              badgeLabel = 'EXEC';
+              badgeStyle = 'text-indigo-300 bg-indigo-950/40 border-indigo-800/40';
+              msgStyle = 'text-slate-200';
             } else if (log.tag) {
-              prefixTag = `[${log.tag.toUpperCase()}]`;
-              prefixColor = 'text-cyan-300 font-semibold';
+              badgeLabel = log.tag.toUpperCase();
+              badgeStyle = 'text-slate-400 bg-slate-800/60 border-slate-700/60';
             }
+
+            const timeStr = log.timestamp
+              ? new Date(log.timestamp).toTimeString().split(' ')[0]
+              : '';
 
             return (
               <div
                 key={log.id}
-                className="group py-0.5 px-1 rounded hover:bg-[#111827]/80 transition-colors leading-relaxed font-mono"
+                className="group py-1 px-1.5 rounded hover:bg-[#111724] transition-colors leading-relaxed font-mono"
               >
                 <div className="flex items-start gap-2">
-                  {/* PowerShell Stream Tag */}
-                  <span className={`shrink-0 select-none text-[10.5px] ${prefixColor}`}>
-                    {prefixTag}
+                  {/* Timestamp */}
+                  {timeStr && (
+                    <span className="text-[10px] text-slate-500 select-none shrink-0 pt-0.5">
+                      {timeStr}
+                    </span>
+                  )}
+
+                  {/* Level Badge */}
+                  <span
+                    className={`text-[9px] px-1 py-0.2 rounded border font-sans font-semibold shrink-0 select-none ${badgeStyle}`}
+                  >
+                    {badgeLabel}
                   </span>
 
-                  {/* Clean message text */}
-                  <div className="flex-1 min-w-0 break-words text-[11px]">
-                    <span className={msgColor}>{cleanMsg}</span>
+                  {/* Message */}
+                  <div className="flex-1 min-w-0 break-words text-[11.5px]">
+                    <span className={msgStyle}>{cleanMsg}</span>
                   </div>
 
-                  {/* Inline JSON payload toggle */}
+                  {/* Payload Toggle */}
                   {hasData && (
                     <button
                       onClick={() => toggleExpand(log.id)}
-                      className="opacity-50 group-hover:opacity-100 text-cyan-400 hover:text-cyan-200 flex items-center gap-0.5 text-[9.5px] shrink-0 transition-opacity ml-1 bg-[#162032] px-1.5 py-0.2 rounded border border-[#233149]"
+                      className="opacity-60 group-hover:opacity-100 text-slate-400 hover:text-slate-200 flex items-center gap-1 text-[10px] shrink-0 transition-opacity bg-slate-800/70 hover:bg-slate-800 px-1.5 py-0.5 rounded border border-slate-700/50 font-sans"
                     >
-                      <span>{isExpanded ? '[-] DATA' : '[+] DATA'}</span>
+                      <Code2 className="w-3 h-3" />
+                      <span>{isExpanded ? 'Hide' : 'Payload'}</span>
                       {isExpanded ? <ChevronDown className="w-2.5 h-2.5" /> : <ChevronRight className="w-2.5 h-2.5" />}
                     </button>
                   )}
                 </div>
 
-                {/* Expanded JSON payload block */}
+                {/* Expanded Payload */}
                 {hasData && isExpanded && (
-                  <pre className="mt-1 ml-4 p-2 rounded bg-[#0b1019] border border-[#1b263b] text-[10px] text-cyan-300/90 overflow-x-auto select-all font-mono leading-tight">
+                  <pre className="mt-1.5 ml-4 p-2 rounded bg-[#0d131f] border border-[#1e293b] text-[10.5px] text-slate-300 overflow-x-auto select-all font-mono leading-tight">
                     {JSON.stringify(log.data, null, 2)}
                   </pre>
                 )}
@@ -483,19 +464,18 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
           })
         )}
 
-        {/* PowerShell Cursor Prompt at end */}
-        <div className="pt-2 flex items-center gap-1 text-[11px] text-slate-500 font-mono select-none">
-          <span className="text-cyan-400 font-semibold">PS C:\NexusGraph\&gt;</span>
-          {isDiscovering ? (
-            <span className="text-emerald-400 flex items-center gap-1">
-              running transforms... <span className="inline-block w-2 h-3.5 bg-emerald-400 animate-pulse" />
-            </span>
-          ) : (
-            <span className="text-slate-600 animate-pulse">_</span>
-          )}
-        </div>
-
         <div ref={logEndRef} />
+      </div>
+
+      {/* Stream Footer */}
+      <div className="px-3 py-1.5 border-t border-[#1e293b] bg-[#0e131d] text-[11px] text-slate-500 font-sans flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+          <span>Stream connected</span>
+        </div>
+        <span className="font-mono text-[10.5px] text-slate-500">
+          {filteredLogs.length} / {liveDiscoveryLogs.length} events
+        </span>
       </div>
     </aside>
   );

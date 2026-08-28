@@ -340,7 +340,7 @@ export function InvestigationDetailPage() {
         {/* Action buttons */}
         <div className="flex items-center gap-2">
           {/* Workspace view switcher */}
-          <div className="hidden sm:flex items-center bg-surface-2 p-0.5 rounded-button border border-border-subtle">
+          <div className="hidden sm:flex items-center bg-[#0d121c] p-0.5 rounded-lg border border-[#1e293b]">
             {(
               [
                 { id: 'graph', label: 'Graph', icon: Network },
@@ -354,10 +354,10 @@ export function InvestigationDetailPage() {
                 <button
                   key={v.id}
                   onClick={() => setActiveWorkspaceView(v.id)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-button transition-colors ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-colors ${
                     active
-                      ? 'bg-primary text-white font-semibold shadow-sm'
-                      : 'text-text-muted hover:text-text'
+                      ? 'bg-slate-800 text-slate-100 font-medium shadow-sm border border-slate-700/60'
+                      : 'text-slate-400 hover:text-slate-200'
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -369,7 +369,7 @@ export function InvestigationDetailPage() {
 
           <button
             onClick={handleRefresh}
-            className="p-2 rounded-button text-text-muted hover:text-text hover:bg-surface-2 transition-colors"
+            className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent hover:border-slate-700/50 transition-colors"
             title="Refresh graph"
           >
             <RefreshCw className="w-3.5 h-3.5" />
@@ -377,21 +377,21 @@ export function InvestigationDetailPage() {
 
           <button
             onClick={() => setLiveLogsOpen(!liveLogsOpen)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-button border transition-all ${
+            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border transition-all ${
               liveLogsOpen
-                ? 'bg-primary/20 border-primary text-primary font-semibold shadow-sm'
+                ? 'bg-slate-800 border-slate-700 text-slate-100 font-medium shadow-sm'
                 : isDiscovering
-                  ? 'bg-emerald-500/15 border-emerald-500/50 text-emerald-300 animate-pulse'
-                  : 'bg-surface-2 border-border-subtle text-text-muted hover:text-text hover:border-border'
+                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
+                  : 'bg-[#101622] border-[#1e293b] text-slate-400 hover:text-slate-200 hover:border-slate-700'
             }`}
-            title="Toggle Real-Time Discovery Logs Console"
+            title="Toggle Discovery Logs Console"
           >
-            <Terminal className="w-3.5 h-3.5 text-primary" />
-            <span className="hidden sm:inline">Live Logs</span>
+            <Terminal className="w-3.5 h-3.5 text-slate-400" />
+            <span className="hidden sm:inline">Console</span>
             {isDiscovering ? (
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
             ) : liveDiscoveryLogs.length > 0 ? (
-              <span className="text-[10px] px-1 py-0.2 rounded bg-surface-3 text-text-muted font-mono">
+              <span className="text-[10px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
                 {liveDiscoveryLogs.length}
               </span>
             ) : null}
@@ -400,7 +400,7 @@ export function InvestigationDetailPage() {
           <Button
             variant="secondary"
             size="sm"
-            icon={<Download className="w-3.5 h-3.5" />}
+            icon={<Download className="w-3.5 h-3.5 text-slate-400" />}
             onClick={() => setExportModalOpen(true)}
           >
             <span className="hidden md:inline">Export Dossier</span>
@@ -411,7 +411,7 @@ export function InvestigationDetailPage() {
             size="sm"
             icon={<Compass className="w-3.5 h-3.5" />}
             onClick={() => setDiscoveryModalOpen(true)}
-            className="shadow-sm font-semibold"
+            className="font-medium"
           >
             <span>Start Discovery</span>
           </Button>

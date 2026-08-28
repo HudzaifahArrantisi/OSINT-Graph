@@ -101,6 +101,7 @@ export function StartDiscoveryModal({
 
     clearLiveLogs();
     setIsDiscovering(true);
+    setLiveLogsOpen(true);
     addToast('Discovery started in background...', 'info');
 
     // Close modal after triggering so user immediately sees graph/map updating

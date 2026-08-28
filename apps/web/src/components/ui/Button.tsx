@@ -12,11 +12,11 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const base = 'inline-flex items-center justify-center font-medium transition-all duration-micro select-none focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-1 focus-visible:ring-offset-app disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none active:scale-[0.98]';
 
     const variants = {
-      primary: 'bg-primary hover:bg-primary-hover text-white shadow-sm shadow-primary/20',
-      secondary: 'bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text border border-border-subtle',
-      ghost: 'bg-transparent hover:bg-surface-2 text-text-secondary hover:text-text',
-      danger: 'bg-status-danger/15 hover:bg-status-danger/25 text-status-danger border border-status-danger/30',
-      outline: 'bg-transparent hover:bg-surface-2 text-text-secondary hover:text-text border border-border-subtle',
+      primary: 'bg-blue-600 hover:bg-blue-500 text-white shadow-sm font-medium transition-colors',
+      secondary: 'bg-[#131926] hover:bg-[#1c2436] text-slate-300 hover:text-slate-100 border border-[#232f46] font-medium transition-colors',
+      ghost: 'bg-transparent hover:bg-slate-800/70 text-slate-300 hover:text-slate-100 font-medium transition-colors',
+      danger: 'bg-rose-950/30 hover:bg-rose-950/50 text-rose-300 hover:text-rose-200 border border-rose-800/40 font-medium transition-colors',
+      outline: 'bg-transparent hover:bg-slate-800 text-slate-300 hover:text-slate-100 border border-slate-700 font-medium transition-colors',
     };
 
     const sizes = {

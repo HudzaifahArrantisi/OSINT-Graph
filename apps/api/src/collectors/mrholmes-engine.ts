@@ -53,6 +53,33 @@ export interface MrHolmesDomainRobots {
   error?: string;
 }
 
+export interface MrHolmesPhoneLocation {
+  type: 'area' | 'timezone' | 'country';
+  query: string;
+  lat: number;
+  lon: number;
+  displayName: string;
+}
+
+export interface MrHolmesPhoneMetadata {
+  valid?: boolean | null;
+  possible?: boolean | null;
+  carrier?: string | null;
+  country?: string | null;
+  countryCode?: string | null;
+  countryPrefix?: string | null;
+  area?: string | null;
+  timezones?: string[];
+  locations?: MrHolmesPhoneLocation[];
+  formats?: {
+    e164?: string;
+    international?: string;
+    rfc3966?: string;
+    national?: string;
+  };
+  error?: string;
+}
+
 export type MrHolmesMode = 'username' | 'people' | 'email' | 'phone' | 'domain';
 
 export interface MrHolmesBridgeOutput {
@@ -64,6 +91,7 @@ export interface MrHolmesBridgeOutput {
   valid?: boolean;
   providers?: MrHolmesProviderResult[];
   githubUsers?: { username: string; url: string }[];
+  phoneMetadata?: MrHolmesPhoneMetadata;
   dorks?: string[];
   robots?: MrHolmesDomainRobots;
   error?: string;
@@ -343,6 +371,88 @@ export const mrholmesEngineCollector: Collector = {
           confidence: 80,
           reason: 'GitHub user publicly lists this exact email address (original Mr.Holmes engine lookup).',
         });
+      }
+    }
+
+    // ── Mode phone: carrier, country, approximate geolocation ──────────
+    if (output.phoneMetadata) {
+      const pm = output.phoneMetadata;
+
+      evidence.push({
+        source_url: `tel:${value}`,
+        source_type: 'PHONE_METADATA',
+        title: `Mr.Holmes Phone OSINT: ${value}`,
+        extracted_value: `Carrier: ${pm.carrier || 'N/A'}, Country: ${pm.country || 'N/A'}, Area: ${pm.area || 'N/A'}`,
+        confidence: pm.valid ? 85 : 60,
+        metadata: {
+          engine: 'mrholmes-python-vendored',
+          valid: pm.valid,
+          possible: pm.possible,
+          carrier: pm.carrier,
+          country: pm.country,
+          countryCode: pm.countryCode,
+          countryPrefix: pm.countryPrefix,
+          area: pm.area,
+          timezones: pm.timezones,
+          formats: pm.formats,
+        },
+      });
+
+      if (pm.locations && Array.isArray(pm.locations)) {
+        for (const loc of pm.locations) {
+          const locVal = `geo:${loc.lat.toFixed(6)},${loc.lon.toFixed(6)}`;
+          const locTitle = loc.displayName || `${loc.query} (${loc.type})`;
+          const confidence = loc.type === 'area' ? 65 : loc.type === 'timezone' ? 50 : 40;
+
+          entities.push({
+            type: 'LOCATION',
+            value: locVal,
+            title: `${locTitle} (Mr.Holmes)`,
+            confidence,
+            metadata: {
+              lat: loc.lat,
+              lng: loc.lon,
+              latitude: loc.lat,
+              longitude: loc.lon,
+              precision: loc.type === 'area' ? 'CITY' : loc.type === 'timezone' ? 'TIMEZONE' : 'COUNTRY',
+              displayName: loc.displayName,
+              query: loc.query,
+              locationType: loc.type,
+              sourcePhone: value,
+              carrier: pm.carrier,
+              country: pm.country,
+              source: sourceMeta({
+                url: `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(loc.query)}`,
+                derivedFrom: value,
+              }),
+            },
+          });
+
+          relationships.push({
+            source_value: value,
+            source_type: 'PHONE',
+            target_value: locVal,
+            target_type: 'LOCATION',
+            relationship_type: 'BELONGS_TO',
+            confidence,
+            reason: `Mr.Holmes geocoded approximate ${loc.type} "${loc.query}" to ${loc.displayName}`,
+          });
+
+          evidence.push({
+            source_url: `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(loc.query)}`,
+            source_type: 'PHONE_METADATA',
+            title: `Mr.Holmes Geolocation (${loc.type}): ${loc.query}`,
+            extracted_value: locVal,
+            confidence,
+            metadata: {
+              engine: 'mrholmes-python-vendored',
+              lat: loc.lat,
+              lon: loc.lon,
+              displayName: loc.displayName,
+              locationType: loc.type,
+            },
+          });
+        }
       }
     }
 

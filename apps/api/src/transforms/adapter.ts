@@ -206,18 +206,14 @@ const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
   },
   'mentions.search-public-web': {
     deriveInput: (v, st, analysis) => {
-      // Web search works with any text-based query
-      if (st === 'ORGANIZATION' || st === 'USERNAME' || st === 'DOMAIN' || st === 'PERSON' || st === 'NAME') {
+      // Only allowed for DOMAIN, IP_ADDRESS, URL, ORGANIZATION
+      if (st === 'ORGANIZATION' || st === 'DOMAIN' || st === 'IP_ADDRESS' || st === 'URL') {
         return v.trim();
       }
-      // For SOCIAL_PROFILE, use the username if available, otherwise the raw value
-      if (st === 'SOCIAL_PROFILE') {
-        return analysis.extractedUsername || v.trim();
+      if (analysis.isUrl || analysis.isIpAddress || analysis.isDomain) {
+        return v.trim();
       }
-      // For URLs, search by the domain or path
-      if (analysis.isUrl) return v.trim();
-      // Default: use the raw value
-      return v.trim();
+      return null;
     },
     collectors: [{ name: 'web-search' }],
   },

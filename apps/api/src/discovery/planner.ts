@@ -27,6 +27,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'domain.find-subdomains-crt',
     'contact.find-official-contact',
     'intelligence.generate-dorks',
+    'mentions.search-public-web',
   ],
   DOMAIN: [
     'domain.resolve-dns',
@@ -41,7 +42,6 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   EMAIL: [
     'domain.resolve-dns',
     'developer.github-profile',
-    'mentions.search-public-web',
     'contact.email-breach-lookup',
   ],
   USERNAME: [
@@ -51,7 +51,6 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'developer.github-profile',
     'developer.gitlab-profile',
     'social.youtube-channel',
-    'mentions.search-public-web',
   ],
   ORGANIZATION: [
     'web.discover-official-site',
@@ -64,7 +63,6 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   PERSON: [
     'web.discover-official-site',
     'social.mrholmes-engine',
-    'mentions.search-public-web',
     'social.youtube-channel',
     'developer.github-profile',
     'developer.gitlab-profile',
@@ -72,26 +70,24 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   NAME: [
     'web.discover-official-site',
     'social.mrholmes-engine',
-    'mentions.search-public-web',
     'social.youtube-channel',
     'developer.github-profile',
     'developer.gitlab-profile',
   ],
   IP_ADDRESS: [
     'domain.resolve-dns',
+    'mentions.search-public-web',
   ],
   SOCIAL_PROFILE: [
     'social.discover-public-profiles',
     'developer.github-profile',
     'developer.gitlab-profile',
     'social.youtube-channel',
-    'mentions.search-public-web',
     'domain.webpage-metadata',
   ],
   PHONE: [
     'phone.geo-metadata',
     'contact.mrholmes-phone',
-    'mentions.search-public-web',
   ],
 };
 

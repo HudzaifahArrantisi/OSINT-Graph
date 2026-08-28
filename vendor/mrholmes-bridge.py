@@ -267,9 +267,104 @@ def run_email(value):
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Mode (2): PHONE-NUMBER-OSINT — dorks + fingerprints
+# Mode (2): PHONE-NUMBER-OSINT — carrier, metadata, geolocation + dorks
 # ─────────────────────────────────────────────────────────────────────
 def run_phone(value):
+    phone_meta = {
+        "valid": None,
+        "possible": None,
+        "carrier": None,
+        "country": None,
+        "countryCode": None,
+        "countryPrefix": None,
+        "area": None,
+        "timezones": [],
+        "locations": [],
+        "formats": {},
+    }
+
+    try:
+        import phonenumbers
+        from phonenumbers import carrier as p_carrier
+        from phonenumbers import geocoder as p_geocoder
+        from phonenumbers import timezone as p_timezone
+        import urllib.request
+        import urllib.parse
+
+        raw_val = value.strip()
+        formatted_val = raw_val if raw_val.startswith("+") else "+" + raw_val
+        parsed = phonenumbers.parse(formatted_val, None)
+
+        phone_meta["valid"] = phonenumbers.is_valid_number(parsed)
+        phone_meta["possible"] = phonenumbers.is_possible_number(parsed)
+
+        code_num = parsed.country_code
+        phone_meta["countryPrefix"] = f"+{code_num}"
+        phone_meta["countryCode"] = phonenumbers.region_code_for_country_code(code_num)
+        phone_meta["country"] = p_geocoder.country_name_for_number(parsed, "en") or None
+        phone_meta["area"] = p_geocoder.description_for_number(parsed, "en") or None
+        phone_meta["carrier"] = p_carrier.name_for_number(parsed, "en") or None
+        phone_meta["timezones"] = list(p_timezone.time_zones_for_number(parsed))
+
+        phone_meta["formats"] = {
+            "e164": phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164),
+            "international": phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL),
+            "rfc3966": phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.RFC3966),
+            "national": phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL),
+        }
+
+        def fetch_geo(query_str, loc_type):
+            if not query_str or query_str in ("Unknown", "None", ""):
+                return None
+            try:
+                clean_q = query_str.strip()
+                if "/" in clean_q:
+                    clean_q = clean_q.split("/")[-1]
+                encoded_q = urllib.parse.quote(clean_q)
+                url = f"https://nominatim.openstreetmap.org/search?q={encoded_q}&format=json&limit=1"
+                req = urllib.request.Request(
+                    url,
+                    headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"}
+                )
+                with urllib.request.urlopen(req, timeout=6) as resp:
+                    data = json.loads(resp.read().decode("utf-8"))
+                    if data and len(data) > 0:
+                        lat = float(data[0].get("lat"))
+                        lon = float(data[0].get("lon"))
+                        display_name = data[0].get("display_name", clean_q)
+                        return {
+                            "type": loc_type,
+                            "query": query_str,
+                            "lat": lat,
+                            "lon": lon,
+                            "displayName": display_name,
+                        }
+            except Exception:
+                pass
+            return None
+
+        # Geocode Area
+        if phone_meta["area"] and phone_meta["area"] != phone_meta["country"]:
+            area_geo = fetch_geo(phone_meta["area"], "area")
+            if area_geo:
+                phone_meta["locations"].append(area_geo)
+
+        # Geocode Timezones
+        for tz in phone_meta["timezones"][:2]:
+            tz_geo = fetch_geo(tz, "timezone")
+            if tz_geo:
+                if not any(abs(l["lat"] - tz_geo["lat"]) < 0.001 and abs(l["lon"] - tz_geo["lon"]) < 0.001 for l in phone_meta["locations"]):
+                    phone_meta["locations"].append(tz_geo)
+
+        # Geocode Country fallback
+        if not phone_meta["locations"] and phone_meta["country"]:
+            country_geo = fetch_geo(phone_meta["country"], "country")
+            if country_geo:
+                phone_meta["locations"].append(country_geo)
+
+    except Exception as e:
+        phone_meta["error"] = str(e)
+
     dork_report = temp_report("Phone", "dorks.txt")
     dorks = generate_dorks(
         value,
@@ -281,7 +376,12 @@ def run_phone(value):
         ],
         dork_report,
     )
-    return {"mode": "phone", "value": value, "dorks": dorks}
+    return {
+        "mode": "phone",
+        "value": value,
+        "phoneMetadata": phone_meta,
+        "dorks": dorks,
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────

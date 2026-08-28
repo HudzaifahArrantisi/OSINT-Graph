@@ -63,12 +63,16 @@ describe('phone-geo collector', () => {
     expect(phone!.metadata?.carrier).toBe('Telkomsel');
   });
 
-  it('rejects bare digits without + or trunk 0 with explicit guidance', async () => {
-    await expect(phoneGeoCollector.run('85219545503', ctx)).rejects.toThrow(/country code context/i);
+  it('resolves bare country-code prefix format (628...) to Indonesia', async () => {
+    const result = await phoneGeoCollector.run('6285219545503', ctx);
+    const phone = result.entities.find((e) => e.type === 'PHONE');
+    expect(phone!.value).toBe('+6285219545503');
+    expect(phone!.metadata?.countryIso).toBe('ID');
+    expect(phone!.metadata?.carrier).toBe('Telkomsel');
   });
 
-  it('throws on numbers without any country code context that cannot parse', async () => {
-    await expect(phoneGeoCollector.run('abc-not-a-phone', ctx)).rejects.toThrow(/Invalid phone seed/i);
+  it('rejects bare national digits without valid country context', async () => {
+    await expect(phoneGeoCollector.run('12345', ctx)).rejects.toThrow(/Invalid phone seed/i);
   });
 });
 

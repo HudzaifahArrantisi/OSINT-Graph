@@ -60,5 +60,40 @@ describe('Discovery & Seed Classification Tests', () => {
     expect(transformIds).toContain('domain.resolve-dns');
     expect(transformIds).toContain('domain.find-tls');
     expect(transformIds).toContain('domain.webpage-metadata');
+    expect(transformIds).toContain('mentions.search-public-web');
+  });
+
+  it('should strictly limit Public Web Mentions to DOMAIN, IP_ADDRESS, URL, and ORGANIZATION only', () => {
+    // Permitted categories
+    const domainPlan = buildDiscoveryPlan('DOMAIN', 'example.com');
+    expect(domainPlan.transforms.map((t) => t.id)).toContain('mentions.search-public-web');
+
+    const urlPlan = buildDiscoveryPlan('URL', 'https://example.com');
+    expect(urlPlan.transforms.map((t) => t.id)).toContain('mentions.search-public-web');
+
+    const ipPlan = buildDiscoveryPlan('IP_ADDRESS', '93.184.216.34');
+    expect(ipPlan.transforms.map((t) => t.id)).toContain('mentions.search-public-web');
+
+    const orgPlan = buildDiscoveryPlan('ORGANIZATION', 'Example Corp');
+    expect(orgPlan.transforms.map((t) => t.id)).toContain('mentions.search-public-web');
+
+    // Forbidden categories
+    const emailPlan = buildDiscoveryPlan('EMAIL', 'test@example.com');
+    expect(emailPlan.transforms.map((t) => t.id)).not.toContain('mentions.search-public-web');
+
+    const usernamePlan = buildDiscoveryPlan('USERNAME', 'johndoe');
+    expect(usernamePlan.transforms.map((t) => t.id)).not.toContain('mentions.search-public-web');
+
+    const personPlan = buildDiscoveryPlan('PERSON', 'John Doe');
+    expect(personPlan.transforms.map((t) => t.id)).not.toContain('mentions.search-public-web');
+
+    const namePlan = buildDiscoveryPlan('NAME', 'John Doe');
+    expect(namePlan.transforms.map((t) => t.id)).not.toContain('mentions.search-public-web');
+
+    const socialPlan = buildDiscoveryPlan('SOCIAL_PROFILE', 'johndoe');
+    expect(socialPlan.transforms.map((t) => t.id)).not.toContain('mentions.search-public-web');
+
+    const phonePlan = buildDiscoveryPlan('PHONE', '+12025550123');
+    expect(phonePlan.transforms.map((t) => t.id)).not.toContain('mentions.search-public-web');
   });
 });

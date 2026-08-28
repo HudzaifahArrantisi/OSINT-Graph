@@ -129,6 +129,11 @@ export function normalizePhone(input: string): string {
     return `+${phone.slice(2)}`;
   }
 
+  // Common Indonesian country prefix entered without '+' (e.g. 628...)
+  if (!hasPlus && phone.startsWith('62') && phone.length >= 10) {
+    return `+${phone}`;
+  }
+
   return hasPlus ? `+${phone}` : phone;
 }
 

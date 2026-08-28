@@ -51,7 +51,16 @@ describe('mrholmes-engine collector', () => {
     }
   }, 240_000);
 
+  it('extracts phone metadata, geolocation, and dorks for PHONE seed', async () => {
+    const result = await mrholmesEngineCollector.run('+6281385718755', ctx);
+    expect(result).toBeDefined();
+    expect(result.evidence.some((ev) => ev.source_type === 'PHONE_METADATA')).toBe(true);
+    // Dorks or locations should be present
+    expect(result.entities.length).toBeGreaterThan(0);
+  }, 30_000);
+
   it('bridge rejects unsupported modes via the JSON contract', async () => {
     await expect(runMrHolmesBridge('nonsense' as never, 'x', ctx.signal)).rejects.toThrow(/bridge error/i);
   });
 });
+
