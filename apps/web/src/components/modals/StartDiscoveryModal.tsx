@@ -3,7 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { SEED_TYPES, SeedType, TransformDefinition } from '@nexusgraph/shared';
+import { SEED_TYPES, SeedType, SEED_PLACEHOLDERS, TransformDefinition } from '@nexusgraph/shared';
 import {
   Sparkles,
   ShieldAlert,
@@ -321,21 +321,7 @@ export function StartDiscoveryModal({
           {/* Seed Input Value */}
           <Input
             label="Seed Target (Starting Point)"
-            placeholder={
-              seedType === 'ORGANIZATION'
-                ? 'e.g. Nurul Fikri, Acme Corp, OWASP'
-                : seedType === 'DOMAIN'
-                  ? 'e.g. example.com'
-                  : seedType === 'EMAIL'
-                    ? 'e.g. security@example.com'
-                    : seedType === 'USERNAME'
-                      ? 'e.g. target_handle'
-                      : seedType === 'PERSON' || seedType === 'NAME'
-                        ? 'e.g. John Doe'
-                        : seedType === 'IP_ADDRESS'
-                          ? 'e.g. 93.184.216.34'
-                          : 'https://example.com/target'
-            }
+            placeholder={SEED_PLACEHOLDERS[seedType] || 'Enter target seed...'}
             value={seedValue}
             onChange={(e) => setSeedValue(e.target.value)}
             error={error}

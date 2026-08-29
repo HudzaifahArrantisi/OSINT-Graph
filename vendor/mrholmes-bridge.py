@@ -267,7 +267,7 @@ def run_email(value):
 
 
 # ─────────────────────────────────────────────────────────────────────
-# Mode (2): PHONE-NUMBER-OSINT — carrier, metadata, geolocation + dorks
+# Mode (2): PHONE-NUMBER-OSINT — carrier, metadata, geolocation + lookups
 # ─────────────────────────────────────────────────────────────────────
 def run_phone(value):
     phone_meta = {
@@ -281,6 +281,7 @@ def run_phone(value):
         "timezones": [],
         "locations": [],
         "formats": {},
+        "lookups": [],
     }
 
     try:
@@ -299,17 +300,34 @@ def run_phone(value):
         phone_meta["possible"] = phonenumbers.is_possible_number(parsed)
 
         code_num = parsed.country_code
-        phone_meta["countryPrefix"] = f"+{code_num}"
+        number_code = f"+{code_num}"
+        phone_meta["countryPrefix"] = number_code
         phone_meta["countryCode"] = phonenumbers.region_code_for_country_code(code_num)
         phone_meta["country"] = p_geocoder.country_name_for_number(parsed, "en") or None
-        phone_meta["area"] = p_geocoder.description_for_number(parsed, "en") or None
+        location_desc = p_geocoder.description_for_number(parsed, "en") or None
+        phone_meta["area"] = location_desc
         phone_meta["carrier"] = p_carrier.name_for_number(parsed, "en") or None
         phone_meta["timezones"] = list(p_timezone.time_zones_for_number(parsed))
 
+        intl_str = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL)
+        e164_str = phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164)
+        local_num = e164_str.replace(number_code, "").replace("+", "")
+
+        # Format calculations as done in Mr.Holmes Numbers.py
+        fmt2 = str(intl_str).replace(number_code, "").replace(" ", "-")
+        fmt3 = fmt2.replace("-", "", 1) if fmt2.startswith("-") else fmt2
+        fmt4 = str(intl_str).replace(number_code, "0").replace(" ", "")
+        fmt1 = "({}){}".format(number_code, fmt3)
+        fmt5 = fmt4.replace("0", "", 1) if fmt4.startswith("0") else fmt4
+
         phone_meta["formats"] = {
-            "e164": phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.E164),
-            "international": phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.INTERNATIONAL),
-            "rfc3966": phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.RFC3966),
+            "e164": e164_str,
+            "localNumber": local_num,
+            "international": intl_str,
+            "rfc3966": fmt1,
+            "local": fmt3,
+            "local2": fmt4,
+            "local3": fmt5,
             "national": phonenumbers.format_number(parsed, phonenumbers.PhoneNumberFormat.NATIONAL),
         }
 
@@ -343,24 +361,54 @@ def run_phone(value):
                 pass
             return None
 
-        # Geocode Area
-        if phone_meta["area"] and phone_meta["area"] != phone_meta["country"]:
-            area_geo = fetch_geo(phone_meta["area"], "area")
+        # 1. Geocode Area/Zone (e.g. Indonesia or City)
+        if location_desc:
+            area_query = location_desc.split(" ", 1)[1] if " " in location_desc else location_desc
+            area_geo = fetch_geo(area_query, "area")
             if area_geo:
                 phone_meta["locations"].append(area_geo)
 
-        # Geocode Timezones
+        # 2. Geocode Timezones (e.g. Asia/Jakarta -> Jakarta)
         for tz in phone_meta["timezones"][:2]:
-            tz_geo = fetch_geo(tz, "timezone")
+            tz_city = tz.split("/")[-1]
+            tz_geo = fetch_geo(tz_city, "timezone")
             if tz_geo:
                 if not any(abs(l["lat"] - tz_geo["lat"]) < 0.001 and abs(l["lon"] - tz_geo["lon"]) < 0.001 for l in phone_meta["locations"]):
                     phone_meta["locations"].append(tz_geo)
 
-        # Geocode Country fallback
+        # 3. Geocode Country fallback if no locations yet
         if not phone_meta["locations"] and phone_meta["country"]:
             country_geo = fetch_geo(phone_meta["country"], "country")
             if country_geo:
                 phone_meta["locations"].append(country_geo)
+
+        # 4. Search Phone Lookup Sites (Mr.Holmes Site_lists/Phone/Lookup)
+        country_code = phone_meta["countryCode"] or "UNDEFINED"
+        lookup_map = {
+            "US": "USA_phone.json",
+            "IT": "ITA_phone.json",
+            "DE": "DEU_phone.json",
+            "FR": "FRA_phone.json",
+            "RO": "ROU_phone.json",
+            "CH": "SWIS_phone.json",
+        }
+        lookup_filename = lookup_map.get(country_code, "Undefined.json")
+        lookup_path = os.path.join(VENDOR_ROOT, "Site_lists", "Phone", "Lookup", lookup_filename)
+        if os.path.isfile(lookup_path):
+            with open(lookup_path, encoding="utf-8") as lf:
+                lookup_data = json.load(lf)
+            clean_digits = raw_val.replace("+", "").replace(" ", "").replace("-", "")
+            for entry in lookup_data:
+                for site_key, site_info in entry.items():
+                    s_name = site_info.get("name", site_key)
+                    s_url_tmpl = site_info.get("url", "")
+                    if s_url_tmpl:
+                        s_url = s_url_tmpl.replace("{}", clean_digits)
+                        phone_meta["lookups"].append({
+                            "name": s_name,
+                            "url": s_url,
+                            "tags": site_info.get("Tag", ["Phone-Lookup"]),
+                        })
 
     except Exception as e:
         phone_meta["error"] = str(e)

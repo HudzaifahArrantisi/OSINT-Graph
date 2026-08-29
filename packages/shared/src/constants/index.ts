@@ -79,6 +79,19 @@ export const SEED_TYPES = [
 
 export type SeedType = (typeof SEED_TYPES)[number];
 
+export const SEED_PLACEHOLDERS: Record<SeedType, string> = {
+  USERNAME: 'e.g. johndoe_sec, target_handle',
+  EMAIL: 'e.g. security@company.com, admin@target.org',
+  DOMAIN: 'e.g. example.com, target-domain.org',
+  IP_ADDRESS: 'e.g. 93.184.216.34 or 2606:2800:220:1:248:1893:25c8:1946',
+  URL: 'e.g. https://example.com/target, https://sub.target.org/page',
+  ORGANIZATION: 'e.g. Acme Corp, OWASP Foundation, Nurul Fikri',
+  SOCIAL_PROFILE: 'e.g. https://github.com/torvalds, https://x.com/target',
+  PERSON: 'e.g. Johnathan Doe, Sarah Connor',
+  NAME: 'e.g. John Doe, Alice Smith',
+  PHONE: 'e.g. +6281234567890, +1-555-0199',
+};
+
 // Collector run status
 export const COLLECTOR_STATUSES = [
   'QUEUED',

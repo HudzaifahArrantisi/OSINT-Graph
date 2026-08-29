@@ -69,192 +69,192 @@ const ENTITY_THEMES: Record<
   }
 > = {
   SEED: {
-    border: 'border-amber-400',
-    bg: 'bg-amber-950/90',
-    iconColor: 'text-amber-300',
-    glow: 'shadow-[0_0_18px_rgba(245,158,11,0.45)] ring-2 ring-amber-400/50',
-    badge: 'bg-amber-500/20 text-amber-300 border-amber-500/40',
-    labelColor: 'text-amber-300 font-semibold',
+    border: 'border-amber-500/90',
+    bg: 'bg-[#1e1709]',
+    iconColor: 'text-amber-400',
+    glow: 'shadow-[0_0_12px_rgba(245,158,11,0.25)] ring-1 ring-amber-400/40',
+    badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
+    labelColor: 'text-amber-200 font-semibold',
     accentColor: 'border-t-amber-400',
   },
   DOMAIN: {
-    border: 'border-sky-400',
-    bg: 'bg-[#0b172a]',
+    border: 'border-sky-600/70',
+    bg: 'bg-[#0b1424]',
     iconColor: 'text-sky-400',
-    glow: 'shadow-[0_0_12px_rgba(56,189,248,0.35)]',
-    badge: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
-    labelColor: 'text-sky-200',
+    glow: 'shadow-sm',
+    badge: 'bg-sky-500/15 text-sky-300 border-sky-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-sky-400',
   },
   SUBDOMAIN: {
-    border: 'border-sky-400',
-    bg: 'bg-[#09182a]',
+    border: 'border-sky-600/70',
+    bg: 'bg-[#0b1424]',
     iconColor: 'text-sky-400',
-    glow: 'shadow-[0_0_12px_rgba(56,189,248,0.35)]',
-    badge: 'bg-sky-500/20 text-sky-300 border-sky-500/30',
-    labelColor: 'text-sky-200',
+    glow: 'shadow-sm',
+    badge: 'bg-sky-500/15 text-sky-300 border-sky-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-sky-400',
   },
   IP_ADDRESS: {
-    border: 'border-cyan-400',
-    bg: 'bg-[#081b24]',
+    border: 'border-cyan-600/70',
+    bg: 'bg-[#081720]',
     iconColor: 'text-cyan-400',
-    glow: 'shadow-[0_0_12px_rgba(6,182,212,0.35)]',
-    badge: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
-    labelColor: 'text-cyan-200',
+    glow: 'shadow-sm',
+    badge: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-cyan-400',
   },
   EMAIL: {
-    border: 'border-emerald-400',
-    bg: 'bg-[#091e17]',
+    border: 'border-emerald-600/70',
+    bg: 'bg-[#091a14]',
     iconColor: 'text-emerald-400',
-    glow: 'shadow-[0_0_12px_rgba(16,185,129,0.35)]',
-    badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    labelColor: 'text-emerald-200',
+    glow: 'shadow-sm',
+    badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-emerald-400',
   },
   USERNAME: {
-    border: 'border-amber-400',
-    bg: 'bg-[#1e1708]',
+    border: 'border-amber-600/70',
+    bg: 'bg-[#181309]',
     iconColor: 'text-amber-400',
-    glow: 'shadow-[0_0_12px_rgba(245,158,11,0.35)]',
-    badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-    labelColor: 'text-amber-200',
+    glow: 'shadow-sm',
+    badge: 'bg-amber-500/15 text-amber-300 border-amber-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-amber-400',
   },
   URL: {
-    border: 'border-blue-400',
-    bg: 'bg-[#0a152d]',
+    border: 'border-blue-600/70',
+    bg: 'bg-[#0b1326]',
     iconColor: 'text-blue-400',
-    glow: 'shadow-[0_0_12px_rgba(96,165,250,0.35)]',
-    badge: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    labelColor: 'text-blue-200',
+    glow: 'shadow-sm',
+    badge: 'bg-blue-500/15 text-blue-300 border-blue-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-blue-400',
   },
   SOCIAL_PROFILE: {
-    border: 'border-purple-400',
-    bg: 'bg-[#1b0d2d]',
+    border: 'border-purple-600/70',
+    bg: 'bg-[#150d24]',
     iconColor: 'text-purple-400',
-    glow: 'shadow-[0_0_12px_rgba(192,132,252,0.35)]',
-    badge: 'bg-purple-500/20 text-purple-300 border-purple-500/30',
-    labelColor: 'text-purple-200',
+    glow: 'shadow-sm',
+    badge: 'bg-purple-500/15 text-purple-300 border-purple-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-purple-400',
   },
   CERTIFICATE: {
-    border: 'border-teal-400',
-    bg: 'bg-[#081d1d]',
+    border: 'border-teal-600/70',
+    bg: 'bg-[#081919]',
     iconColor: 'text-teal-400',
-    glow: 'shadow-[0_0_12px_rgba(45,212,191,0.35)]',
-    badge: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
-    labelColor: 'text-teal-200',
+    glow: 'shadow-sm',
+    badge: 'bg-teal-500/15 text-teal-300 border-teal-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-teal-400',
   },
   TECHNOLOGY: {
-    border: 'border-amber-400',
-    bg: 'bg-[#1c1409]',
+    border: 'border-amber-600/70',
+    bg: 'bg-[#181309]',
     iconColor: 'text-amber-400',
-    glow: 'shadow-[0_0_12px_rgba(251,191,36,0.35)]',
-    badge: 'bg-amber-500/20 text-amber-300 border-amber-500/30',
-    labelColor: 'text-amber-200',
+    glow: 'shadow-sm',
+    badge: 'bg-amber-500/15 text-amber-300 border-amber-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-amber-400',
   },
   PERSON: {
-    border: 'border-indigo-400',
-    bg: 'bg-[#11122e]',
+    border: 'border-indigo-600/70',
+    bg: 'bg-[#0f1126]',
     iconColor: 'text-indigo-400',
-    glow: 'shadow-[0_0_12px_rgba(129,140,248,0.35)]',
-    badge: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30',
-    labelColor: 'text-indigo-200',
+    glow: 'shadow-sm',
+    badge: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-indigo-400',
   },
   DOCUMENT: {
-    border: 'border-slate-400',
-    bg: 'bg-[#10141e]',
+    border: 'border-slate-600/70',
+    bg: 'bg-[#0f141e]',
     iconColor: 'text-slate-300',
-    glow: 'shadow-[0_0_12px_rgba(148,163,184,0.3)]',
-    badge: 'bg-slate-500/20 text-slate-300 border-slate-500/30',
+    glow: 'shadow-sm',
+    badge: 'bg-slate-500/15 text-slate-300 border-slate-500/25',
     labelColor: 'text-slate-200',
     accentColor: 'border-t-slate-400',
   },
   PHONE: {
-    border: 'border-emerald-400',
-    bg: 'bg-[#0a2016]',
+    border: 'border-emerald-600/70',
+    bg: 'bg-[#091a14]',
     iconColor: 'text-emerald-400',
-    glow: 'shadow-[0_0_12px_rgba(52,211,153,0.35)]',
-    badge: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-    labelColor: 'text-emerald-200',
+    glow: 'shadow-sm',
+    badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-emerald-400',
   },
   LOCATION: {
-    border: 'border-orange-400',
-    bg: 'bg-[#221008]',
+    border: 'border-orange-600/70',
+    bg: 'bg-[#1c0f08]',
     iconColor: 'text-orange-400',
-    glow: 'shadow-[0_0_12px_rgba(251,146,60,0.35)]',
-    badge: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-    labelColor: 'text-orange-200',
+    glow: 'shadow-sm',
+    badge: 'bg-orange-500/15 text-orange-300 border-orange-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-orange-400',
   },
   ADDRESS: {
-    border: 'border-orange-400',
-    bg: 'bg-[#221008]',
+    border: 'border-orange-600/70',
+    bg: 'bg-[#1c0f08]',
     iconColor: 'text-orange-400',
-    glow: 'shadow-[0_0_12px_rgba(251,146,60,0.35)]',
-    badge: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-    labelColor: 'text-orange-200',
+    glow: 'shadow-sm',
+    badge: 'bg-orange-500/15 text-orange-300 border-orange-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-orange-400',
   },
   GITHUB_PROFILE: {
-    border: 'border-violet-400',
-    bg: 'bg-[#150d28]',
+    border: 'border-violet-600/70',
+    bg: 'bg-[#130d22]',
     iconColor: 'text-violet-400',
-    glow: 'shadow-[0_0_12px_rgba(167,139,250,0.35)]',
-    badge: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
-    labelColor: 'text-violet-200',
+    glow: 'shadow-sm',
+    badge: 'bg-violet-500/15 text-violet-300 border-violet-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-violet-400',
   },
   GITLAB_PROFILE: {
-    border: 'border-orange-400',
-    bg: 'bg-[#200e08]',
+    border: 'border-orange-600/70',
+    bg: 'bg-[#1c0e08]',
     iconColor: 'text-orange-400',
-    glow: 'shadow-[0_0_12px_rgba(251,146,60,0.35)]',
-    badge: 'bg-orange-500/20 text-orange-300 border-orange-500/30',
-    labelColor: 'text-orange-200',
+    glow: 'shadow-sm',
+    badge: 'bg-orange-500/15 text-orange-300 border-orange-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-orange-400',
   },
   YOUTUBE_CHANNEL: {
-    border: 'border-red-400',
-    bg: 'bg-[#200a0a]',
+    border: 'border-red-600/70',
+    bg: 'bg-[#1c0909]',
     iconColor: 'text-red-400',
-    glow: 'shadow-[0_0_12px_rgba(248,113,113,0.35)]',
-    badge: 'bg-red-500/20 text-red-300 border-red-500/30',
-    labelColor: 'text-red-200',
+    glow: 'shadow-sm',
+    badge: 'bg-red-500/15 text-red-300 border-red-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-red-400',
   },
   MX_RECORD: {
-    border: 'border-teal-400',
-    bg: 'bg-[#091c1a]',
+    border: 'border-teal-600/70',
+    bg: 'bg-[#081817]',
     iconColor: 'text-teal-400',
-    glow: 'shadow-[0_0_12px_rgba(45,212,191,0.35)]',
-    badge: 'bg-teal-500/20 text-teal-300 border-teal-500/30',
-    labelColor: 'text-teal-200',
+    glow: 'shadow-sm',
+    badge: 'bg-teal-500/15 text-teal-300 border-teal-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-teal-400',
   },
   NS_RECORD: {
-    border: 'border-cyan-400',
-    bg: 'bg-[#081c22]',
+    border: 'border-cyan-600/70',
+    bg: 'bg-[#08171f]',
     iconColor: 'text-cyan-400',
-    glow: 'shadow-[0_0_12px_rgba(6,182,212,0.35)]',
-    badge: 'bg-cyan-500/20 text-cyan-300 border-cyan-500/30',
-    labelColor: 'text-cyan-200',
+    glow: 'shadow-sm',
+    badge: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-cyan-400',
   },
   PUBLIC_MENTION: {
-    border: 'border-blue-400',
-    bg: 'bg-[#0a152d]',
+    border: 'border-blue-600/70',
+    bg: 'bg-[#0b1326]',
     iconColor: 'text-blue-400',
-    glow: 'shadow-[0_0_12px_rgba(96,165,250,0.35)]',
-    badge: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
-    labelColor: 'text-blue-200',
+    glow: 'shadow-sm',
+    badge: 'bg-blue-500/15 text-blue-300 border-blue-500/25',
+    labelColor: 'text-slate-200',
     accentColor: 'border-t-blue-400',
   },
 };
@@ -428,23 +428,45 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
 
       {/* Main Circular Node Badge */}
       <div
-        className={`rounded-full flex items-center justify-center border-2 transition-all duration-200 cursor-pointer ${nodeSize} ${
+        className={`rounded-full flex items-center justify-center border transition-all duration-150 cursor-pointer relative ${nodeSize} ${
           theme.bg
         } ${theme.border} ${
           selected
-            ? 'ring-4 ring-sky-400/80 border-sky-300 scale-110 shadow-[0_0_24px_rgba(56,189,248,0.6)]'
+            ? 'ring-2 ring-sky-400 border-sky-300 scale-105 shadow-lg'
             : isHovered
-              ? 'scale-110 ' + theme.glow
-              : theme.glow
+              ? 'scale-105 border-slate-400 shadow-md'
+              : ''
         }`}
       >
-        <Icon className={`${iconSize} ${theme.iconColor} transition-transform duration-200 group-hover:scale-110`} />
+        <Handle
+          type="target"
+          position={Position.Top}
+          className="!w-1.5 !h-1.5 !bg-slate-500 !border !border-[#0d121c] !opacity-0 group-hover:!opacity-60 transition-opacity"
+        />
+        <Handle
+          type="source"
+          position={Position.Bottom}
+          className="!w-1.5 !h-1.5 !bg-slate-500 !border !border-[#0d121c] !opacity-0 group-hover:!opacity-60 transition-opacity"
+        />
+        <Handle
+          type="target"
+          position={Position.Left}
+          id="left"
+          className="!w-1.5 !h-1.5 !bg-slate-500 !border !border-[#0d121c] !opacity-0 group-hover:!opacity-60 transition-opacity"
+        />
+        <Handle
+          type="source"
+          position={Position.Right}
+          id="right"
+          className="!w-1.5 !h-1.5 !bg-slate-500 !border !border-[#0d121c] !opacity-0 group-hover:!opacity-60 transition-opacity"
+        />
+
+        <Icon className={`${iconSize} ${theme.iconColor} transition-transform duration-150 group-hover:scale-105`} />
 
         {/* Seed Target Indicator Badge */}
         {isSeed && (
-          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
-            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500 border border-black text-[7px] text-black font-extrabold items-center justify-center">
+          <span className="absolute -top-1 -right-1 flex h-3 w-3">
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500 text-[6.5px] text-black font-extrabold items-center justify-center">
               ★
             </span>
           </span>
@@ -453,15 +475,12 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
 
       {/* Underneath Text Label & Category */}
       {!hideLabel && (
-        <div className="mt-1.5 flex flex-col items-center max-w-[130px] pointer-events-none text-center animate-in fade-in duration-100">
+        <div className="mt-1 flex flex-col items-center max-w-[120px] pointer-events-none text-center animate-in fade-in duration-75">
           <span
-            className={`font-mono text-[9.5px] leading-tight truncate w-full px-1 py-0.5 rounded ${theme.labelColor} drop-shadow-[0_1px_3px_rgba(0,0,0,0.9)]`}
+            className={`font-mono text-[9px] leading-tight truncate w-full px-1 py-0.5 rounded text-slate-300 bg-[#090d14]/70 border border-slate-800/40`}
             title={value}
           >
             {value}
-          </span>
-          <span className="text-[7.5px] font-mono uppercase tracking-wider text-slate-400/80 -mt-0.5 scale-90">
-            {isSeed ? 'SEED' : entityType.replace('_', ' ')}
           </span>
         </div>
       )}

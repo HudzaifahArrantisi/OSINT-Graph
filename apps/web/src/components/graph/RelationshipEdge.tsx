@@ -51,9 +51,10 @@ export const RelationshipEdge = memo(
           markerEnd={markerEnd}
           style={{
             ...(style || {}),
-            stroke: selected ? '#38bdf8' : hovered ? '#60a5fa' : 'rgba(56, 189, 248, 0.28)',
-            strokeWidth: selected ? 2.2 : hovered ? 1.8 : 1,
-            opacity: selected ? 1 : hovered ? 0.95 : 0.6,
+            stroke: selected ? '#38bdf8' : hovered ? '#60a5fa' : 'rgba(100, 116, 139, 0.45)',
+            strokeWidth: selected ? 2 : hovered ? 1.6 : 1,
+            strokeDasharray: relType === 'CONTAINS' ? '3 3' : undefined,
+            opacity: selected ? 1 : hovered ? 0.95 : 0.7,
             transition: 'stroke 0.15s ease, stroke-width 0.15s ease, opacity 0.15s ease',
           }}
         />

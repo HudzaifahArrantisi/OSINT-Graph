@@ -1,0 +1,16 @@
+{
+  "include": [
+    "vendor"
+  ],
+  "extraPaths": [
+    "./vendor/Mr.Holmes"
+  ],
+  "executionEnvironments": [
+    {
+      "root": "vendor",
+      "extraPaths": [
+        "../vendor/Mr.Holmes"
+      ]
+    }
+  ]
+}

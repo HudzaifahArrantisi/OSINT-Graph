@@ -382,38 +382,19 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
             const isHttp = log.level === 'http' || log.tag === 'HTTP';
             const isExec = log.level === 'transform' || log.tag === 'SCAN';
 
-            let badgeLabel = 'INFO';
-            let badgeStyle = 'text-slate-400 bg-slate-800/80 border-slate-700/60';
             let msgStyle = 'text-slate-300';
 
             if (isFound) {
-              badgeLabel = 'SUCCESS';
-              badgeStyle = 'text-emerald-400 bg-emerald-950/40 border-emerald-800/40';
-              msgStyle = 'text-emerald-200';
+              msgStyle = 'text-emerald-300';
             } else if (isErr) {
-              badgeLabel = 'ERROR';
-              badgeStyle = 'text-rose-400 bg-rose-950/50 border-rose-800/40';
-              msgStyle = 'text-rose-200';
+              msgStyle = 'text-rose-300';
             } else if (isWarn) {
-              badgeLabel = 'WARN';
-              badgeStyle = 'text-amber-300 bg-amber-950/40 border-amber-800/40';
-              msgStyle = 'text-amber-200';
+              msgStyle = 'text-amber-300';
             } else if (isHttp) {
-              badgeLabel = 'HTTP';
-              badgeStyle = 'text-sky-400 bg-sky-950/40 border-sky-800/40';
-              msgStyle = 'text-slate-300';
+              msgStyle = 'text-sky-300';
             } else if (isExec) {
-              badgeLabel = 'EXEC';
-              badgeStyle = 'text-indigo-300 bg-indigo-950/40 border-indigo-800/40';
-              msgStyle = 'text-slate-200';
-            } else if (log.tag) {
-              badgeLabel = log.tag.toUpperCase();
-              badgeStyle = 'text-slate-400 bg-slate-800/60 border-slate-700/60';
+              msgStyle = 'text-indigo-300';
             }
-
-            const timeStr = log.timestamp
-              ? new Date(log.timestamp).toTimeString().split(' ')[0]
-              : '';
 
             return (
               <div
@@ -421,20 +402,6 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
                 className="group py-1 px-1.5 rounded hover:bg-[#111724] transition-colors leading-relaxed font-mono"
               >
                 <div className="flex items-start gap-2">
-                  {/* Timestamp */}
-                  {timeStr && (
-                    <span className="text-[10px] text-slate-500 select-none shrink-0 pt-0.5">
-                      {timeStr}
-                    </span>
-                  )}
-
-                  {/* Level Badge */}
-                  <span
-                    className={`text-[9px] px-1 py-0.2 rounded border font-sans font-semibold shrink-0 select-none ${badgeStyle}`}
-                  >
-                    {badgeLabel}
-                  </span>
-
                   {/* Message */}
                   <div className="flex-1 min-w-0 break-words text-[11.5px]">
                     <span className={msgStyle}>{cleanMsg}</span>

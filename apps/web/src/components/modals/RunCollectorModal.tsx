@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Modal } from '../ui/Modal';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { SEED_TYPES, SeedType, CollectorName, COLLECTOR_NAMES } from '@nexusgraph/shared';
+import { SEED_TYPES, SeedType, SEED_PLACEHOLDERS, CollectorName, COLLECTOR_NAMES } from '@nexusgraph/shared';
 import { Play, ShieldAlert, Check, Globe2, Mail, User, Network, Link, Building, Phone } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAppStore } from '../../stores/appStore';
@@ -138,17 +138,7 @@ export function RunCollectorModal({
         {/* Seed Input Value */}
         <Input
           label="Seed Value"
-          placeholder={
-            seedType === 'DOMAIN'
-              ? 'example.com'
-              : seedType === 'EMAIL'
-                ? 'investigation@example.com'
-                : seedType === 'USERNAME'
-                  ? 'target_handle'
-                  : seedType === 'IP_ADDRESS'
-                    ? '93.184.216.34'
-                    : 'https://example.com/profile'
-          }
+          placeholder={SEED_PLACEHOLDERS[seedType] || 'Enter target seed...'}
           value={seedValue}
           onChange={(e) => setSeedValue(e.target.value)}
           error={error}

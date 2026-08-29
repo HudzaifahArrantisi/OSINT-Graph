@@ -246,7 +246,7 @@ function GraphViewInner({ graphData }: GraphViewProps) {
         layouted = applyForceLayout(currentNodes, currentEdges);
       }
 
-      // Automatically construct edges to Hub nodes if any were created
+      // Automatically construct edges to Hub nodes and from Hub nodes to member leaf nodes
       const hubNodes = layouted.filter((n) => n.type === 'cluster_hub' || (n.data as any)?.isHub);
       const seedNodes = layouted.filter((n) => (n.data as any)?.isSeed || n.type === 'seed');
       const edgeList = [...currentEdges];
@@ -265,23 +265,73 @@ function GraphViewInner({ graphData }: GraphViewProps) {
         return n;
       });
 
-      if (hubNodes.length > 0 && seedNodes.length > 0) {
+      if (hubNodes.length > 0) {
         const defaultSeed = seedNodes[0];
+
         hubNodes.forEach((hub) => {
-          const edgeId = `edge-to-${hub.id}`;
-          if (!edgeList.some((e) => e.id === edgeId)) {
-            edgeList.push({
-              id: edgeId,
-              source: defaultSeed.id,
-              target: hub.id,
-              type: 'relationship',
-              data: {
-                relationshipType: 'EXECUTES_TRANSFORM',
-                confidence: 100,
-                reason: `Discovery cluster module: ${hub.data?.label || 'Sub-Category'}`,
-                evidenceCount: 0,
-                relationshipId: edgeId,
-              },
+          const catKey = (hub.data as any)?.categoryKey;
+          const isCollapsed = Boolean((hub.data as any)?.isCollapsed);
+
+          // Edge from central seed to Hub
+          if (defaultSeed) {
+            const edgeId = `edge-to-${hub.id}`;
+            if (!edgeList.some((e) => e.id === edgeId)) {
+              edgeList.push({
+                id: edgeId,
+                source: defaultSeed.id,
+                target: hub.id,
+                type: 'relationship',
+                data: {
+                  relationshipType: 'EXECUTES_TRANSFORM',
+                  confidence: 100,
+                  reason: `Discovery cluster module: ${hub.data?.label || 'Sub-Category'}`,
+                  evidenceCount: 0,
+                  relationshipId: edgeId,
+                },
+              });
+            }
+          }
+
+          // If hub is expanded, connect Hub to its satellite member nodes
+          if (!isCollapsed && catKey) {
+            layouted.forEach((node) => {
+              if (node.id === hub.id || (node.data as any)?.isHub || (node.data as any)?.isSeed) return;
+              const nodeCatKey = (node.data as any)?.subCategoryKey;
+              // Check if node is part of this cluster satellite
+              const metadata = (node.data as any)?.metadata || {};
+              const discoveredBy = metadata.discoveredBy || metadata.source?.transform || metadata.source?.collector;
+              const entityType = String((node.data as any)?.entityType || node.type || '').toUpperCase();
+
+              const matchesCat =
+                (catKey === 'subcat_subdomain' && (entityType === 'SUBDOMAIN' || String(discoveredBy).toLowerCase().includes('subdomain'))) ||
+                (catKey === 'subcat_dns' && (['MX_RECORD', 'NS_RECORD'].includes(entityType) || String(discoveredBy).toLowerCase().includes('dns'))) ||
+                (catKey === 'subcat_tls' && (entityType === 'CERTIFICATE' || String(discoveredBy).toLowerCase().includes('tls'))) ||
+                (catKey === 'subcat_ip' && entityType === 'IP_ADDRESS') ||
+                (catKey === 'subcat_domain' && ['DOMAIN', 'WEBSITE'].includes(entityType)) ||
+                (catKey === 'subcat_url' && ['URL', 'DOCUMENT'].includes(entityType)) ||
+                (catKey === 'subcat_contact' && ['EMAIL', 'PERSON', 'ORGANIZATION'].includes(entityType)) ||
+                (catKey === 'subcat_phone_geo' && ['PHONE', 'LOCATION', 'ADDRESS'].includes(entityType)) ||
+                (catKey === 'subcat_social' && ['SOCIAL_PROFILE', 'GITHUB_PROFILE', 'GITLAB_PROFILE', 'YOUTUBE_CHANNEL', 'USERNAME'].includes(entityType)) ||
+                (catKey === 'subcat_mentions' && entityType === 'PUBLIC_MENTION');
+
+              if (matchesCat) {
+                const memberEdgeId = `hub-member-${hub.id}-${node.id}`;
+                if (!edgeList.some((e) => (e.source === hub.id && e.target === node.id) || (e.source === node.id && e.target === hub.id))) {
+                  edgeList.push({
+                    id: memberEdgeId,
+                    source: hub.id,
+                    target: node.id,
+                    type: 'relationship',
+                    data: {
+                      relationshipType: 'CONTAINS',
+                      confidence: (node.data as any)?.confidence || 90,
+                      reason: `Discovered in ${(hub.data as any)?.label || 'cluster'}`,
+                      evidenceCount: 0,
+                      relationshipId: memberEdgeId,
+                    },
+                  });
+                }
+              }
             });
           }
         });

@@ -61,6 +61,12 @@ export interface MrHolmesPhoneLocation {
   displayName: string;
 }
 
+export interface MrHolmesPhoneLookup {
+  name: string;
+  url: string;
+  tags?: string[];
+}
+
 export interface MrHolmesPhoneMetadata {
   valid?: boolean | null;
   possible?: boolean | null;
@@ -73,10 +79,15 @@ export interface MrHolmesPhoneMetadata {
   locations?: MrHolmesPhoneLocation[];
   formats?: {
     e164?: string;
+    localNumber?: string;
     international?: string;
     rfc3966?: string;
+    local?: string;
+    local2?: string;
+    local3?: string;
     national?: string;
   };
+  lookups?: MrHolmesPhoneLookup[];
   error?: string;
 }
 
@@ -454,12 +465,68 @@ export const mrholmesEngineCollector: Collector = {
           });
         }
       }
+
+      // Carrier Organization Entity
+      if (pm.carrier && pm.carrier !== 'Unknown' && pm.carrier !== 'None') {
+        entities.push({
+          type: 'ORGANIZATION',
+          value: pm.carrier,
+          title: `${pm.carrier} (Carrier/ISP)`,
+          confidence: 85,
+          metadata: {
+            orgType: 'CARRIER',
+            sourcePhone: value,
+            engine: 'mrholmes-python',
+            source: sourceMeta({ derivedFrom: value }),
+          },
+        });
+        relationships.push({
+          source_value: value,
+          source_type: 'PHONE',
+          target_value: pm.carrier,
+          target_type: 'ORGANIZATION',
+          relationship_type: 'BELONGS_TO',
+          confidence: 85,
+          reason: `Mr.Holmes identified registered mobile network / telecom carrier as ${pm.carrier}`,
+        });
+      }
+
+      // Phone Directory Lookups
+      if (pm.lookups && Array.isArray(pm.lookups)) {
+        for (const lookup of pm.lookups) {
+          evidence.push({
+            source_url: lookup.url,
+            source_type: 'PHONE_METADATA',
+            title: `Phone Directory Lookup: ${lookup.name}`,
+            extracted_value: lookup.url,
+            confidence: 70,
+            metadata: {
+              engine: 'mrholmes-python-vendored',
+              provider: lookup.name,
+              tags: lookup.tags,
+              lookupUrl: lookup.url,
+            },
+          });
+        }
+      }
     }
 
     // ── Modes phone/email/domain: generated dork URLs ──────────────────
     const dorkSourceType =
       mode === 'domain' ? 'DOMAIN' : mode === 'phone' ? 'PHONE' : 'EMAIL';
-    if (output.dorks) {
+    if (mode === 'phone' && output.dorks) {
+      // For phone numbers, store dorks in evidence only to avoid graph entity clutter
+      for (const dork of output.dorks) {
+        evidence.push({
+          source_url: dork,
+          source_type: 'DORK_TEMPLATE',
+          title: 'Mr.Holmes Phone Dork Template',
+          extracted_value: dork,
+          confidence: 100,
+          metadata: { engine: 'mrholmes-python-vendored', category: 'phone', deterministic: true },
+        });
+      }
+    } else if (output.dorks) {
       for (const dork of output.dorks) {
         entities.push({
           type: 'URL',

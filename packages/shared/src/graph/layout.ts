@@ -256,31 +256,43 @@ export function partitionGraphClusters<T extends Record<string, unknown>>(
 function layoutStarburst<T extends Record<string, unknown>>(
   centerPos: { x: number; y: number },
   nodes: SimpleNode<T>[],
-  startRadius = 120,
+  startRadius = 85,
+  startAngle = -Math.PI / 2,
+  angleSpan = 2 * Math.PI,
 ): SimpleNode<T>[] {
   if (nodes.length === 0) return [];
   if (nodes.length === 1) {
-    return [{ ...nodes[0], position: { x: centerPos.x + startRadius, y: centerPos.y } }];
+    const angle = startAngle + angleSpan / 2;
+    return [{
+      ...nodes[0],
+      position: {
+        x: Math.round(centerPos.x + Math.cos(angle) * startRadius),
+        y: Math.round(centerPos.y + Math.sin(angle) * startRadius),
+      },
+    }];
   }
 
   const result: SimpleNode<T>[] = [];
   let nodeIndex = 0;
   let ringIndex = 0;
-  const RING_STEP = Math.max(75, Math.min(95, 75 + Math.floor(nodes.length / 40)));
+  const RING_STEP = 60;
 
   while (nodeIndex < nodes.length) {
     const currentRadius = startRadius + ringIndex * RING_STEP;
-    // Calculate how many nodes fit on circle perimeter with at least 80px spacing
-    const perimeter = 2 * Math.PI * currentRadius;
-    const maxNodesInRing = Math.max(6, Math.floor(perimeter / 80));
+    // Calculate how many nodes fit nicely on this arc with at least 55px arc spacing
+    const arcLength = Math.abs(angleSpan) * currentRadius;
+    const maxNodesInRing = Math.max(3, Math.floor(arcLength / 55));
 
     const remaining = nodes.length - nodeIndex;
     const countInRing = Math.min(remaining, maxNodesInRing);
     const ringNodes = nodes.slice(nodeIndex, nodeIndex + countInRing);
-    const phaseOffset = (ringIndex * 0.42) % (2 * Math.PI);
 
     ringNodes.forEach((node, i) => {
-      const angle = (2 * Math.PI * i) / countInRing + phaseOffset;
+      const angle =
+        countInRing === 1
+          ? startAngle + angleSpan / 2
+          : startAngle + (angleSpan * (i + 0.5)) / countInRing;
+
       result.push({
         ...node,
         position: {
@@ -493,7 +505,7 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
   const clusters = partitionGraphClusters(nodes, edges);
   let currentOffsetX = 0;
   const result: SimpleNode<T>[] = [];
-  const CLUSTER_GAP = 550;
+  const CLUSTER_GAP = 280;
 
   for (const cluster of clusters) {
     const cNodes = cluster.nodes;
@@ -504,7 +516,7 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
         ...cNodes[0],
         position: { x: currentOffsetX, y: 0 },
       });
-      currentOffsetX += 150 + CLUSTER_GAP;
+      currentOffsetX += 100 + CLUSTER_GAP;
       continue;
     }
 
@@ -547,17 +559,21 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
       const numSubCats = subCategories.length;
 
       // Estimate satellite radius requirements
-      let maxSatExtent = 140;
+      let maxSatExtent = 90;
       subCategories.forEach(([catKey, catNodes]) => {
         const isCollapsed = collapsedSet.has(catKey);
         if (isCollapsed) return;
         const ringsNeeded = Math.ceil(Math.sqrt(catNodes.length * 1.5));
-        const extent = 120 + ringsNeeded * 80;
+        const extent = 70 + ringsNeeded * 55;
         if (extent > maxSatExtent) maxSatExtent = extent;
       });
 
-      const orbitRadius = Math.max(380, 240 + maxSatExtent + Math.sqrt(others.length) * 16);
-      const totalClusterRadius = orbitRadius + maxSatExtent + 60;
+      // Compact orbit radius so hubs sit balanced around seed target
+      const orbitRadius = Math.max(
+        numSubCats === 1 ? 160 : 190,
+        130 + (numSubCats > 1 ? maxSatExtent * 0.6 : 0) + Math.sqrt(others.length) * 6
+      );
+      const totalClusterRadius = orbitRadius + maxSatExtent + 30;
       const clusterCenterX = currentOffsetX + totalClusterRadius;
 
       // Place central seed node at center of the universe
@@ -566,7 +582,7 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
         position: { x: clusterCenterX, y: 0 },
       });
 
-      // Place each sub-category as a full 360° starburst at its orbit angle
+      // Place each sub-category satellite
       subCategories.forEach(([catKey, catNodes], catIndex) => {
         const isCollapsed = collapsedSet.has(catKey);
         const angle = (2 * Math.PI * catIndex) / numSubCats - Math.PI / 2;
@@ -588,9 +604,19 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
           position: { x: satCenterX, y: satCenterY },
         });
 
-        // If not collapsed, place leaf nodes in 360° starburst around the Hub node
+        // If not collapsed, fan outward from hub away from the central seed
         if (!isCollapsed) {
-          const starburstNodes = layoutStarburst({ x: satCenterX, y: satCenterY }, catNodes, 120);
+          const outwardAngle = angle;
+          const span = numSubCats === 1 ? 2 * Math.PI : Math.PI * 1.35;
+          const startAngle = outwardAngle - span / 2;
+
+          const starburstNodes = layoutStarburst(
+            { x: satCenterX, y: satCenterY },
+            catNodes,
+            80,
+            startAngle,
+            span
+          );
           starburstNodes.forEach((node) => result.push(node));
         }
       });
@@ -600,9 +626,9 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
       // Direct center node only
       result.push({
         ...center,
-        position: { x: currentOffsetX + 150, y: 0 },
+        position: { x: currentOffsetX + 100, y: 0 },
       });
-      currentOffsetX += 300 + CLUSTER_GAP;
+      currentOffsetX += 200 + CLUSTER_GAP;
     }
   }
 
