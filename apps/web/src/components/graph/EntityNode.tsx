@@ -27,6 +27,7 @@ import {
   ExternalLink,
   Copy,
   Check,
+  Target,
 } from 'lucide-react';
 
 const ENTITY_ICONS: Record<EntityType, React.ComponentType<{ className?: string }>> = {
@@ -461,13 +462,13 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
           className="!w-1.5 !h-1.5 !bg-slate-500 !border !border-[#0d121c] !opacity-0 group-hover:!opacity-60 transition-opacity"
         />
 
-        <Icon className={`${iconSize} ${theme.iconColor} transition-transform duration-150 group-hover:scale-105`} />
+        <Icon className={`${iconSize} ${theme.iconColor} transition-transform duration-200 group-hover:scale-110`} />
 
         {/* Seed Target Indicator Badge */}
         {isSeed && (
-          <span className="absolute -top-1 -right-1 flex h-3 w-3">
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500 text-[6.5px] text-black font-extrabold items-center justify-center">
-              ★
+          <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+            <span className="relative inline-flex rounded-full h-3.5 w-3.5 bg-amber-500 text-black border border-[#0d1422] items-center justify-center shadow-sm">
+              <Target className="w-2.5 h-2.5 text-black" strokeWidth={2.5} />
             </span>
           </span>
         )}
