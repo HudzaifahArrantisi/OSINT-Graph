@@ -37,6 +37,17 @@ export interface GetContactResult {
   tags?: Array<{ tag: string; count: number }>;
 }
 
+function parseGtcJson(rawOutput: string): any {
+  if (!rawOutput) return null;
+  const firstBrace = rawOutput.indexOf('{');
+  const lastBrace = rawOutput.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace >= firstBrace) {
+    const jsonSubstring = rawOutput.slice(firstBrace, lastBrace + 1);
+    return JSON.parse(jsonSubstring);
+  }
+  return JSON.parse(rawOutput.trim());
+}
+
 /**
  * Queries GetContact intelligence via local gtc.py if credentials exist.
  */
@@ -50,6 +61,7 @@ export async function queryGetContact(e164: string, requestId?: string): Promise
     customConfigDir ? path.join(customConfigDir, 'credentials.json') : null,
     path.join(os.homedir(), '.config', 'gtc', 'credentials.json'),
     path.resolve(process.cwd(), '.config', 'gtc', 'credentials.json'),
+    path.resolve(process.cwd(), '..', '.config', 'gtc', 'credentials.json'),
     path.resolve('c:/laragon/www/OSINT Investigation Graph/.config/gtc/credentials.json'),
   ].filter(Boolean) as string[];
 
@@ -62,29 +74,33 @@ export async function queryGetContact(e164: string, requestId?: string): Promise
   // Find gtc.py in project root or current directory
   const possiblePaths = [
     path.resolve(process.cwd(), 'gtc.py'),
+    path.resolve(process.cwd(), '..', 'gtc.py'),
     path.resolve(process.cwd(), '..', '..', 'gtc.py'),
     path.resolve('c:/laragon/www/OSINT Investigation Graph/gtc.py'),
+    path.join(__dirname, '../../../../gtc.py'),
+    path.join(__dirname, '../../../gtc.py'),
   ];
   const gtcScript = possiblePaths.find((p) => fs.existsSync(p));
   if (!gtcScript) {
+    logger.warn('GetContact lookup skipped: gtc.py not found', { requestId, possiblePaths });
     return null;
   }
 
   const activeConfigDir = path.dirname(credPath);
 
   try {
-    // 1. First attempt: Query tags (-t tags)
     let tagsList: Array<{ tag: string; count: number }> = [];
     let displayName: string | null = null;
     let tagCount = 0;
 
+    // 1. First attempt: Query tags (-t tags)
     try {
       const { stdout: tagsOut } = await execFileAsync('python', [gtcScript, 'search', e164, '-t', 'tags', '--json'], {
         timeout: 15000,
         env: { ...process.env, GTC_CONFIG_DIR: activeConfigDir, PYTHONIOENCODING: 'utf-8' },
       });
 
-      const tagsData = JSON.parse(tagsOut);
+      const tagsData = parseGtcJson(tagsOut);
       const rawTags = tagsData?.result?.tags;
       if (Array.isArray(rawTags) && rawTags.length > 0) {
         tagsList = rawTags
@@ -96,27 +112,38 @@ export async function queryGetContact(e164: string, requestId?: string): Promise
 
         if (tagsList.length > 0) {
           displayName = tagsList[0]?.tag || null;
-          tagCount = tagsList.length;
         }
       }
-    } catch {
-      // Tags endpoint may be rate-limited / quota exhausted (numberDetail 0/0), fallback to profile
+
+      if (typeof tagsData?.result?.tagCount === 'number') {
+        tagCount = tagsData.result.tagCount;
+      } else if (tagsList.length > 0) {
+        tagCount = tagsList.length;
+      }
+    } catch (err: any) {
+      logger.warn('GetContact -t tags failed, attempting profile fallback', {
+        requestId,
+        error: err.message,
+      });
     }
 
-    // 2. Fallback or Enrichment: Query profile (-t profile) which uses search quota (200/mo)
+    // 2. Fallback or Enrichment: Query profile (-t profile)
     try {
       const { stdout: profOut } = await execFileAsync('python', [gtcScript, 'search', e164, '-t', 'profile', '--json'], {
         timeout: 15000,
         env: { ...process.env, GTC_CONFIG_DIR: activeConfigDir, PYTHONIOENCODING: 'utf-8' },
       });
 
-      const profData = JSON.parse(profOut);
+      const profData = parseGtcJson(profOut);
       const profile = profData?.result?.profile;
       if (profile?.displayName) {
         displayName = profile.displayName;
       }
       if (typeof profile?.tagCount === 'number' && profile.tagCount > tagCount) {
         tagCount = profile.tagCount;
+      }
+      if (typeof profData?.result?.tagCount === 'number' && profData.result.tagCount > tagCount) {
+        tagCount = profData.result.tagCount;
       }
 
       // Check if profile also returned tags and merge them
@@ -134,23 +161,27 @@ export async function queryGetContact(e164: string, requestId?: string): Promise
           }
         }
       }
-    } catch {
-      // Ignore profile error if tags were already populated
+    } catch (err: any) {
+      logger.warn('GetContact -t profile failed', {
+        requestId,
+        error: err.message,
+      });
     }
 
-    if (!displayName && tagsList.length === 0) {
+    if (!displayName && tagsList.length === 0 && tagCount === 0) {
       return null;
     }
 
     return {
-      displayName: displayName || (tagsList[0]?.tag ?? null),
-      tagCount: tagCount || tagsList.length,
+      displayName: displayName || (tagsList.length > 0 ? tagsList[0].tag : null),
       tags: tagsList,
+      tagCount: tagCount || tagsList.length,
     };
-  } catch (err) {
+  } catch (err: any) {
     logger.warn('GetContact lookup skipped or error', {
       requestId,
-      error: (err as Error).message,
+      e164,
+      error: err.message,
     });
     return null;
   }
@@ -1003,11 +1034,20 @@ export const phoneGeoCollector: Collector = {
           };
         }
       }
-    } catch (err) {
-      logger.warn('Phone-geo GetContact enrichment error', {
+    } catch (err: any) {
+      const errMsg = err?.message || String(err);
+      const isCaptcha = errMsg.includes('User validation is required') || errMsg.includes('403');
+      const userWarning = isCaptcha
+        ? 'GetContact API memerlukan verifikasi Captcha untuk akun aktif. Silakan jalankan: python gtc.py captcha di terminal untuk membuka sesi.'
+        : `GetContact lookup failed: ${errMsg.slice(0, 120)}`;
+
+      logger.warn('Phone-geo GetContact enrichment warning', {
         requestId: ctx.requestId,
-        error: (err as Error).message,
+        error: errMsg,
+        isCaptcha,
       });
+
+      warnings.push(userWarning);
     }
 
     logger.info('Phone-geo completed', {

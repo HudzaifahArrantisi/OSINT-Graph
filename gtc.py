@@ -339,9 +339,10 @@ def cmd_captcha(args) -> int:
         code, body = gtc_call("/v2.8/verify-code",
                               {"validationCode": answer, "token": cred["token"]}, **common)
         if code == 200 and dig(body, "meta.httpStatusCode") == 200:
-            print("Captcha verified.")
+            print("Captcha verified successfully!")
             return 0
-        print("Wrong code, new captcha issued.")
+        errMsg = dig(body, "meta.errorMessage") or "Wrong code"
+        print(f"[{errMsg}] New captcha issued.")
         image = dig(body, "result.image") or image
 
 
