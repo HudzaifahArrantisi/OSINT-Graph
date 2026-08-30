@@ -19,6 +19,8 @@ import { emailLookupCollector } from './email-lookup.js';
 import { websiteReconCollector } from './website-recon.js';
 import { mrholmesEngineCollector } from './mrholmes-engine.js';
 import { subdomainCrtCollector } from './subdomain-crt.js';
+import { whoisRdapCollector } from './whois-rdap.js';
+import { ipGeolocationCollector } from './ip-geolocation.js';
 import { logger } from '../lib/logger.js';
 
 // Collector registry
@@ -39,6 +41,8 @@ collectors.set('email-lookup', emailLookupCollector);
 collectors.set('website-recon', websiteReconCollector);
 collectors.set('mrholmes-engine', mrholmesEngineCollector);
 collectors.set('subdomain-crt', subdomainCrtCollector);
+collectors.set('whois-rdap', whoisRdapCollector);
+collectors.set('ip-geolocation', ipGeolocationCollector);
 
 export function getCollector(name: CollectorName): Collector | undefined {
   return collectors.get(name);

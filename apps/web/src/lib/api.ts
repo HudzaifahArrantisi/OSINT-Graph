@@ -121,6 +121,8 @@ export const api = {
   // Graph
   graph: {
     get: (caseId: string) => request<any>('GET', `/investigations/${caseId}/graph`),
+    path: (caseId: string, fromId: string, toId: string) =>
+      request<any>('GET', `/investigations/${caseId}/graph/path?from=${encodeURIComponent(fromId)}&to=${encodeURIComponent(toId)}`),
   },
 
   // Collectors (legacy)

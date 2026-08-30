@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
 import { Navbar } from '../components/layout/Navbar';
 import { GraphView } from '../components/graph/GraphView';
 import { PhoneMapPanel } from '../components/map/PhoneMapPanel';
+import { TimelineView } from '../components/timeline/TimelineView';
 import { EntityDetailPanel } from '../components/detail/EntityDetailPanel';
 import { DiscoveryLogsPanel } from '../components/detail/DiscoveryLogsPanel';
 import { StartDiscoveryModal } from '../components/modals/StartDiscoveryModal';
@@ -15,14 +16,11 @@ import { LoadingState } from '../components/ui/LoadingState';
 import { EmptyState } from '../components/ui/EmptyState';
 import { useAppStore } from '../stores/appStore';
 import {
-  Play,
   Download,
   Network,
   Clock,
   FileText,
   Shield,
-  Layers,
-  Archive,
   RefreshCw,
   Plus,
   Compass,
@@ -33,9 +31,9 @@ import {
   Trash2,
   Sparkles,
   Terminal,
-  Radio,
   Target,
   MapPin,
+  MoreVertical,
 } from 'lucide-react';
 import type { Investigation, GraphPayload, CollectorRun, Note, DiscoveryJob } from '@nexusgraph/shared';
 
@@ -63,6 +61,8 @@ export function InvestigationDetailPage() {
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState('');
   const [submittingNote, setSubmittingNote] = useState(false);
+  const [moreActionsOpen, setMoreActionsOpen] = useState(false);
+  const moreActionsRef = useRef<HTMLDivElement>(null);
 
   // Resizable sidebar dimensions with persistent storage
   const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(() => {
@@ -74,6 +74,17 @@ export function InvestigationDetailPage() {
     }
   });
 
+  // Right console width (when console is placed in right sidebar)
+  const [consoleWidth, setConsoleWidth] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('nexusgraph_console_width');
+      return saved ? Math.max(280, Math.min(650, parseInt(saved, 10))) : 360;
+    } catch {
+      return 360;
+    }
+  });
+
+  // Right sidebar width for entity detail inspector only
   const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(() => {
     try {
       const saved = localStorage.getItem('nexusgraph_right_sidebar_width');
@@ -110,17 +121,16 @@ export function InvestigationDetailPage() {
     window.addEventListener('mouseup', onMouseUp);
   };
 
-  const handleRightResizeStart = (e: React.MouseEvent) => {
+  const handleConsoleResizeStart = (e: React.MouseEvent) => {
     e.preventDefault();
     const startX = e.clientX;
-    const startWidth = rightSidebarWidth;
+    const startWidth = consoleWidth;
     document.body.style.cursor = 'col-resize';
     document.body.style.userSelect = 'none';
 
     const onMouseMove = (moveEvent: MouseEvent) => {
-      const maxAllowed = Math.max(400, window.innerWidth - 300);
-      const newWidth = Math.max(320, Math.min(maxAllowed, startWidth - (moveEvent.clientX - startX)));
-      setRightSidebarWidth(newWidth);
+      const newWidth = Math.max(260, Math.min(700, startWidth - (moveEvent.clientX - startX)));
+      setConsoleWidth(newWidth);
     };
 
     const onMouseUp = (upEvent: MouseEvent) => {
@@ -128,16 +138,29 @@ export function InvestigationDetailPage() {
       document.body.style.userSelect = '';
       window.removeEventListener('mousemove', onMouseMove);
       window.removeEventListener('mouseup', onMouseUp);
-      const maxAllowed = Math.max(400, window.innerWidth - 300);
-      const finalWidth = Math.max(320, Math.min(maxAllowed, startWidth - (upEvent.clientX - startX)));
+      const finalWidth = Math.max(260, Math.min(700, startWidth - (upEvent.clientX - startX)));
       try {
-        localStorage.setItem('nexusgraph_right_sidebar_width', finalWidth.toString());
+        localStorage.setItem('nexusgraph_console_width', finalWidth.toString());
       } catch {}
     };
 
     window.addEventListener('mousemove', onMouseMove);
     window.addEventListener('mouseup', onMouseUp);
   };
+
+  // Close more-actions dropdown on outside click
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (moreActionsRef.current && !moreActionsRef.current.contains(e.target as HTMLElement)) {
+        setMoreActionsOpen(false);
+      }
+    };
+    if (moreActionsOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [moreActionsOpen]);
+
 
   // Fetch Investigation metadata
   const {
@@ -227,12 +250,12 @@ export function InvestigationDetailPage() {
     const seeds = graphData.nodes.filter(
       (n) => n.data?.isSeed || n.data?.entityType === 'SEED' || n.type === 'seed',
     );
+    const seedIds = new Set(seeds.map((s) => s.id));
 
-    const adj = new Map<string, Set<string>>();
-    for (const n of graphData.nodes) adj.set(n.id, new Set());
+    const forwardAdj = new Map<string, Set<string>>();
+    for (const n of graphData.nodes) forwardAdj.set(n.id, new Set());
     for (const e of graphData.edges || []) {
-      adj.get(e.source)?.add(e.target);
-      adj.get(e.target)?.add(e.source);
+      forwardAdj.get(e.source)?.add(e.target);
     }
 
     return seeds.map((seed) => {
@@ -240,8 +263,9 @@ export function InvestigationDetailPage() {
       const queue = [seed.id];
       while (queue.length > 0) {
         const curr = queue.shift()!;
-        const neighbors = adj.get(curr) || new Set();
+        const neighbors = forwardAdj.get(curr) || new Set();
         for (const n of neighbors) {
+          if (seedIds.has(n) && n !== seed.id) continue;
           if (!visited.has(n)) {
             visited.add(n);
             queue.push(n);
@@ -345,6 +369,7 @@ export function InvestigationDetailPage() {
               [
                 { id: 'graph', label: 'Graph', icon: Network },
                 { id: 'map', label: 'Geo Map', icon: MapPin },
+                { id: 'timeline', label: 'Timeline', icon: Clock },
                 { id: 'notes', label: 'Notes', icon: FileText },
               ] as const
             ).map((v) => {
@@ -376,25 +401,21 @@ export function InvestigationDetailPage() {
           </button>
 
           <button
-            onClick={() => setLiveLogsOpen(!liveLogsOpen)}
-            className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border transition-all ${
+            onClick={() => setLiveLogsOpen((prev) => !prev)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${
               liveLogsOpen
-                ? 'bg-slate-800 border-slate-700 text-slate-100 font-medium shadow-sm'
-                : isDiscovering
-                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                  : 'bg-[#101622] border-[#1e293b] text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                ? 'bg-slate-800 text-slate-100 border-slate-700 font-medium'
+                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border-transparent hover:border-slate-700/50'
             }`}
-            title="Toggle Discovery Logs Console"
+            title="Toggle Console Sidebar"
           >
-            <Terminal className="w-3.5 h-3.5 text-slate-400" />
-            <span className="hidden sm:inline">Console</span>
-            {isDiscovering ? (
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            ) : liveDiscoveryLogs.length > 0 ? (
-              <span className="text-[10px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
+            <Terminal className="w-3.5 h-3.5" />
+            <span className="hidden md:inline">Console</span>
+            {liveDiscoveryLogs.length > 0 && (
+              <span className="text-[9.5px] px-1 py-0.2 rounded bg-slate-800/90 text-slate-400 font-mono">
                 {liveDiscoveryLogs.length}
               </span>
-            ) : null}
+            )}
           </button>
 
           <Button
@@ -439,13 +460,74 @@ export function InvestigationDetailPage() {
               <span className="text-xs font-semibold text-text uppercase tracking-wider">
                 Case Activity
               </span>
-              <button
-                onClick={() => setSidebarOpen(false)}
-                className="p-1 rounded-button text-text-muted hover:text-text"
-                title="Collapse sidebar"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-              </button>
+              <div className="flex items-center gap-1">
+                {/* More Actions Dropdown */}
+                <div className="relative" ref={moreActionsRef}>
+                  <button
+                    onClick={() => setMoreActionsOpen((prev) => !prev)}
+                    className="p-1 rounded-button text-text-muted hover:text-text hover:bg-surface-2 transition-colors"
+                    title="More actions"
+                  >
+                    <MoreVertical className="w-3.5 h-3.5" />
+                  </button>
+                  {moreActionsOpen && (
+                    <div className="absolute right-0 top-full mt-1 w-52 bg-[#0d1220]/98 backdrop-blur-xl border border-[#1e293b] rounded-lg shadow-2xl py-1 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
+                      <button
+                        onClick={async () => {
+                          setMoreActionsOpen(false);
+                          if (
+                            window.confirm(
+                              'Are you sure you want to clear all graph data (entities, relationships, evidence) in this investigation dossier?',
+                            )
+                          ) {
+                            try {
+                              await api.investigations.reset(caseId!);
+                              handleRefresh();
+                              addToast('Cleared all graph data in dossier', 'info');
+                            } catch (err: any) {
+                              addToast(err.message || 'Failed to reset graph', 'error');
+                            }
+                          }
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 text-slate-300 hover:bg-slate-800/60 hover:text-slate-100 transition-colors"
+                      >
+                        <RefreshCw className="w-3.5 h-3.5 text-slate-400" />
+                        <span>Clear All Graph Data</span>
+                      </button>
+                      <div className="h-[1px] bg-[#1e293b] mx-2 my-1" />
+                      <button
+                        onClick={async () => {
+                          setMoreActionsOpen(false);
+                          if (
+                            window.confirm(
+                              `Permanently delete the entire investigation dossier "${investigation.title}"?`,
+                            )
+                          ) {
+                            try {
+                              await api.investigations.delete(caseId!);
+                              addToast('Investigation dossier deleted', 'info');
+                              navigate('/investigations');
+                            } catch (err: any) {
+                              addToast(err.message || 'Failed to delete investigation', 'error');
+                            }
+                          }
+                        }}
+                        className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 text-rose-400 hover:bg-rose-500/10 hover:text-rose-300 transition-colors"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                        <span>Delete Dossier</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+                <button
+                  onClick={() => setSidebarOpen(false)}
+                  className="p-1 rounded-button text-text-muted hover:text-text"
+                  title="Collapse sidebar"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
 
             <div className="flex-1 overflow-y-auto p-3 space-y-4 text-xs">
@@ -571,35 +653,14 @@ export function InvestigationDetailPage() {
                       {categories.map(([type, count]) => (
                         <div
                           key={type}
-                          className="bg-surface-2 px-2 py-1.5 rounded-input border border-border-subtle flex items-center justify-between text-[11px]"
+                          className="bg-surface-2 px-2.5 py-1.5 rounded-input border border-border-subtle flex items-center justify-between text-[11px]"
                         >
                           <div className="flex items-center gap-1.5 truncate">
                             <span className="font-mono text-primary font-semibold text-[10px]">
                               {type}
                             </span>
-                            <span className="text-[10px] text-text-muted">({count})</span>
                           </div>
-                          <button
-                            onClick={async () => {
-                              if (
-                                window.confirm(
-                                  `Delete all ${count} "${type}" entities from this case?`,
-                                )
-                              ) {
-                                try {
-                                  await api.entities.deleteByType(caseId!, type);
-                                  handleRefresh();
-                                  addToast(`Deleted all ${count} ${type} entities`, 'info');
-                                } catch (err: any) {
-                                  addToast(err.message || 'Failed to delete entities', 'error');
-                                }
-                              }
-                            }}
-                            title={`Delete all ${type} entities`}
-                            className="p-1 text-status-danger/70 hover:text-status-danger hover:bg-status-danger/10 rounded transition-colors"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
+                          <span className="text-[10px] text-text-muted font-mono">{count}</span>
                         </div>
                       ))}
                     </div>
@@ -646,63 +707,6 @@ export function InvestigationDetailPage() {
                 </div>
               </div>
 
-              {/* Quick Start Discovery Button */}
-              <Button
-                variant="secondary"
-                size="sm"
-                className="w-full text-xs"
-                icon={<Compass className="w-3.5 h-3.5 text-primary" />}
-                onClick={() => setDiscoveryModalOpen(true)}
-              >
-                Start Discovery
-              </Button>
-
-              {/* Case Reset & Delete Management */}
-              <div className="pt-2 border-t border-border-subtle space-y-1.5">
-                <button
-                  onClick={async () => {
-                    if (
-                      window.confirm(
-                        'Are you sure you want to clear all graph data (entities, relationships, evidence) in this investigation dossier?',
-                      )
-                    ) {
-                      try {
-                        await api.investigations.reset(caseId!);
-                        handleRefresh();
-                        addToast('Cleared all graph data in dossier', 'info');
-                      } catch (err: any) {
-                        addToast(err.message || 'Failed to reset graph', 'error');
-                      }
-                    }
-                  }}
-                  className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] text-text-muted hover:text-status-danger hover:bg-status-danger/10 rounded-button border border-border-subtle transition-colors"
-                >
-                  <RefreshCw className="w-3 h-3" />
-                  <span>Clear All Graph Data</span>
-                </button>
-
-                <button
-                  onClick={async () => {
-                    if (
-                      window.confirm(
-                        `Permanently delete the entire investigation dossier "${investigation.title}"?`,
-                      )
-                    ) {
-                      try {
-                        await api.investigations.delete(caseId!);
-                        addToast('Investigation dossier deleted', 'info');
-                        navigate('/investigations');
-                      } catch (err: any) {
-                        addToast(err.message || 'Failed to delete investigation', 'error');
-                      }
-                    }
-                  }}
-                  className="w-full flex items-center justify-center gap-1.5 py-1.5 text-[11px] text-status-danger hover:bg-status-danger/15 rounded-button border border-status-danger/30 transition-colors"
-                >
-                  <Trash2 className="w-3 h-3" />
-                  <span>Delete Dossier</span>
-                </button>
-              </div>
             </div>
           </aside>
         ) : (
@@ -715,116 +719,160 @@ export function InvestigationDetailPage() {
           </button>
         )}
 
-        {/* Center: Interactive Graph View OR Notes View */}
-        <div className="flex-1 h-full relative overflow-hidden bg-app">
-          {activeWorkspaceView === 'graph' ? (
-            isGraphLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <LoadingState message="Rendering investigation graph..." />
-              </div>
-            ) : !hasNodes ? (
-              <div className="flex items-center justify-center h-full">
-                <EmptyState
-                  icon={<Compass className="w-10 h-10 text-primary" />}
-                  title="Investigation graph is empty"
-                  description="Enter an organization name, domain, email, username, or IP to start automated multi-category discovery."
-                  actionLabel="Start Discovery"
-                  actionIcon={<Sparkles className="w-4 h-4 text-amber-300" />}
-                  onAction={() => setDiscoveryModalOpen(true)}
-                />
-              </div>
-            ) : (
-              <GraphView graphData={graphData!} onRefresh={handleRefresh} />
-            )
-          ) : activeWorkspaceView === 'map' ? (
-            graphData ? (
-              <PhoneMapPanel graphData={graphData} />
-            ) : (
-              <LoadingState message="Loading geolocation data..." />
-            )
-          ) : (
-            /* Analyst Notes View */
-            <div className="h-full overflow-y-auto p-6 max-w-4xl mx-auto space-y-6">
-              <div>
-                <h3 className="text-lg font-bold text-text">Analyst Case Notes</h3>
-                <p className="text-xs text-text-muted">
-                  Document hypotheses, observations, provenance trails, and investigation conclusions
-                </p>
-              </div>
-
-              {/* Note input form */}
-              <form onSubmit={handleAddNote} className="bg-surface p-4 rounded-card border border-border-subtle space-y-3">
-                <textarea
-                  rows={3}
-                  placeholder="Record an analyst observation or investigation note..."
-                  value={newNoteContent}
-                  onChange={(e) => setNewNoteContent(e.target.value)}
-                  className="input-field resize-none text-xs font-sans"
-                  disabled={submittingNote}
-                />
-                <div className="flex justify-end">
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    type="submit"
-                    loading={submittingNote}
-                    icon={<Send className="w-3.5 h-3.5" />}
-                  >
-                    Save Note
-                  </Button>
+        {/* Center Workspace (Canvas + Slide-over Panel + Bottom Console Drawer) */}
+        <div className="flex-1 flex flex-col min-w-0 overflow-hidden relative">
+          {/* Upper Workspace: Graph/Map/Timeline/Notes + Right Slide-over */}
+          <div className="flex-1 flex overflow-hidden relative min-h-0">
+            {/* Center: Interactive Graph View OR Notes View */}
+            <div className="flex-1 h-full relative overflow-hidden bg-app">
+            {activeWorkspaceView === 'graph' ? (
+              isGraphLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <LoadingState message="Rendering investigation graph..." />
                 </div>
-              </form>
-
-              {/* Notes List */}
-              <div className="space-y-3">
-                {notes.length === 0 ? (
-                  <p className="text-xs text-text-muted text-center py-8">
-                    No notes recorded yet.
+              ) : !hasNodes ? (
+                <div className="flex items-center justify-center h-full">
+                  <EmptyState
+                    icon={<Compass className="w-10 h-10 text-primary" />}
+                    title="Investigation graph is empty"
+                    description="Enter an organization name, domain, email, username, or IP to start automated multi-category discovery."
+                    actionLabel="Start Discovery"
+                    actionIcon={<Sparkles className="w-4 h-4 text-amber-300" />}
+                    onAction={() => setDiscoveryModalOpen(true)}
+                  />
+                </div>
+              ) : (
+                <GraphView graphData={graphData!} onRefresh={handleRefresh} />
+              )
+            ) : activeWorkspaceView === 'map' ? (
+              graphData ? (
+                <PhoneMapPanel graphData={graphData} />
+              ) : (
+                <LoadingState message="Loading geolocation data..." />
+              )
+            ) : activeWorkspaceView === 'timeline' ? (
+              <TimelineView caseId={caseId!} />
+            ) : (
+              /* Analyst Notes View */
+              <div className="h-full overflow-y-auto p-6 max-w-4xl mx-auto space-y-6">
+                <div>
+                  <h3 className="text-lg font-bold text-text">Analyst Case Notes</h3>
+                  <p className="text-xs text-text-muted">
+                    Document hypotheses, observations, provenance trails, and investigation conclusions
                   </p>
-                ) : (
-                  notes.map((note) => (
-                    <div
-                      key={note.id}
-                      className="bg-surface p-4 rounded-card border border-border-subtle space-y-2"
-                    >
-                      <div className="flex items-center justify-between text-[11px] text-text-muted font-mono">
-                        <span>{new Date(note.created_at).toLocaleString()}</span>
-                        <button
-                          onClick={() => handleDeleteNote(note.id)}
-                          className="p-1 text-text-muted hover:text-status-danger transition-colors"
-                        >
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                      <p className="text-xs text-text leading-relaxed whitespace-pre-wrap">
-                        {note.content}
-                      </p>
-                    </div>
-                  ))
-                )}
-              </div>
-            </div>
-          )}
-        </div>
+                </div>
 
-        {/* Right Panel: Live Discovery Logs OR Entity Details */}
-        {liveLogsOpen ? (
-          <DiscoveryLogsPanel
-            onClose={() => setLiveLogsOpen(false)}
-            width={rightSidebarWidth}
-            onResizeStart={handleRightResizeStart}
-          />
-        ) : isDetailOpen && caseId ? (
-          <EntityDetailPanel
-            caseId={caseId}
-            onClose={() => {
-              setSelectedNodeId(null);
-              setSelectedEdgeId(null);
-            }}
-            width={rightSidebarWidth}
-            onResizeStart={handleRightResizeStart}
-          />
-        ) : null}
+                {/* Note input form */}
+                <form onSubmit={handleAddNote} className="bg-surface p-4 rounded-card border border-border-subtle space-y-3">
+                  <textarea
+                    rows={3}
+                    placeholder="Record an analyst observation or investigation note..."
+                    value={newNoteContent}
+                    onChange={(e) => setNewNoteContent(e.target.value)}
+                    className="input-field resize-none text-xs font-sans"
+                    disabled={submittingNote}
+                  />
+                  <div className="flex justify-end">
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      type="submit"
+                      loading={submittingNote}
+                      icon={<Send className="w-3.5 h-3.5" />}
+                    >
+                      Save Note
+                    </Button>
+                  </div>
+                </form>
+
+                {/* Notes List */}
+                <div className="space-y-3">
+                  {notes.length === 0 ? (
+                    <p className="text-xs text-text-muted text-center py-8">
+                      No notes recorded yet.
+                    </p>
+                  ) : (
+                    notes.map((note) => (
+                      <div
+                        key={note.id}
+                        className="bg-surface p-4 rounded-card border border-border-subtle space-y-2"
+                      >
+                        <div className="flex items-center justify-between text-[11px] text-text-muted font-mono">
+                          <span>{new Date(note.created_at).toLocaleString()}</span>
+                          <button
+                            onClick={() => handleDeleteNote(note.id)}
+                            className="p-1 text-text-muted hover:text-status-danger transition-colors"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                        <p className="text-xs text-text leading-relaxed whitespace-pre-wrap">
+                          {note.content}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+            {/* Right Panel: Entity/Edge Detail Inspector (slide-over only when selected) */}
+            {isDetailOpen && caseId && (
+              <EntityDetailPanel
+                caseId={caseId}
+                onClose={() => {
+                  setSelectedNodeId(null);
+                  setSelectedEdgeId(null);
+                }}
+                width={rightSidebarWidth}
+              />
+            )}
+
+            {/* Right Panel: Execution Console Sidebar */}
+            {liveLogsOpen && (
+              <DiscoveryLogsPanel
+                onClose={() => setLiveLogsOpen(false)}
+                width={consoleWidth}
+                onResizeStart={handleConsoleResizeStart}
+              />
+            )}
+          </div>
+
+          {/* Bottom: Minimal Status Bar */}
+          <div className="h-7 bg-[#090d14] border-t border-[#1e293b] flex items-center justify-between px-3 shrink-0 z-10">
+            <div className="flex items-center gap-2.5 text-[10.5px] font-mono text-slate-500">
+              <div className="flex items-center gap-1.5">
+                <span className={`w-1.5 h-1.5 rounded-full ${isDiscovering ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
+                <span className="text-slate-400">{isDiscovering ? 'Discovering' : 'Ready'}</span>
+              </div>
+              <span className="text-slate-700">·</span>
+              <span>{graphData?.nodes?.length || 0} Entities</span>
+              <span className="text-slate-700">·</span>
+              <span>{graphData?.edges?.length || 0} Links</span>
+              <span className="text-slate-700">·</span>
+              <span>{seedTargets.length} Seeds</span>
+            </div>
+
+            <button
+              onClick={() => setLiveLogsOpen((prev) => !prev)}
+              className={`flex items-center gap-1.5 px-1.5 py-0.5 text-[10.5px] rounded transition-colors ${
+                liveLogsOpen
+                  ? 'text-slate-200 bg-slate-800/80 font-medium'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
+              }`}
+              title="Toggle Console Sidebar"
+            >
+              <Terminal className="w-3 h-3" />
+              <span>Console</span>
+              {liveDiscoveryLogs.length > 0 && (
+                <span className="text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
+                  {liveDiscoveryLogs.length}
+                </span>
+              )}
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Modals */}

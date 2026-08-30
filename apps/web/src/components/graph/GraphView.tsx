@@ -25,7 +25,9 @@ import {
   applyHierarchicalLayout,
   applyRadialLayout,
 } from '../../lib/graphLayout';
-import { Radio, Layers, Eye } from 'lucide-react';
+import { Radio, Layers, Route, X } from 'lucide-react';
+import { useParams } from 'react-router-dom';
+import { PathFinderModal } from './PathFinderModal';
 import type { GraphPayload } from '@nexusgraph/shared';
 
 const nodeTypes = {
@@ -74,12 +76,18 @@ function GraphViewInner({ graphData }: GraphViewProps) {
     setSelectedEdgeId,
     graphFilter,
     graphLayout,
+    highlightedPath,
+    setHighlightedPath,
   } = useAppStore();
+
+  const { id: routeCaseId } = useParams<{ id: string }>();
+  const caseId = routeCaseId || '';
 
   const { fitView } = useReactFlow();
 
   const [filterOpen, setFilterOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [pathFinderOpen, setPathFinderOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSeedFilter, setSelectedSeedFilter] = useState<string | null>(null);
 
@@ -194,16 +202,16 @@ function GraphViewInner({ graphData }: GraphViewProps) {
   const seedSubgraphNodeIds = useMemo(() => {
     if (seedTargets.length === 0) return new Map<string, Set<string>>();
 
-    const adj = new Map<string, string[]>();
-    initialNodes.forEach((n) => adj.set(n.id, []));
+    const forwardAdj = new Map<string, string[]>();
+    initialNodes.forEach((n) => forwardAdj.set(n.id, []));
     initialEdges.forEach((e) => {
-      if (adj.has(e.source) && adj.has(e.target)) {
-        adj.get(e.source)!.push(e.target);
-        adj.get(e.target)!.push(e.source);
+      if (forwardAdj.has(e.source) && forwardAdj.has(e.target)) {
+        forwardAdj.get(e.source)!.push(e.target);
       }
     });
 
     const map = new Map<string, Set<string>>();
+    const seedIds = new Set(seedTargets.map((s) => s.id));
 
     seedTargets.forEach((seed) => {
       const visited = new Set<string>([seed.id]);
@@ -211,8 +219,9 @@ function GraphViewInner({ graphData }: GraphViewProps) {
 
       while (queue.length > 0) {
         const curr = queue.shift()!;
-        const neighbors = adj.get(curr) || [];
+        const neighbors = forwardAdj.get(curr) || [];
         for (const nb of neighbors) {
+          if (seedIds.has(nb) && nb !== seed.id) continue;
           if (!visited.has(nb)) {
             visited.add(nb);
             queue.push(nb);
@@ -399,6 +408,45 @@ function GraphViewInner({ graphData }: GraphViewProps) {
     );
   }, [edges, visibleNodeIds]);
 
+  const displayNodes = useMemo(() => {
+    if (!highlightedPath) return filteredNodes;
+    return filteredNodes.map((node) => {
+      const isPathNode = highlightedPath.nodeIds.includes(node.id);
+      return {
+        ...node,
+        style: {
+          ...(node.style || {}),
+          opacity: isPathNode ? 1 : 0.18,
+          transition: 'opacity 0.2s ease',
+        },
+      };
+    });
+  }, [filteredNodes, highlightedPath]);
+
+  const displayEdges = useMemo(() => {
+    if (!highlightedPath) return filteredEdges;
+    return filteredEdges.map((edge) => {
+      const isPathEdge =
+        highlightedPath.edgeIds.includes(edge.id) ||
+        (highlightedPath.nodeIds.includes(edge.source) &&
+          highlightedPath.nodeIds.includes(edge.target));
+
+      return {
+        ...edge,
+        style: {
+          ...(edge.style || {}),
+          stroke: isPathEdge ? '#38bdf8' : 'rgba(100, 116, 139, 0.2)',
+          strokeWidth: isPathEdge ? 2.5 : 1,
+          opacity: isPathEdge ? 1 : 0.1,
+        },
+        data: {
+          ...(edge.data || {}),
+          isHighlighted: isPathEdge,
+        },
+      };
+    });
+  }, [filteredEdges, highlightedPath]);
+
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
       if (node.type === 'cluster_hub' || (node.data as any)?.isHub) {
@@ -432,70 +480,75 @@ function GraphViewInner({ graphData }: GraphViewProps) {
         filterOpen={filterOpen}
         onToggleSearch={() => setSearchOpen((prev) => !prev)}
         searchOpen={searchOpen}
+        onTogglePathFinder={() => setPathFinderOpen((prev) => !prev)}
+        pathFinderOpen={pathFinderOpen}
         onApplyLayout={(layout) => applyLayout(layout)}
         clusterMode={clusterMode}
         onToggleClusterMode={handleToggleClusterMode}
         labelMode={labelMode}
         onToggleLabelMode={handleToggleLabelMode}
         totalNodeCount={rawNodeCount}
+        seedTargets={seedTargets.map((seed) => {
+          const seedData = (seed.data || {}) as Record<string, any>;
+          return {
+            id: seed.id,
+            label: String(seedData.value || seedData.label || 'Seed'),
+            count: seedSubgraphNodeIds.get(seed.id)?.size || 1,
+          };
+        })}
+        selectedSeedFilter={selectedSeedFilter}
+        onSelectSeedFilter={handleSelectSeedFilter}
       />
-
-      {/* Target Seed Isolation & Subgraph Switcher */}
-      {seedTargets.length > 1 && (
-        <div className="absolute top-4 left-[380px] z-10 hidden md:flex items-center gap-1 p-1 bg-surface/90 backdrop-blur-md border border-border-subtle rounded-card shadow-xl max-w-[calc(100vw-740px)] overflow-x-auto scrollbar-none">
-          <div className="flex items-center gap-1 text-[11px] font-mono text-text-muted px-2 py-0.5 border-r border-border-subtle shrink-0">
-            <Layers className="w-3.5 h-3.5 text-primary" />
-            <span className="font-semibold text-slate-300">Target Clusters:</span>
-          </div>
-
-          <button
-            onClick={() => handleSelectSeedFilter(null)}
-            className={`px-2.5 py-1 rounded text-xs font-mono transition-all flex items-center gap-1.5 shrink-0 ${
-              selectedSeedFilter === null
-                ? 'bg-primary text-white font-semibold shadow-sm ring-1 ring-primary/50'
-                : 'text-text-secondary hover:text-text hover:bg-surface-2'
-            }`}
-            title="Show all seed targets (separated side-by-side clusters)"
-          >
-            <Eye className="w-3 h-3" />
-            <span>All Targets ({seedTargets.length})</span>
-          </button>
-
-          {seedTargets.map((seed) => {
-            const seedData = (seed.data || {}) as Record<string, any>;
-            const count = seedSubgraphNodeIds.get(seed.id)?.size || 1;
-            const label = seedData.value || seedData.label || 'Seed';
-            const isSelected = selectedSeedFilter === seed.id;
-
-            return (
-              <button
-                key={seed.id}
-                onClick={() => handleSelectSeedFilter(seed.id)}
-                className={`px-2.5 py-1 rounded text-xs font-mono transition-all flex items-center gap-1.5 shrink-0 max-w-[240px] truncate ${
-                  isSelected
-                    ? 'bg-amber-500/20 text-amber-200 border border-amber-500/60 font-semibold shadow-sm shadow-amber-950/40'
-                    : 'text-text-secondary hover:text-amber-300 hover:bg-surface-2 border border-transparent'
-                }`}
-                title={`Isolate graph to target: ${label} (${count} entities)`}
-              >
-                <Radio className={`w-3 h-3 shrink-0 ${isSelected ? 'text-amber-400 animate-pulse' : 'text-amber-500/70'}`} />
-                <span className="truncate">{label}</span>
-                <span className={`text-[10px] px-1 py-0.2 rounded font-bold ${
-                  isSelected ? 'bg-amber-500/30 text-amber-300' : 'bg-surface-3 text-text-muted'
-                }`}>
-                  {count}
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      )}
 
       {filterOpen && <GraphFilterBar onClose={() => setFilterOpen(false)} />}
 
+      {/* Floating Active Path Highlight Banner */}
+      {highlightedPath && (
+        <div className="absolute top-16 left-4 z-20 flex items-center gap-3 px-3.5 py-2 bg-[#0c1017]/95 backdrop-blur-md border border-sky-500/50 rounded-lg shadow-2xl animate-in fade-in slide-in-from-top-2 text-xs">
+          <div className="flex items-center gap-2 font-mono">
+            <Route className="w-4 h-4 text-sky-400 animate-pulse" />
+            <span className="text-slate-200 font-semibold">Active Path:</span>
+            <span className="text-sky-300 font-bold">
+              {highlightedPath.nodeIds.length - 1}{' '}
+              {highlightedPath.nodeIds.length - 1 === 1 ? 'hop' : 'hops'}
+            </span>
+            <span className="text-slate-600">·</span>
+            <span className="text-emerald-400 font-semibold">
+              {highlightedPath.confidence}% confidence
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1.5 ml-2 border-l border-slate-700/60 pl-2.5">
+            <button
+              onClick={() => setPathFinderOpen(true)}
+              className="text-[11px] text-sky-300 hover:text-sky-200 hover:underline font-medium"
+            >
+              Details
+            </button>
+            <button
+              onClick={() => setHighlightedPath(null)}
+              className="p-1 text-slate-400 hover:text-white rounded hover:bg-slate-800 transition-colors"
+              title="Clear path highlight"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Path Finder Modal */}
+      {caseId && (
+        <PathFinderModal
+          isOpen={pathFinderOpen}
+          onClose={() => setPathFinderOpen(false)}
+          caseId={caseId}
+          nodes={nodes}
+        />
+      )}
+
       <ReactFlow
-        nodes={filteredNodes}
-        edges={filteredEdges}
+        nodes={displayNodes}
+        edges={displayEdges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
@@ -512,9 +565,9 @@ function GraphViewInner({ graphData }: GraphViewProps) {
       >
         <Background
           variant={BackgroundVariant.Dots}
-          gap={24}
+          gap={20}
           size={1}
-          color="rgba(255, 255, 255, 0.05)"
+          color="rgba(30, 41, 59, 0.35)"
         />
         <Controls showInteractive={false} position="bottom-left" />
         <MiniMap

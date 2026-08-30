@@ -39,6 +39,7 @@ import { executeTransform } from '../transforms/adapter.js';
 import { runDiscovery } from '../discovery/executor.js';
 import { buildDiscoveryPlan } from '../discovery/planner.js';
 import { rateLimitMiddleware } from '../middleware/index.js';
+import { findShortestPath } from '../correlation/pathfinder.js';
 import { logger } from '../lib/logger.js';
 
 const api = new Hono();
@@ -435,6 +436,31 @@ api.get('/investigations/:id/graph', async (c) => {
     return c.json({ data });
   } catch {
     return c.json({ error: 'Not Found', message: 'Investigation not found', statusCode: 404 }, 404);
+  }
+});
+
+api.get('/investigations/:id/graph/path', async (c) => {
+  const userId = c.get('userId');
+  const caseId = c.req.param('id');
+  const from = c.req.query('from');
+  const to = c.req.query('to');
+
+  if (!from || !to) {
+    return c.json(
+      { error: 'Validation Error', message: 'Both "from" and "to" query parameters are required', statusCode: 400 },
+      400,
+    );
+  }
+
+  try {
+    const data = await findShortestPath(caseId, from, to, userId);
+    return c.json({ data });
+  } catch (err: any) {
+    const status = err.message?.includes('not found') ? 404 : 400;
+    return c.json(
+      { error: 'Error', message: err.message || 'Path finder failed', statusCode: status },
+      status,
+    );
   }
 });
 

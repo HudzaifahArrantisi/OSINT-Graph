@@ -73,39 +73,82 @@ export async function queryGetContact(e164: string, requestId?: string): Promise
   const activeConfigDir = path.dirname(credPath);
 
   try {
-    // Execute ONLY -t tags search as requested by user
-    const { stdout: tagsOut } = await execFileAsync('python', [gtcScript, 'search', e164, '-t', 'tags', '--json'], {
-      timeout: 15000,
-      env: { ...process.env, GTC_CONFIG_DIR: activeConfigDir, PYTHONIOENCODING: 'utf-8' },
-    });
+    // 1. First attempt: Query tags (-t tags)
+    let tagsList: Array<{ tag: string; count: number }> = [];
+    let displayName: string | null = null;
+    let tagCount = 0;
 
-    const tagsData = JSON.parse(tagsOut);
-    const rawTags = tagsData?.result?.tags;
-    if (!Array.isArray(rawTags) || rawTags.length === 0) {
-      return null;
+    try {
+      const { stdout: tagsOut } = await execFileAsync('python', [gtcScript, 'search', e164, '-t', 'tags', '--json'], {
+        timeout: 15000,
+        env: { ...process.env, GTC_CONFIG_DIR: activeConfigDir, PYTHONIOENCODING: 'utf-8' },
+      });
+
+      const tagsData = JSON.parse(tagsOut);
+      const rawTags = tagsData?.result?.tags;
+      if (Array.isArray(rawTags) && rawTags.length > 0) {
+        tagsList = rawTags
+          .map((t: any) => ({
+            tag: String(t.tag || '').trim(),
+            count: Number(t.count || 1),
+          }))
+          .filter((t: any) => t.tag.length > 0);
+
+        if (tagsList.length > 0) {
+          displayName = tagsList[0]?.tag || null;
+          tagCount = tagsList.length;
+        }
+      }
+    } catch {
+      // Tags endpoint may be rate-limited / quota exhausted (numberDetail 0/0), fallback to profile
     }
 
-    const tagsList: Array<{ tag: string; count: number }> = rawTags
-      .map((t: any) => ({
-        tag: String(t.tag || '').trim(),
-        count: Number(t.count || 1),
-      }))
-      .filter((t: any) => t.tag.length > 0);
+    // 2. Fallback or Enrichment: Query profile (-t profile) which uses search quota (200/mo)
+    try {
+      const { stdout: profOut } = await execFileAsync('python', [gtcScript, 'search', e164, '-t', 'profile', '--json'], {
+        timeout: 15000,
+        env: { ...process.env, GTC_CONFIG_DIR: activeConfigDir, PYTHONIOENCODING: 'utf-8' },
+      });
 
-    if (tagsList.length === 0) {
-      return null;
+      const profData = JSON.parse(profOut);
+      const profile = profData?.result?.profile;
+      if (profile?.displayName) {
+        displayName = profile.displayName;
+      }
+      if (typeof profile?.tagCount === 'number' && profile.tagCount > tagCount) {
+        tagCount = profile.tagCount;
+      }
+
+      // Check if profile also returned tags and merge them
+      const pTags = profData?.result?.tags;
+      if (Array.isArray(pTags) && pTags.length > 0) {
+        const existingTags = new Set(tagsList.map((t) => t.tag.toLowerCase()));
+        for (const pt of pTags) {
+          const tagStr = String(pt.tag || '').trim();
+          if (tagStr && !existingTags.has(tagStr.toLowerCase())) {
+            tagsList.push({
+              tag: tagStr,
+              count: Number(pt.count || 1),
+            });
+            existingTags.add(tagStr.toLowerCase());
+          }
+        }
+      }
+    } catch {
+      // Ignore profile error if tags were already populated
     }
 
-    // Top tag is chosen as the primary alias / displayName candidate
-    const topTag = tagsList[0]?.tag || null;
+    if (!displayName && tagsList.length === 0) {
+      return null;
+    }
 
     return {
-      displayName: topTag,
-      tagCount: tagsList.length,
+      displayName: displayName || (tagsList[0]?.tag ?? null),
+      tagCount: tagCount || tagsList.length,
       tags: tagsList,
     };
   } catch (err) {
-    logger.warn('GetContact -t tags lookup skipped or error', {
+    logger.warn('GetContact lookup skipped or error', {
       requestId,
       error: (err as Error).message,
     });
@@ -712,6 +755,36 @@ export const phoneGeoCollector: Collector = {
           metadata: { method: 'E.164 mobile prefix → licensed carrier allocation lookup' },
         });
       }
+
+      if (carrier && carrier !== 'Unknown' && carrier !== 'None') {
+        entities.push({
+          type: 'ORGANIZATION',
+          value: carrier,
+          title: `${carrier} (Carrier/ISP)`,
+          confidence: 90,
+          metadata: {
+            orgType: 'CARRIER',
+            sourcePhone: e164,
+            source: {
+              url: `tel:${e164}`,
+              collector: 'phone-geo',
+              transform: 'phone.carrier-lookup',
+              derivedFrom: e164,
+              collectedAt,
+            },
+          },
+        });
+
+        relationships.push({
+          source_value: e164,
+          source_type: 'PHONE',
+          target_value: carrier,
+          target_type: 'ORGANIZATION',
+          relationship_type: 'BELONGS_TO',
+          confidence: 90,
+          reason: `Mobile number ${e164} prefix is allocated to carrier "${carrier}"`,
+        });
+      }
     }
 
     // Geographic attribution
@@ -833,23 +906,27 @@ export const phoneGeoCollector: Collector = {
           });
         }
 
-        // Add top tags as PUBLIC_MENTION nodes if distinct
-        const topTags = (gtcData.tags || [])
-          .filter((t) => t.tag && t.tag !== gtcData.displayName && t.tag.length > 1)
-          .slice(0, 8);
+        // Add all discovered tags as PUBLIC_MENTION nodes
+        const allTags = (gtcData.tags || []).filter((t) => t.tag && t.tag.length > 1);
 
-        for (const t of topTags) {
+        const seenTagValues = new Set<string>();
+
+        for (const t of allTags) {
           const tagValue = `tag:${t.tag.toLowerCase().replace(/\s+/g, '-')}`;
+          if (seenTagValues.has(tagValue)) continue;
+          seenTagValues.add(tagValue);
+
           entities.push({
             type: 'PUBLIC_MENTION',
             value: tagValue,
-            title: `🏷️ ${t.tag} (${t.count}x)`,
+            title: t.count > 1 ? `${t.tag} (${t.count}x)` : t.tag,
             confidence: 80,
             metadata: {
               rawTag: t.tag,
               count: t.count,
               sourcePhone: e164,
               provider: 'GetContact',
+              totalAccountTags: gtcData.tagCount,
             },
           });
 
@@ -864,6 +941,39 @@ export const phoneGeoCollector: Collector = {
           });
         }
 
+        // If GetContact indicates more tags on server than previewed in tier
+        if (gtcData.tagCount && gtcData.tagCount > allTags.length) {
+          const remainingCount = gtcData.tagCount - allTags.length;
+          const summaryTagValue = `gtc:total-tags:${e164}`;
+          if (!seenTagValues.has(summaryTagValue)) {
+            seenTagValues.add(summaryTagValue);
+            entities.push({
+              type: 'PUBLIC_MENTION',
+              value: summaryTagValue,
+              title: `+${remainingCount} Tag Lainnya (${gtcData.tagCount} Total di GetContact)`,
+              confidence: 85,
+              metadata: {
+                totalTags: gtcData.tagCount,
+                previewTags: allTags.length,
+                remainingTags: remainingCount,
+                sourcePhone: e164,
+                provider: 'GetContact',
+                note: `Nomor ini memiliki total ${gtcData.tagCount} tag tersimpan di GetContact database`,
+              },
+            });
+
+            relationships.push({
+              source_value: e164,
+              source_type: 'PHONE',
+              target_value: summaryTagValue,
+              target_type: 'PUBLIC_MENTION',
+              relationship_type: 'MENTIONS',
+              confidence: 85,
+              reason: `Total ${gtcData.tagCount} tags recorded in GetContact caller directory (${remainingCount} additional encrypted contacts)`,
+            });
+          }
+        }
+
         evidence.push({
           source_url: `getcontact://phone/${encodeURIComponent(e164)}`,
           source_type: 'PHONE_METADATA',
@@ -871,7 +981,7 @@ export const phoneGeoCollector: Collector = {
           extracted_value: JSON.stringify({
             displayName: gtcData.displayName,
             tagCount: gtcData.tagCount,
-            tags: gtcData.tags?.slice(0, 15),
+            tags: gtcData.tags,
           }),
           confidence: 85,
           metadata: {

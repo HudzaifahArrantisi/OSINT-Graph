@@ -25,12 +25,14 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'domain.resolve-dns',
     'domain.find-tls',
     'domain.find-subdomains-crt',
+    'domain.whois-rdap',
     'contact.find-official-contact',
     'intelligence.generate-dorks',
     'mentions.search-public-web',
   ],
   DOMAIN: [
     'domain.resolve-dns',
+    'domain.whois-rdap',
     'domain.find-tls',
     'domain.find-subdomains-crt',
     'domain.webpage-metadata',
@@ -76,6 +78,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   ],
   IP_ADDRESS: [
     'domain.resolve-dns',
+    'infrastructure.ip-geolocation',
     'mentions.search-public-web',
   ],
   SOCIAL_PROFILE: [

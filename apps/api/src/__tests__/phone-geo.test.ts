@@ -32,11 +32,12 @@ describe('phone-geo collector', () => {
     expect(typeof location!.metadata?.lat).toBe('number');
     expect(typeof location!.metadata?.lng).toBe('number');
 
-    const rel = result.relationships[0];
-    expect(rel.source_value).toBe('+6281234567890');
-    expect(rel.target_type).toBe('LOCATION');
-    expect(rel.confidence).toBe(40);
-    expect(rel.reason).toContain('+62');
+    const rel = result.relationships.find((r) => r.target_type === 'LOCATION');
+    expect(rel).toBeDefined();
+    expect(rel!.source_value).toBe('+6281234567890');
+    expect(rel!.target_type).toBe('LOCATION');
+    expect(rel!.confidence).toBe(40);
+    expect(rel!.reason).toContain('+62');
 
     expect(result.evidence.length).toBeGreaterThanOrEqual(2);
     expect(result.evidence.every((ev) => ev.source_type === 'PHONE_METADATA')).toBe(true);

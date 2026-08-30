@@ -59,6 +59,26 @@ export const TRANSFORM_DEFINITIONS: TransformDefinition[] = [
     riskLevel: 'low',
     enabled: true,
   },
+  {
+    id: 'domain.whois-rdap',
+    name: 'WHOIS / RDAP Registration Lookup',
+    description: 'Query authoritative RFC 7483 RDAP records for domain registrar, creation/expiration dates, nameservers, and registrant details',
+    inputTypes: ['DOMAIN', 'WEBSITE', 'URL'],
+    outputTypes: ['ORGANIZATION', 'NS_RECORD', 'PERSON'],
+    category: 'infrastructure',
+    riskLevel: 'low',
+    enabled: true,
+  },
+  {
+    id: 'infrastructure.ip-geolocation',
+    name: 'IP Geolocation & ASN Lookup',
+    description: 'Geolocate an IP address to resolve city, country, coordinates, ISP, and Autonomous System (ASN)',
+    inputTypes: ['IP_ADDRESS'],
+    outputTypes: ['LOCATION', 'ORGANIZATION'],
+    category: 'infrastructure',
+    riskLevel: 'low',
+    enabled: true,
+  },
 
   // ─── Social Transforms ──────────────────────────────────────────────
   {

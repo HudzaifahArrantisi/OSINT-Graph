@@ -70,10 +70,10 @@ const ENTITY_THEMES: Record<
   }
 > = {
   SEED: {
-    border: 'border-amber-500/90',
+    border: 'border-amber-500/70',
     bg: 'bg-[#1e1709]',
     iconColor: 'text-amber-400',
-    glow: 'shadow-[0_0_12px_rgba(245,158,11,0.25)] ring-1 ring-amber-400/40',
+    glow: 'shadow-sm',
     badge: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
     labelColor: 'text-amber-200 font-semibold',
     accentColor: 'border-t-amber-400',
@@ -106,13 +106,13 @@ const ENTITY_THEMES: Record<
     accentColor: 'border-t-cyan-400',
   },
   EMAIL: {
-    border: 'border-emerald-600/70',
-    bg: 'bg-[#091a14]',
-    iconColor: 'text-emerald-400',
+    border: 'border-violet-600/70',
+    bg: 'bg-[#130d22]',
+    iconColor: 'text-violet-400',
     glow: 'shadow-sm',
-    badge: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25',
+    badge: 'bg-violet-500/15 text-violet-300 border-violet-500/25',
     labelColor: 'text-slate-200',
-    accentColor: 'border-t-emerald-400',
+    accentColor: 'border-t-violet-400',
   },
   USERNAME: {
     border: 'border-amber-600/70',
@@ -476,12 +476,14 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
 
       {/* Underneath Text Label & Category */}
       {!hideLabel && (
-        <div className="mt-1 flex flex-col items-center max-w-[120px] pointer-events-none text-center animate-in fade-in duration-75">
+        <div className="mt-1.5 flex flex-col items-center max-w-[130px] pointer-events-none text-center animate-in fade-in duration-75">
           <span
-            className={`font-mono text-[9px] leading-tight truncate w-full px-1 py-0.5 rounded text-slate-300 bg-[#090d14]/70 border border-slate-800/40`}
-            title={value}
+            className={`font-mono text-[9.5px] leading-tight truncate w-full px-1.5 py-0.5 rounded text-slate-200 bg-[#0c1118]/85 border border-slate-700/40`}
+            title={title || value}
           >
-            {value}
+            {entityType === 'LOCATION' && title
+              ? title.replace(/\s*\((country-level|Mr\.Holmes|area code.*?)\)/gi, '').trim()
+              : value}
           </span>
         </div>
       )}

@@ -293,7 +293,16 @@ def run_phone(value):
         import urllib.parse
 
         raw_val = value.strip()
-        formatted_val = raw_val if raw_val.startswith("+") else "+" + raw_val
+        digits = re.sub(r"[^\d]", "", raw_val)
+        if raw_val.startswith("+"):
+            formatted_val = raw_val
+        elif digits.startswith("0") and len(digits) >= 10:
+            formatted_val = "+62" + digits[1:]
+        elif digits.startswith("62") and len(digits) >= 10:
+            formatted_val = "+" + digits
+        else:
+            formatted_val = "+" + digits
+
         parsed = phonenumbers.parse(formatted_val, None)
 
         phone_meta["valid"] = phonenumbers.is_valid_number(parsed)

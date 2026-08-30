@@ -53,6 +53,10 @@ interface AppState {
   graphLayout: 'force' | 'hierarchical' | 'radial';
   setGraphLayout: (layout: 'force' | 'hierarchical' | 'radial') => void;
 
+  // Path finder highlight
+  highlightedPath: { nodeIds: string[]; edgeIds: string[]; confidence: number } | null;
+  setHighlightedPath: (path: { nodeIds: string[]; edgeIds: string[]; confidence: number } | null) => void;
+
   // Toast notifications
   toasts: Array<{ id: string; message: string; type: 'success' | 'error' | 'info' }>;
   addToast: (message: string, type?: 'success' | 'error' | 'info') => void;
@@ -119,6 +123,9 @@ export const useAppStore = create<AppState>((set) => ({
 
   graphLayout: 'force',
   setGraphLayout: (layout) => set({ graphLayout: layout }),
+
+  highlightedPath: null,
+  setHighlightedPath: (path) => set({ highlightedPath: path }),
 
   toasts: [],
   addToast: (message, type = 'info') => {

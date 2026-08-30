@@ -51,6 +51,7 @@ export const RELATIONSHIP_TYPES = [
   'HAS_GITHUB',
   'HAS_GITLAB',
   'HAS_YOUTUBE',
+  'GEOLOCATED_IN',
 ] as const;
 
 export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
@@ -194,6 +195,8 @@ export const COLLECTOR_NAMES = [
   'website-recon',
   'mrholmes-engine',
   'subdomain-crt',
+  'whois-rdap',
+  'ip-geolocation',
 ] as const;
 
 export type CollectorName = (typeof COLLECTOR_NAMES)[number];

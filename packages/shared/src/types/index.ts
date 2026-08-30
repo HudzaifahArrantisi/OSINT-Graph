@@ -452,3 +452,21 @@ export interface SearchResult {
   notes: Note[];
   total: number;
 }
+
+// ─── Path Finder ────────────────────────────────────────────────────
+
+export interface PathHop {
+  entityId: string;
+  entityType: string;
+  entityValue: string;
+  relationshipId: string | null;
+  relationshipType: string | null;
+  confidence: number;
+}
+
+export interface PathResult {
+  found: boolean;
+  hops: PathHop[];
+  totalHops: number;
+  cumulativeConfidence: number;
+}

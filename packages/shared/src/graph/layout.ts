@@ -37,7 +37,7 @@ function isSeedNode<T extends Record<string, unknown>>(node: SimpleNode<T>): boo
  * Determines the sub-category / transform key for a discovered node.
  * Groups entities into discrete functional modules (DNS, TLS, Webpage Metadata, Contacts, Social, etc.)
  */
-function getSubCategoryKey<T extends Record<string, unknown>>(node: SimpleNode<T>): string {
+export function getSubCategoryKey<T extends Record<string, unknown>>(node: SimpleNode<T>): string {
   const d = (node.data || {}) as Record<string, any>;
   const metadata = d.metadata || {};
   const discoveredBy =
@@ -78,9 +78,25 @@ function getSubCategoryKey<T extends Record<string, unknown>>(node: SimpleNode<T
   return `subcat_${entityType || 'other'}`;
 }
 
+function matchesSeedProvenance(seedVal: string, derivedFrom: string): boolean {
+  if (!seedVal || !derivedFrom) return false;
+  const s = seedVal.toLowerCase().trim();
+  const d = derivedFrom.toLowerCase().trim();
+  if (s === d) return true;
+  const sDigits = s.replace(/\D/g, '');
+  const dDigits = d.replace(/\D/g, '');
+  if (sDigits && dDigits && sDigits.length >= 6 && dDigits.length >= 6) {
+    if (sDigits === dDigits) return true;
+    const sSuffix = sDigits.replace(/^0+/, '').replace(/^62/, '');
+    const dSuffix = dDigits.replace(/^0+/, '').replace(/^62/, '');
+    if (sSuffix === dSuffix) return true;
+  }
+  return s.includes(d) || d.includes(s);
+}
+
 /**
  * Partition nodes & edges into independent seed subgraphs / connected components.
- * Guarantees that multiple seed targets NEVER collide or overlap into a single messy clump.
+ * Guarantees that multiple seed targets NEVER collide, steal each other's nodes, or overlap.
  */
 export function partitionGraphClusters<T extends Record<string, unknown>>(
   nodes: SimpleNode<T>[],
@@ -93,40 +109,94 @@ export function partitionGraphClusters<T extends Record<string, unknown>>(
   const nodeMap = new Map<string, SimpleNode<T>>();
   actualNodes.forEach((n) => nodeMap.set(n.id, n));
 
-  const adj = new Map<string, string[]>();
-  actualNodes.forEach((n) => adj.set(n.id, []));
+  const forwardAdj = new Map<string, string[]>();
+  const undirectedAdj = new Map<string, string[]>();
+  actualNodes.forEach((n) => {
+    forwardAdj.set(n.id, []);
+    undirectedAdj.set(n.id, []);
+  });
 
   edges.forEach((e) => {
-    if (adj.has(e.source) && adj.has(e.target)) {
-      adj.get(e.source)!.push(e.target);
-      adj.get(e.target)!.push(e.source);
+    if (forwardAdj.has(e.source) && forwardAdj.has(e.target)) {
+      forwardAdj.get(e.source)!.push(e.target);
+    }
+    if (undirectedAdj.has(e.source) && undirectedAdj.has(e.target)) {
+      undirectedAdj.get(e.source)!.push(e.target);
+      undirectedAdj.get(e.target)!.push(e.source);
     }
   });
 
   const seeds = actualNodes.filter(isSeedNode);
 
-  // If we have multiple seeds, partition nodes by multi-source BFS / nearest seed
+  // If we have multiple seeds, partition nodes by forward-derivation & nearest seed
   if (seeds.length > 1) {
     const seedIds = seeds.map((s) => s.id);
     const nodeToSeedDist = new Map<string, { seedId: string; dist: number }>();
     const seedClusters = new Map<string, SimpleNode<T>[]>();
     seeds.forEach((s) => seedClusters.set(s.id, [s]));
 
-    // BFS per seed to measure distance
+    // 1. First priority: Direct provenance attribution from node metadata
+    for (const node of actualNodes) {
+      if (seedIds.includes(node.id)) continue;
+      const nData = (node.data || {}) as Record<string, any>;
+      const nMeta = nData.metadata || {};
+      const derivedFrom = String(
+        nMeta.derivedFrom || nMeta.sourcePhone || nMeta.source?.derivedFrom || '',
+      ).trim();
+
+      if (derivedFrom) {
+        for (const seed of seeds) {
+          const seedData = (seed.data || {}) as Record<string, any>;
+          const seedVal = String(seedData.value || seedData.label || '').trim();
+          if (matchesSeedProvenance(seedVal, derivedFrom)) {
+            nodeToSeedDist.set(node.id, { seedId: seed.id, dist: 0.5 });
+            break;
+          }
+        }
+      }
+    }
+
+    // 2. Second priority: Forward-directed BFS from each seed (following discovery direction)
     for (const seed of seeds) {
       const visited = new Set<string>([seed.id]);
       const queue: Array<{ id: string; dist: number }> = [{ id: seed.id, dist: 0 }];
 
       while (queue.length > 0) {
         const { id: curr, dist } = queue.shift()!;
-        const neighbors = adj.get(curr) || [];
+        const forwardNeighbors = forwardAdj.get(curr) || [];
 
-        for (const neighbor of neighbors) {
+        for (const neighbor of forwardNeighbors) {
+          if (seedIds.includes(neighbor) && neighbor !== seed.id) continue;
+
           if (!visited.has(neighbor)) {
             visited.add(neighbor);
             const currentRecord = nodeToSeedDist.get(neighbor);
             if (!currentRecord || dist + 1 < currentRecord.dist) {
               nodeToSeedDist.set(neighbor, { seedId: seed.id, dist: dist + 1 });
+            }
+            queue.push({ id: neighbor, dist: dist + 1 });
+          }
+        }
+      }
+    }
+
+    // 3. Fallback: Undirected BFS for any remaining nodes not yet reached
+    for (const seed of seeds) {
+      const visited = new Set<string>([seed.id]);
+      const queue: Array<{ id: string; dist: number }> = [{ id: seed.id, dist: 0 }];
+
+      while (queue.length > 0) {
+        const { id: curr, dist } = queue.shift()!;
+        const neighbors = undirectedAdj.get(curr) || [];
+
+        for (const neighbor of neighbors) {
+          if (seedIds.includes(neighbor) && neighbor !== seed.id) continue;
+
+          if (!visited.has(neighbor)) {
+            visited.add(neighbor);
+            const currentRecord = nodeToSeedDist.get(neighbor);
+            if (!currentRecord || dist + 10 < currentRecord.dist) {
+              nodeToSeedDist.set(neighbor, { seedId: seed.id, dist: dist + 10 });
             }
             queue.push({ id: neighbor, dist: dist + 1 });
           }
@@ -178,7 +248,7 @@ export function partitionGraphClusters<T extends Record<string, unknown>>(
           const nObj = nodeMap.get(curr);
           if (nObj) compNodes.push(nObj);
 
-          const neighbors = adj.get(curr) || [];
+          const neighbors = undirectedAdj.get(curr) || [];
           for (const neighbor of neighbors) {
             if (!visited.has(neighbor) && !nodeToSeedDist.has(neighbor)) {
               visited.add(neighbor);
@@ -223,7 +293,7 @@ export function partitionGraphClusters<T extends Record<string, unknown>>(
       const nObj = nodeMap.get(curr);
       if (nObj) compNodes.push(nObj);
 
-      const neighbors = adj.get(curr) || [];
+      const neighbors = undirectedAdj.get(curr) || [];
       for (const neighbor of neighbors) {
         if (!visited.has(neighbor)) {
           visited.add(neighbor);
@@ -253,7 +323,7 @@ export function partitionGraphClusters<T extends Record<string, unknown>>(
 /**
  * Helper to layout a list of nodes in a Maltego-style 360° concentric starburst/dandelion around a central hub
  */
-function layoutStarburst<T extends Record<string, unknown>>(
+export function layoutStarburst<T extends Record<string, unknown>>(
   centerPos: { x: number; y: number },
   nodes: SimpleNode<T>[],
   startRadius = 85,
@@ -324,7 +394,7 @@ export function applyForceLayout<T extends Record<string, unknown>>(
 
   let currentOffsetX = 0;
   const result: SimpleNode<T>[] = [];
-  const CLUSTER_GAP = 400;
+  const CLUSTER_GAP = 140;
 
   for (const cluster of clusters) {
     const cNodes = cluster.nodes;
@@ -384,7 +454,7 @@ export function applyHierarchicalLayout<T extends Record<string, unknown>>(
   const clusters = partitionGraphClusters(nodes, edges);
   let currentOffsetX = 0;
   const result: SimpleNode<T>[] = [];
-  const CLUSTER_GAP = 500;
+  const CLUSTER_GAP = 160;
 
   for (const cluster of clusters) {
     const cNodes = cluster.nodes;
@@ -487,149 +557,214 @@ export function applyHierarchicalLayout<T extends Record<string, unknown>>(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 3. Radial Layout (Maltego-style Dandelion Starburst with Sub-Category Hubs)
+// 3. Radial Layout (Maltego-style Concentric Radial & Starburst Tree)
 // ─────────────────────────────────────────────────────────────────────────────
 export function applyRadialLayout<T extends Record<string, unknown>>(
   nodes: SimpleNode<T>[],
   edges: SimpleEdge[],
-  options?: {
+  _options?: {
     collapsedCategories?: string[];
   },
 ): SimpleNode<T>[] {
   if (nodes.length === 0) return [];
-  if (nodes.length === 1) {
-    return [{ ...nodes[0], position: { x: 0, y: 0 } }];
-  }
+  if (nodes.length === 1) return [{ ...nodes[0], position: { x: 0, y: 0 } }];
 
-  const collapsedSet = new Set(options?.collapsedCategories || []);
-  const clusters = partitionGraphClusters(nodes, edges);
+  const actualNodes = nodes.filter((n) => !(n.data as any)?.isHub && n.type !== 'cluster_hub');
+  if (actualNodes.length === 0) return [];
+
+  const clusters = partitionGraphClusters(actualNodes, edges);
   let currentOffsetX = 0;
   const result: SimpleNode<T>[] = [];
-  const CLUSTER_GAP = 280;
+  const CLUSTER_GAP = 180;
 
   for (const cluster of clusters) {
     const cNodes = cluster.nodes;
     const cEdges = cluster.edges;
 
     if (cNodes.length === 1) {
-      result.push({
-        ...cNodes[0],
-        position: { x: currentOffsetX, y: 0 },
-      });
-      currentOffsetX += 100 + CLUSTER_GAP;
+      result.push({ ...cNodes[0], position: { x: currentOffsetX, y: 0 } });
+      currentOffsetX += 200 + CLUSTER_GAP;
       continue;
     }
 
-    const degrees = new Map<string, number>();
-    cNodes.forEach((n) => degrees.set(n.id, 0));
+    const nodeMap = new Map<string, SimpleNode<T>>();
+    cNodes.forEach((n) => nodeMap.set(n.id, n));
+
+    const adj = new Map<string, string[]>();
+    cNodes.forEach((n) => adj.set(n.id, []));
     cEdges.forEach((e) => {
-      degrees.set(e.source, (degrees.get(e.source) || 0) + 1);
-      degrees.set(e.target, (degrees.get(e.target) || 0) + 1);
-    });
-
-    // Focal center node of this cluster
-    let center: SimpleNode<T>;
-    let others: SimpleNode<T>[];
-
-    if (cluster.seedNode) {
-      center = cluster.seedNode;
-      others = cNodes.filter((n) => n.id !== cluster.seedNode!.id);
-    } else {
-      const sorted = [...cNodes].sort(
-        (a, b) => (degrees.get(b.id) || 0) - (degrees.get(a.id) || 0),
-      );
-      center = sorted[0];
-      others = sorted.slice(1);
-    }
-
-    // Partition children into Sub-Category Satellites (DNS, TLS, Webpage, Contacts, Social, Dorks, etc.)
-    const subCategoryGroups = new Map<string, SimpleNode<T>[]>();
-    others.forEach((node) => {
-      const subCat = getSubCategoryKey(node);
-      if (!subCategoryGroups.has(subCat)) {
-        subCategoryGroups.set(subCat, []);
+      if (adj.has(e.source) && adj.has(e.target)) {
+        adj.get(e.source)!.push(e.target);
+        adj.get(e.target)!.push(e.source);
       }
-      subCategoryGroups.get(subCat)!.push(node);
     });
 
-    const subCategories = Array.from(subCategoryGroups.entries());
-
-    // If sub-categories exist, organize them as Starburst Satellites with Hubs
-    if (subCategories.length > 0) {
-      const numSubCats = subCategories.length;
-
-      // Estimate satellite radius requirements
-      let maxSatExtent = 90;
-      subCategories.forEach(([catKey, catNodes]) => {
-        const isCollapsed = collapsedSet.has(catKey);
-        if (isCollapsed) return;
-        const ringsNeeded = Math.ceil(Math.sqrt(catNodes.length * 1.5));
-        const extent = 70 + ringsNeeded * 55;
-        if (extent > maxSatExtent) maxSatExtent = extent;
-      });
-
-      // Compact orbit radius so hubs sit balanced around seed target
-      const orbitRadius = Math.max(
-        numSubCats === 1 ? 160 : 190,
-        130 + (numSubCats > 1 ? maxSatExtent * 0.6 : 0) + Math.sqrt(others.length) * 6
-      );
-      const totalClusterRadius = orbitRadius + maxSatExtent + 30;
-      const clusterCenterX = currentOffsetX + totalClusterRadius;
-
-      // Place central seed node at center of the universe
-      result.push({
-        ...center,
-        position: { x: clusterCenterX, y: 0 },
-      });
-
-      // Place each sub-category satellite
-      subCategories.forEach(([catKey, catNodes], catIndex) => {
-        const isCollapsed = collapsedSet.has(catKey);
-        const angle = (2 * Math.PI * catIndex) / numSubCats - Math.PI / 2;
-        const satCenterX = clusterCenterX + Math.cos(angle) * orbitRadius;
-        const satCenterY = Math.sin(angle) * orbitRadius;
-
-        // Place the Sub-Category Hub Label Node at the center of the satellite
-        const hubId = `hub_${cluster.seedNode ? cluster.seedNode.id : 'root'}_${catKey}`;
-        result.push({
-          id: hubId,
-          type: 'cluster_hub',
-          data: {
-            isHub: true,
-            categoryKey: catKey,
-            label: catKey,
-            count: catNodes.length,
-            isCollapsed,
-          } as any,
-          position: { x: satCenterX, y: satCenterY },
-        });
-
-        // If not collapsed, fan outward from hub away from the central seed
-        if (!isCollapsed) {
-          const outwardAngle = angle;
-          const span = numSubCats === 1 ? 2 * Math.PI : Math.PI * 1.35;
-          const startAngle = outwardAngle - span / 2;
-
-          const starburstNodes = layoutStarburst(
-            { x: satCenterX, y: satCenterY },
-            catNodes,
-            80,
-            startAngle,
-            span
-          );
-          starburstNodes.forEach((node) => result.push(node));
-        }
-      });
-
-      currentOffsetX += totalClusterRadius * 2 + CLUSTER_GAP;
+    // Determine root focal node of this cluster
+    let root: SimpleNode<T>;
+    if (cluster.seedNode) {
+      root = cluster.seedNode;
     } else {
-      // Direct center node only
-      result.push({
-        ...center,
-        position: { x: currentOffsetX + 100, y: 0 },
-      });
-      currentOffsetX += 200 + CLUSTER_GAP;
+      const degrees = cNodes.map((n) => ({
+        node: n,
+        deg: adj.get(n.id)?.length || 0,
+      }));
+      degrees.sort((a, b) => b.deg - a.deg);
+      root = degrees[0].node;
     }
+
+    // Build spanning tree via BFS from root
+    const parentMap = new Map<string, string | null>();
+    const childrenMap = new Map<string, string[]>();
+    const depthMap = new Map<string, number>();
+    cNodes.forEach((n) => childrenMap.set(n.id, []));
+
+    const visited = new Set<string>([root.id]);
+    const queue: string[] = [root.id];
+    parentMap.set(root.id, null);
+    depthMap.set(root.id, 0);
+
+    while (queue.length > 0) {
+      const curr = queue.shift()!;
+      const currDepth = depthMap.get(curr) || 0;
+      const neighbors = adj.get(curr) || [];
+
+      for (const nb of neighbors) {
+        if (!visited.has(nb)) {
+          visited.add(nb);
+          parentMap.set(nb, curr);
+          childrenMap.get(curr)!.push(nb);
+          depthMap.set(nb, currDepth + 1);
+          queue.push(nb);
+        }
+      }
+    }
+
+    // Add any disconnected nodes in cluster directly to root
+    for (const n of cNodes) {
+      if (!visited.has(n.id)) {
+        visited.add(n.id);
+        parentMap.set(n.id, root.id);
+        childrenMap.get(root.id)!.push(n.id);
+        depthMap.set(n.id, 1);
+      }
+    }
+
+    // Calculate subtree weight (number of leaves) for proportional angular allocation
+    const weightMap = new Map<string, number>();
+    function calcWeight(nodeId: string): number {
+      const children = childrenMap.get(nodeId) || [];
+      if (children.length === 0) {
+        weightMap.set(nodeId, 1);
+        return 1;
+      }
+      let sum = 0;
+      for (const ch of children) {
+        sum += calcWeight(ch);
+      }
+      const w = Math.max(1, sum);
+      weightMap.set(nodeId, w);
+      return w;
+    }
+    calcWeight(root.id);
+
+    // Calculate dynamic base radius based on total nodes to prevent crowding
+    const totalCount = cNodes.length;
+    const baseRadius = Math.max(180, Math.min(340, 120 + totalCount * 12));
+    const ringStep = Math.max(140, Math.min(240, 120 + totalCount * 5));
+
+    // Map of positioned coordinates
+    const positions = new Map<string, { x: number; y: number }>();
+    positions.set(root.id, { x: 0, y: 0 });
+
+    // Recursive Maltego Sector Placement
+    function layoutSubtree(
+      nodeId: string,
+      startAngle: number,
+      endAngle: number,
+      currentRadius: number,
+    ) {
+      const children = childrenMap.get(nodeId) || [];
+      if (children.length === 0) return;
+
+      const totalWeight = children.reduce((acc, ch) => acc + (weightMap.get(ch) || 1), 0);
+      const angleSpan = endAngle - startAngle;
+
+      let currentAngle = startAngle;
+
+      children.forEach((childId) => {
+        const childWeight = weightMap.get(childId) || 1;
+        const childSpan = (childWeight / totalWeight) * angleSpan;
+        const midAngle = currentAngle + childSpan / 2;
+
+        // Position child along its sector ray
+        const px = Math.round(Math.cos(midAngle) * currentRadius);
+        const py = Math.round(Math.sin(midAngle) * currentRadius);
+        positions.set(childId, { x: px, y: py });
+
+        // Recurse for grandchildren in the outer orbit
+        const nextRadius = currentRadius + ringStep;
+        layoutSubtree(childId, currentAngle, currentAngle + childSpan, nextRadius);
+
+        currentAngle += childSpan;
+      });
+    }
+
+    // Start full 360-degree layout from root (-PI to PI)
+    layoutSubtree(root.id, -Math.PI, Math.PI, baseRadius);
+
+    // Collision avoidance relaxation pass:
+    // If any two nodes are closer than 85px, apply gentle repulsive displacement
+    const posList = Array.from(positions.entries()).filter(([id]) => id !== root.id);
+    for (let iter = 0; iter < 16; iter++) {
+      let moved = false;
+      for (let i = 0; i < posList.length; i++) {
+        for (let j = i + 1; j < posList.length; j++) {
+          const p1 = posList[i][1];
+          const p2 = posList[j][1];
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const minDist = 85;
+
+          if (dist < minDist) {
+            const overlap = (minDist - dist) / 2;
+            const nx = (dx / dist) * overlap;
+            const ny = (dy / dist) * overlap;
+
+            p1.x -= nx;
+            p1.y -= ny;
+            p2.x += nx;
+            p2.y += ny;
+            moved = true;
+          }
+        }
+      }
+      if (!moved) break;
+    }
+
+    // Measure bounding box of this cluster
+    let minX = 0;
+    let maxX = 0;
+    positions.forEach((pos) => {
+      if (pos.x < minX) minX = pos.x;
+      if (pos.x > maxX) maxX = pos.x;
+    });
+
+    const clusterWidth = maxX - minX;
+    const clusterCenterX = currentOffsetX + Math.abs(minX) + 50;
+
+    cNodes.forEach((n) => {
+      const pos = positions.get(n.id) || { x: 0, y: 0 };
+      result.push({
+        ...n,
+        position: {
+          x: clusterCenterX + pos.x,
+          y: pos.y,
+        },
+      });
+    });
+
+    currentOffsetX += clusterWidth + 100 + CLUSTER_GAP;
   }
 
   return result;

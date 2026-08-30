@@ -99,6 +99,23 @@ const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
     },
     collectors: [{ name: 'url-metadata' }],
   },
+  'domain.whois-rdap': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;
+      if (analysis.isDomain) return v.trim();
+      if (analysis.isEmail && analysis.extractedDomain) return analysis.extractedDomain;
+      const d = extractDomain(v);
+      return d && d.includes('.') ? d : null;
+    },
+    collectors: [{ name: 'whois-rdap' }],
+  },
+  'infrastructure.ip-geolocation': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isIpAddress) return v.trim();
+      return null;
+    },
+    collectors: [{ name: 'ip-geolocation' }],
+  },
   'social.discover-public-profiles': {
     deriveInput: (v, st, analysis) => {
       // Accept if value IS a username (regardless of declared seed type)
