@@ -40,6 +40,8 @@ export interface DiscoveryInput {
   userId: string;
   seedType: SeedType;
   seedValue: string;
+  platforms?: string[];
+  selectedTransforms?: string[];
   onProgress?: (event: DiscoveryProgressEvent) => void | Promise<void>;
 }
 
@@ -150,7 +152,10 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
   }
 
   // 2. Build discovery plan strictly based on seed type
-  const plan = buildDiscoveryPlan(seedType, seedValue);
+  let plan = buildDiscoveryPlan(seedType, seedValue);
+  if (input.selectedTransforms && input.selectedTransforms.length > 0) {
+    plan.transforms = plan.transforms.filter((t) => input.selectedTransforms!.includes(t.id));
+  }
 
   logger.info('Discovery plan built', {
     requestId,
@@ -277,6 +282,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
           caseId,
           signal: abortController.signal,
           requestId,
+          platforms: input.platforms,
         },
       );
 

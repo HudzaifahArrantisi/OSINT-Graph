@@ -48,9 +48,9 @@ export function Modal({
 
       {/* Modal Dialog */}
       <div
-        className={`relative w-full ${maxWidthClasses[maxWidth]} bg-[#0a0a0a] border border-[#262626] rounded-modal shadow-2xl p-6 z-10 animate-slide-in-up`}
+        className={`relative w-full ${maxWidthClasses[maxWidth]} max-h-[92vh] flex flex-col bg-[#0a0a0a] border border-[#262626] rounded-modal shadow-2xl p-5 sm:p-6 z-10 animate-slide-in-up`}
       >
-        <div className="flex items-start justify-between pb-4 border-b border-[#1c1c1c]">
+        <div className="flex items-start justify-between pb-3 border-b border-[#1c1c1c] shrink-0">
           <div>
             <h3 className="text-sm font-semibold text-white tracking-tight">{title}</h3>
             {description && <p className="text-xs text-neutral-400 mt-0.5">{description}</p>}
@@ -63,7 +63,7 @@ export function Modal({
           </button>
         </div>
 
-        <div className="mt-4">{children}</div>
+        <div className="mt-3.5 overflow-y-auto pr-1">{children}</div>
       </div>
     </div>
   );

@@ -863,39 +863,6 @@ export function InvestigationDetailPage() {
               />
             )}
           </div>
-
-          {/* Bottom: Minimal Status Bar */}
-          <div className="h-7 bg-[#090d14] border-t border-[#1e293b] flex items-center justify-between px-3 shrink-0 z-10">
-            <div className="flex items-center gap-2.5 text-[10.5px] font-mono text-slate-500">
-              <div className="flex items-center gap-1.5">
-                <span className={`w-1.5 h-1.5 rounded-full ${isDiscovering ? 'bg-emerald-400 animate-pulse' : 'bg-slate-600'}`} />
-                <span className="text-slate-400">{isDiscovering ? 'Discovering' : 'Ready'}</span>
-              </div>
-              <span className="text-slate-700">·</span>
-              <span>{graphData?.nodes?.length || 0} Entities</span>
-              <span className="text-slate-700">·</span>
-              <span>{graphData?.edges?.length || 0} Links</span>
-              <span className="text-slate-700">·</span>
-              <span>{seedTargets.length} Seeds</span>
-            </div>
-
-            <button
-              onClick={() => setLiveLogsOpen(!liveLogsOpen)}
-              className={`flex items-center gap-1.5 px-1.5 py-0.5 text-[10.5px] rounded transition-colors ${liveLogsOpen
-                  ? 'text-slate-200 bg-slate-800/80 font-medium'
-                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
-                }`}
-              title="Toggle Console Sidebar"
-            >
-              <Terminal className="w-3 h-3" />
-              <span>Console</span>
-              {liveDiscoveryLogs.length > 0 && (
-                <span className="text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
-                  {liveDiscoveryLogs.length}
-                </span>
-              )}
-            </button>
-          </div>
         </div>
       </div>
 

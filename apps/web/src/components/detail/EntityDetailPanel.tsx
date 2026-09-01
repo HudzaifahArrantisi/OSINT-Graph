@@ -7,6 +7,7 @@ import { EvidenceCard } from './EvidenceCard';
 import { TransformPanel } from './TransformPanel';
 import { ConfirmDialog } from '../ui/ConfirmDialog';
 import { SubdomainsInventory } from './SubdomainsInventory';
+import { SocialProfileDetailList } from './SocialProfileDetailList';
 import {
   X,
   Globe2,
@@ -404,6 +405,27 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
                     activeCount={(selectedEntity.metadata as any)?.activeCount}
                     inactiveCount={(selectedEntity.metadata as any)?.inactiveCount}
                     apex={(selectedEntity.metadata as any)?.apex}
+                  />
+                )}
+
+                {/* SOCIAL INTELLIGENCE & STATS ATTRIBUTES LIST */}
+                {(selectedEntity.type === 'SOCIAL_PROFILE' ||
+                  Boolean((selectedEntity.metadata as any)?.platform) ||
+                  Boolean((selectedEntity.metadata as any)?.followers_count !== undefined) ||
+                  Boolean((selectedEntity.metadata as any)?.followers !== undefined) ||
+                  Boolean((selectedEntity.metadata as any)?.biography) ||
+                  Boolean((selectedEntity.metadata as any)?.full_biography) ||
+                  Boolean((selectedEntity.metadata as any)?.headline) ||
+                  Boolean((selectedEntity.metadata as any)?.post_url) ||
+                  Boolean((selectedEntity.metadata as any)?.highlight_id) ||
+                  selectedEntity.value.toLowerCase().includes('instagram') ||
+                  selectedEntity.value.toLowerCase().includes('tiktok') ||
+                  selectedEntity.value.toLowerCase().includes('linkedin') ||
+                  selectedEntity.value.toLowerCase().includes('followers') ||
+                  selectedEntity.value.toLowerCase().includes('stats')) && (
+                  <SocialProfileDetailList
+                    entity={selectedEntity}
+                    onCopy={handleCopyValue}
                   />
                 )}
 

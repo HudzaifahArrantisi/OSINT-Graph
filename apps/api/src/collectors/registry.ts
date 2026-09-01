@@ -21,6 +21,8 @@ import { mrholmesEngineCollector } from './mrholmes-engine.js';
 import { subdomainCrtCollector } from './subdomain-crt.js';
 import { whoisRdapCollector } from './whois-rdap.js';
 import { ipGeolocationCollector } from './ip-geolocation.js';
+import { socialRapidapiCollector } from './social-rapidapi.js';
+import { shodanCollector } from './shodan.js';
 import { logger } from '../lib/logger.js';
 
 // Collector registry
@@ -43,6 +45,8 @@ collectors.set('mrholmes-engine', mrholmesEngineCollector);
 collectors.set('subdomain-crt', subdomainCrtCollector);
 collectors.set('whois-rdap', whoisRdapCollector);
 collectors.set('ip-geolocation', ipGeolocationCollector);
+collectors.set('social-rapidapi', socialRapidapiCollector);
+collectors.set('shodan-recon', shodanCollector);
 
 export function getCollector(name: CollectorName): Collector | undefined {
   return collectors.get(name);

@@ -116,6 +116,19 @@ const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
     },
     collectors: [{ name: 'ip-geolocation' }],
   },
+  'social.rapidapi-social-lookup': {
+    deriveInput: (v, st, analysis) => {
+      // Direct username or extracted username from profile URL
+      if (analysis.isUsername && analysis.extractedUsername) return analysis.extractedUsername;
+      if (st === 'USERNAME' || st === 'PERSON' || st === 'NAME') return v.trim().replace(/^@/, '');
+      if (analysis.isUrl && analysis.extractedUsername) return analysis.extractedUsername;
+      if (v.includes('instagram.com/') || v.includes('tiktok.com/') || v.includes('linkedin.com/')) {
+        return v.trim();
+      }
+      return v.trim().replace(/^@/, '');
+    },
+    collectors: [{ name: 'social-rapidapi' }],
+  },
   'social.discover-public-profiles': {
     deriveInput: (v, st, analysis) => {
       // Accept if value IS a username (regardless of declared seed type)
@@ -220,6 +233,15 @@ const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
       return v.trim();
     },
     collectors: [{ name: 'mrholmes-engine' }],
+  },
+  'infrastructure.shodan-recon': {
+    deriveInput: (v, st, analysis) => {
+      if (st === 'IP_ADDRESS' || st === 'DOMAIN' || st === 'URL') return v.trim();
+      if (analysis.isIpAddress || analysis.isDomain) return v.trim();
+      if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;
+      return null;
+    },
+    collectors: [{ name: 'shodan-recon' }],
   },
   'mentions.search-public-web': {
     deriveInput: (v, st, analysis) => {

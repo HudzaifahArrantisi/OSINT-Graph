@@ -112,6 +112,8 @@ export const runCollectorSchema = z.object({
 export const startDiscoverySchema = z.object({
   seed_type: z.enum(SEED_TYPES),
   seed_value: z.string().min(1).max(2000).trim(),
+  platforms: z.array(z.string()).optional(),
+  selected_transforms: z.array(z.string()).optional(),
 });
 
 export const runTransformSchema = z.object({

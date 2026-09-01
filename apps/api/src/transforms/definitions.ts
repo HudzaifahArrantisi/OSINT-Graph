@@ -82,6 +82,18 @@ export const TRANSFORM_DEFINITIONS: TransformDefinition[] = [
 
   // ─── Social Transforms ──────────────────────────────────────────────
   {
+    id: 'social.rapidapi-social-lookup',
+    name: 'RapidAPI Social Deep Recon',
+    description: 'Deep reconnaissance across Instagram, TikTok, and LinkedIn to extract full names, emails, phones, workplaces, and locations',
+    inputTypes: ['USERNAME', 'SOCIAL_PROFILE', 'PERSON'],
+    outputTypes: ['SOCIAL_PROFILE', 'PERSON', 'EMAIL', 'PHONE', 'ORGANIZATION', 'LOCATION', 'WEBSITE'],
+    category: 'social',
+    riskLevel: 'low',
+    enabled: true,
+    requiresApiKey: true,
+    apiKeyName: 'RAPIDAPI_KEY',
+  },
+  {
     id: 'social.discover-public-profiles',
     name: 'Public Social Profile Discovery',
     description: 'Check for public profile existence across major platforms',
@@ -204,6 +216,17 @@ export const TRANSFORM_DEFINITIONS: TransformDefinition[] = [
     inputTypes: ['PHONE'],
     outputTypes: ['LOCATION', 'URL'],
     category: 'contact',
+    riskLevel: 'low',
+    enabled: true,
+  },
+
+  {
+    id: 'infrastructure.shodan-recon',
+    name: 'Shodan Port & Host Intelligence',
+    description: 'Enumerate open ports, running network services, banners, CPE, technologies, and vulnerabilities indexed by Shodan',
+    inputTypes: ['IP_ADDRESS', 'DOMAIN', 'URL'],
+    outputTypes: ['IP_ADDRESS', 'TECHNOLOGY', 'LOCATION', 'ORGANIZATION', 'DOMAIN'],
+    category: 'infrastructure',
     riskLevel: 'low',
     enabled: true,
   },

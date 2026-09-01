@@ -174,6 +174,7 @@ export const EVIDENCE_SOURCE_TYPES = [
   'EMAIL_LOOKUP',
   'IP_GEOLOCATION',
   'SUBDOMAIN_ENUM',
+  'SHODAN_HOST',
 ] as const;
 
 export type EvidenceSourceType = (typeof EVIDENCE_SOURCE_TYPES)[number];
@@ -197,6 +198,8 @@ export const COLLECTOR_NAMES = [
   'subdomain-crt',
   'whois-rdap',
   'ip-geolocation',
+  'social-rapidapi',
+  'shodan-recon',
 ] as const;
 
 export type CollectorName = (typeof COLLECTOR_NAMES)[number];

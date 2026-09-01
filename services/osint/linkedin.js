@@ -1,11 +1,29 @@
 import { callRapidAPI } from '../../lib/rapidapi.js';
 
-const HOST = 'linkedin-data-api.p.rapidapi.com';
+export const HOST = 'linkedin-data-api.p.rapidapi.com';
+
+/**
+ * Get LinkedIn full profile data by username (Main Endpoint).
+ * GET /?username={username}
+ */
+export async function getProfileByUsername(username) {
+  try {
+    if (!username) throw new Error('username is required');
+    const cleanUsername = username.replace(/^@/, '').trim();
+    return await callRapidAPI(
+      HOST,
+      `/?username=${encodeURIComponent(cleanUsername)}`,
+      'GET',
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`[linkedin.getProfileByUsername] Failed for "${username}": ${message}`);
+  }
+}
 
 /**
  * Get LinkedIn profile data by full profile URL.
- * @param {string} url - Full LinkedIn profile URL
- * @returns {Promise<any>} Profile data
+ * GET /get-profile-data-by-url?url={url}
  */
 export async function getProfileByUrl(url) {
   try {
@@ -22,29 +40,8 @@ export async function getProfileByUrl(url) {
 }
 
 /**
- * Get LinkedIn user profile posts.
- * @param {string} username - LinkedIn username / vanity name
- * @returns {Promise<any>} Profile posts data
- */
-export async function getProfilePosts(username) {
-  try {
-    if (!username) throw new Error('username is required');
-    const cleanUsername = username.replace(/^@/, '').trim();
-    return await callRapidAPI(
-      HOST,
-      `/get-profile-posts?username=${encodeURIComponent(cleanUsername)}`,
-      'GET',
-    );
-  } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`[linkedin.getProfilePosts] Failed for username "${username}": ${message}`);
-  }
-}
-
-/**
  * Get LinkedIn profile recent activity timestamp.
- * @param {string} username - LinkedIn username / vanity name
- * @returns {Promise<any>} Recent activity time data
+ * GET /get-profile-recent-activity-time?username={username}
  */
 export async function getProfileRecentActivity(username) {
   try {
@@ -58,15 +55,71 @@ export async function getProfileRecentActivity(username) {
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(
-      `[linkedin.getProfileRecentActivity] Failed for username "${username}": ${message}`,
+      `[linkedin.getProfileRecentActivity] Failed for "${username}": ${message}`,
     );
   }
 }
 
 /**
+ * Get LinkedIn user profile posts.
+ * GET /get-profile-posts?username={username}
+ */
+export async function getProfilePosts(username) {
+  try {
+    if (!username) throw new Error('username is required');
+    const cleanUsername = username.replace(/^@/, '').trim();
+    return await callRapidAPI(
+      HOST,
+      `/get-profile-posts?username=${encodeURIComponent(cleanUsername)}`,
+      'GET',
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`[linkedin.getProfilePosts] Failed for "${username}": ${message}`);
+  }
+}
+
+/**
+ * Get LinkedIn connection count.
+ * GET /connection-count?username={username}
+ */
+export async function getConnectionCount(username) {
+  try {
+    if (!username) throw new Error('username is required');
+    const cleanUsername = username.replace(/^@/, '').trim();
+    return await callRapidAPI(
+      HOST,
+      `/connection-count?username=${encodeURIComponent(cleanUsername)}`,
+      'GET',
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`[linkedin.getConnectionCount] Failed for "${username}": ${message}`);
+  }
+}
+
+/**
+ * Get LinkedIn data connection count.
+ * GET /data-connection-count?username={username}
+ */
+export async function getDataConnectionCount(username) {
+  try {
+    if (!username) throw new Error('username is required');
+    const cleanUsername = username.replace(/^@/, '').trim();
+    return await callRapidAPI(
+      HOST,
+      `/data-connection-count?username=${encodeURIComponent(cleanUsername)}`,
+      'GET',
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`[linkedin.getDataConnectionCount] Failed for "${username}": ${message}`);
+  }
+}
+
+/**
  * Get "About This Profile" metadata for LinkedIn profile.
- * @param {string} username - LinkedIn username / vanity name
- * @returns {Promise<any>} About profile data
+ * GET /about-this-profile?username={username}
  */
 export async function getAboutProfile(username) {
   try {
@@ -79,58 +132,85 @@ export async function getAboutProfile(username) {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`[linkedin.getAboutProfile] Failed for username "${username}": ${message}`);
+    throw new Error(`[linkedin.getAboutProfile] Failed for "${username}": ${message}`);
   }
 }
 
 /**
- * Get LinkedIn profile connection count and posts summary.
- * @param {string} username - LinkedIn username / vanity name
- * @returns {Promise<any>} Connection count and posts summary
+ * Search locations on LinkedIn.
+ * GET /search-locations?keyword={keyword}
  */
-export async function getProfileConnectionCountPosts(username) {
+export async function searchLocations(keyword) {
+  try {
+    if (!keyword) throw new Error('keyword is required');
+    return await callRapidAPI(
+      HOST,
+      `/search-locations?keyword=${encodeURIComponent(keyword.trim())}`,
+      'GET',
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`[linkedin.searchLocations] Failed for "${keyword}": ${message}`);
+  }
+}
+
+/**
+ * Get schools of interest for profile.
+ * POST /profiles/interests/schools
+ */
+export async function getInterestsSchools(username, page = 1) {
   try {
     if (!username) throw new Error('username is required');
     const cleanUsername = username.replace(/^@/, '').trim();
     return await callRapidAPI(
       HOST,
-      `/profile-data-connection-count-posts?username=${encodeURIComponent(cleanUsername)}`,
-      'GET',
+      '/profiles/interests/schools',
+      'POST',
+      { username: cleanUsername, page },
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(
-      `[linkedin.getProfileConnectionCountPosts] Failed for username "${username}": ${message}`,
-    );
+    throw new Error(`[linkedin.getInterestsSchools] Failed for "${username}": ${message}`);
   }
 }
 
 /**
- * Get all available LinkedIn profile data by username.
- * @param {string} username - LinkedIn username / vanity name
- * @returns {Promise<any>} Complete profile data
+ * Get companies of interest for profile.
+ * POST /profiles/interests/companies
  */
-export async function getAllProfileData(username) {
+export async function getInterestsCompanies(username, page = 1) {
   try {
     if (!username) throw new Error('username is required');
     const cleanUsername = username.replace(/^@/, '').trim();
     return await callRapidAPI(
       HOST,
-      `/all-profile-data?username=${encodeURIComponent(cleanUsername)}`,
-      'GET',
+      '/profiles/interests/companies',
+      'POST',
+      { username: cleanUsername, page },
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    throw new Error(`[linkedin.getAllProfileData] Failed for username "${username}": ${message}`);
+    throw new Error(`[linkedin.getInterestsCompanies] Failed for "${username}": ${message}`);
   }
 }
 
-export default {
+export const getAllProfileData = getProfileByUsername;
+export const getProfileConnectionCountPosts = getDataConnectionCount;
+
+export const linkedin = {
   HOST,
+  getProfileByUsername,
   getProfileByUrl,
-  getProfilePosts,
   getProfileRecentActivity,
+  getProfilePosts,
+  getConnectionCount,
+  getDataConnectionCount,
   getAboutProfile,
-  getProfileConnectionCountPosts,
+  searchLocations,
+  getInterestsSchools,
+  getInterestsCompanies,
   getAllProfileData,
+  getProfileConnectionCountPosts,
 };
+
+export default linkedin;

@@ -237,13 +237,54 @@ function GraphViewInner({ graphData }: GraphViewProps) {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
+  // Load and apply saved manual node positions from localStorage for this case
+  const getSavedPositions = useCallback((): Record<string, { x: number; y: number }> => {
+    if (!caseId) return {};
+    try {
+      const raw = localStorage.getItem(`nexusgraph_positions_${caseId}`);
+      return raw ? JSON.parse(raw) : {};
+    } catch {
+      return {};
+    }
+  }, [caseId]);
+
+  const savePositions = useCallback(
+    (currentNodes: Node[]) => {
+      if (!caseId || currentNodes.length === 0) return;
+      try {
+        const positions: Record<string, { x: number; y: number }> = {};
+        currentNodes.forEach((n) => {
+          if (n.position && typeof n.position.x === 'number' && typeof n.position.y === 'number') {
+            positions[n.id] = { x: Math.round(n.position.x), y: Math.round(n.position.y) };
+          }
+        });
+        localStorage.setItem(`nexusgraph_positions_${caseId}`, JSON.stringify(positions));
+      } catch {
+        // Ignore quota errors
+      }
+    },
+    [caseId],
+  );
+
+  // Save manual drag positions when nodes finish moving
+  const onNodeDragStop = useCallback(
+    (_event: any, _node: Node, allNodes: Node[]) => {
+      savePositions(allNodes);
+    },
+    [savePositions],
+  );
+
   const applyLayout = useCallback(
     (
       layout: 'force' | 'hierarchical' | 'radial',
       currentNodes = initialNodes,
       currentEdges = initialEdges,
       activeCollapsedCategories = collapsedCategories,
+      forceRecalculate = false,
     ) => {
+      const savedPositions = !forceRecalculate ? getSavedPositions() : {};
+      const hasSavedPositions = Object.keys(savedPositions).length > 0;
+
       let layouted: Node[] = [];
       if (layout === 'hierarchical') {
         layouted = applyHierarchicalLayout(currentNodes, currentEdges);
@@ -253,6 +294,20 @@ function GraphViewInner({ graphData }: GraphViewProps) {
         });
       } else {
         layouted = applyForceLayout(currentNodes, currentEdges);
+      }
+
+      // If saved positions exist for nodes, preserve their custom positions!
+      if (hasSavedPositions) {
+        layouted = layouted.map((node) => {
+          const savedPos = savedPositions[node.id];
+          if (savedPos && typeof savedPos.x === 'number' && typeof savedPos.y === 'number') {
+            return {
+              ...node,
+              position: { x: savedPos.x, y: savedPos.y },
+            };
+          }
+          return node;
+        });
       }
 
       // If Radial Layout is active, ensure edges flow hierarchically:
@@ -307,7 +362,7 @@ function GraphViewInner({ graphData }: GraphViewProps) {
               if (s.includes('subdomain') || s.includes('crt')) catKey = 'subcat_subdomain';
               else if (s.includes('dns')) catKey = 'subcat_dns';
               else if (s.includes('tls') || s.includes('cert')) catKey = 'subcat_tls';
-              else if (s.includes('tech')) catKey = 'subcat_tech';
+              else if (s.includes('tech') || s.includes('shodan') || s.includes('port')) catKey = 'subcat_tech';
               else if (s.includes('recon')) catKey = 'subcat_recon';
               else if (s.includes('contact') || s.includes('email')) catKey = 'subcat_contact';
               else if (s.includes('phone') || s.includes('geo')) catKey = 'subcat_phone';
@@ -592,6 +647,15 @@ function GraphViewInner({ graphData }: GraphViewProps) {
     setSelectedEdgeId(null);
   }, [setSelectedNodeId, setSelectedEdgeId]);
 
+  const handleResetLayout = useCallback(() => {
+    if (caseId) {
+      try {
+        localStorage.removeItem(`nexusgraph_positions_${caseId}`);
+      } catch {}
+    }
+    applyLayout(graphLayout, initialNodes, initialEdges, collapsedCategories, true);
+  }, [caseId, applyLayout, graphLayout, initialNodes, initialEdges, collapsedCategories]);
+
   return (
     <div className="relative w-full h-full bg-app overflow-hidden">
       <GraphToolbar
@@ -601,7 +665,7 @@ function GraphViewInner({ graphData }: GraphViewProps) {
         searchOpen={searchOpen}
         onTogglePathFinder={() => setPathFinderOpen((prev) => !prev)}
         pathFinderOpen={pathFinderOpen}
-        onApplyLayout={(layout) => applyLayout(layout)}
+        onApplyLayout={(layout, forceRecalc) => applyLayout(layout, initialNodes, initialEdges, collapsedCategories, forceRecalc)}
         clusterMode={clusterMode}
         onToggleClusterMode={handleToggleClusterMode}
         labelMode={labelMode}
@@ -617,6 +681,7 @@ function GraphViewInner({ graphData }: GraphViewProps) {
         })}
         selectedSeedFilter={selectedSeedFilter}
         onSelectSeedFilter={handleSelectSeedFilter}
+        onResetLayout={handleResetLayout}
       />
 
       {filterOpen && <GraphFilterBar onClose={() => setFilterOpen(false)} />}
@@ -672,6 +737,7 @@ function GraphViewInner({ graphData }: GraphViewProps) {
         edgeTypes={edgeTypes}
         onNodesChange={onNodesChange}
         onEdgesChange={onEdgesChange}
+        onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}

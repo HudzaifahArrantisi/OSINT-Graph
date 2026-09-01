@@ -31,7 +31,7 @@ interface GraphToolbarProps {
   searchOpen: boolean;
   onTogglePathFinder?: () => void;
   pathFinderOpen?: boolean;
-  onApplyLayout: (layout: 'force' | 'hierarchical' | 'radial') => void;
+  onApplyLayout: (layout: 'force' | 'hierarchical' | 'radial', forceRecalculate?: boolean) => void;
   clusterMode?: boolean;
   onToggleClusterMode?: () => void;
   labelMode?: 'auto' | 'always' | 'hover';
@@ -40,6 +40,7 @@ interface GraphToolbarProps {
   seedTargets?: SeedTarget[];
   selectedSeedFilter?: string | null;
   onSelectSeedFilter?: (seedId: string | null) => void;
+  onResetLayout?: () => void;
 }
 
 export function GraphToolbar({
@@ -58,6 +59,7 @@ export function GraphToolbar({
   seedTargets = [],
   selectedSeedFilter = null,
   onSelectSeedFilter,
+  onResetLayout,
 }: GraphToolbarProps) {
   const { zoomIn, zoomOut, fitView } = useReactFlow();
   const { graphLayout, setGraphLayout, resetGraphFilter } = useAppStore();
@@ -66,7 +68,7 @@ export function GraphToolbar({
 
   const handleLayoutChange = (layout: 'force' | 'hierarchical' | 'radial') => {
     setGraphLayout(layout);
-    onApplyLayout(layout);
+    onApplyLayout(layout, true);
   };
 
   // Close dropdown on outside click
@@ -306,9 +308,12 @@ export function GraphToolbar({
         </button>
 
         <button
-          onClick={resetGraphFilter}
+          onClick={() => {
+            resetGraphFilter();
+            if (onResetLayout) onResetLayout();
+          }}
           className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-[#181818] transition-colors"
-          title="Reset filters"
+          title="Reset filters & auto-align layout"
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>

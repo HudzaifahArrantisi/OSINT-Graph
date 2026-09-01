@@ -565,6 +565,8 @@ api.post(
         userId,
         seedType: parsed.data.seed_type,
         seedValue: parsed.data.seed_value,
+        platforms: parsed.data.platforms,
+        selectedTransforms: parsed.data.selected_transforms,
       });
 
       return c.json({ data: result });
@@ -604,6 +606,8 @@ api.post(
           userId,
           seedType: parsed.data.seed_type,
           seedValue: parsed.data.seed_value,
+          platforms: parsed.data.platforms,
+          selectedTransforms: parsed.data.selected_transforms,
           onProgress: async (event) => {
             await stream.writeSSE({
               event: event.type,

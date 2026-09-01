@@ -28,9 +28,12 @@ async function scheduleHostRequest<T>(host: string, fn: () => Promise<T>): Promi
   try {
     return await fn();
   } finally {
-    setTimeout(() => {
-      release();
-    }, 1000);
+    setTimeout(
+      () => {
+        release();
+      },
+      process.env.NODE_ENV === 'test' ? 0 : 1000,
+    );
   }
 }
 

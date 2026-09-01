@@ -1,5 +1,6 @@
 import { instagramScraper } from './instagramScraper.js';
 import { tiktok } from './tiktok.js';
+import { tiktokBestExperience } from './tiktokBestExperience.js';
 import { instagramFastReliable } from './instagramFastReliable.js';
 import { instagramBestExperience } from './instagramBestExperience.js';
 import { instagramScraperStable } from './instagramScraperStable.js';
@@ -8,6 +9,7 @@ import { linkedin } from './linkedin.js';
 export {
   instagramScraper,
   tiktok,
+  tiktokBestExperience,
   instagramFastReliable,
   instagramBestExperience,
   instagramScraperStable,
@@ -78,7 +80,7 @@ export async function lookupAllPlatforms(
         if (target.includes('linkedin.com')) {
           data = await linkedin.getProfileByUrl(target);
         } else {
-          data = await linkedin.getAllProfileData(cleanTarget);
+          data = await linkedin.getProfileByUsername(cleanTarget);
         }
         return { platform: 'linkedin', data };
       })(),

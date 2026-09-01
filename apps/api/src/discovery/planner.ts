@@ -47,6 +47,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'contact.email-breach-lookup',
   ],
   USERNAME: [
+    'social.rapidapi-social-lookup',
     'social.discover-public-profiles',
     'social.username-sweep',
     'social.mrholmes-engine',
@@ -63,6 +64,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'domain.find-subdomains-crt',
   ],
   PERSON: [
+    'social.rapidapi-social-lookup',
     'web.discover-official-site',
     'social.mrholmes-engine',
     'social.youtube-channel',
@@ -70,6 +72,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'developer.gitlab-profile',
   ],
   NAME: [
+    'social.rapidapi-social-lookup',
     'web.discover-official-site',
     'social.mrholmes-engine',
     'social.youtube-channel',
@@ -82,6 +85,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'mentions.search-public-web',
   ],
   SOCIAL_PROFILE: [
+    'social.rapidapi-social-lookup',
     'social.discover-public-profiles',
     'developer.github-profile',
     'developer.gitlab-profile',

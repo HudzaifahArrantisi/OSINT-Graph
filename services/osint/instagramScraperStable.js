@@ -1,12 +1,9 @@
 import { callRapidAPI } from '../../lib/rapidapi.js';
 
-const HOST = 'instagram-scraper-stable-api.p.rapidapi.com';
+export const HOST = 'instagram-scraper-stable-api.p.rapidapi.com';
 
 /**
- * Get Instagram/FB profile data (v1).
- * @param {string} usernameOrUrl - Instagram username or profile URL
- * @param {string} [data='basic'] - Data type parameter ('basic', etc.)
- * @returns {Promise<any>} Profile data
+ * Get Instagram/FB profile data (v1 basic).
  */
 export async function getFbProfile(usernameOrUrl, data = 'basic') {
   try {
@@ -24,9 +21,7 @@ export async function getFbProfile(usernameOrUrl, data = 'basic') {
 }
 
 /**
- * Get Instagram/FB profile data (v3).
- * @param {string} usernameOrUrl - Instagram username or profile URL
- * @returns {Promise<any>} Profile data v3
+ * Get Instagram/FB profile data (v3 full deep metadata).
  */
 export async function getFbProfileV3(usernameOrUrl) {
   try {
@@ -42,8 +37,75 @@ export async function getFbProfileV3(usernameOrUrl) {
   }
 }
 
-export default {
+/**
+ * Get Instagram user posts (amount up to 12).
+ */
+export async function getUserPosts(usernameOrUrl, amount = 12, paginationToken = '') {
+  try {
+    if (!usernameOrUrl) throw new Error('usernameOrUrl is required');
+    return await callRapidAPI(HOST, '/get_ig_user_posts.php', 'POST', {
+      username_or_url: usernameOrUrl.trim(),
+      amount: String(amount),
+      pagination_token: paginationToken,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `[instagramScraperStable.getUserPosts] Failed for "${usernameOrUrl}": ${message}`,
+    );
+  }
+}
+
+/**
+ * Get Instagram user followers list.
+ */
+export async function getUserFollowers(
+  usernameOrUrl,
+  amount = 12,
+  startFrom = 0,
+  searchQuery = '',
+) {
+  try {
+    if (!usernameOrUrl) throw new Error('usernameOrUrl is required');
+    return await callRapidAPI(HOST, '/get_ig_user_followers.php', 'POST', {
+      username_or_url: usernameOrUrl.trim(),
+      data: 'followers',
+      amount: String(amount),
+      start_from: String(startFrom),
+      search_query: searchQuery,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `[instagramScraperStable.getUserFollowers] Failed for "${usernameOrUrl}": ${message}`,
+    );
+  }
+}
+
+/**
+ * Get Instagram user story highlights collection.
+ */
+export async function getUserHighlights(usernameOrUrl) {
+  try {
+    if (!usernameOrUrl) throw new Error('usernameOrUrl is required');
+    return await callRapidAPI(HOST, '/get_ig_user_highlights.php', 'POST', {
+      username_or_url: usernameOrUrl.trim(),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(
+      `[instagramScraperStable.getUserHighlights] Failed for "${usernameOrUrl}": ${message}`,
+    );
+  }
+}
+
+export const instagramScraperStable = {
   HOST,
   getFbProfile,
   getFbProfileV3,
+  getUserPosts,
+  getUserFollowers,
+  getUserHighlights,
 };
+
+export default instagramScraperStable;

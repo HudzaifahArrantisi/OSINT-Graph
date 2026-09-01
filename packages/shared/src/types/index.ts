@@ -215,6 +215,8 @@ export interface CollectorContext {
   caseId: string;
   signal: AbortSignal;
   requestId: string;
+  platforms?: string[];
+  options?: Record<string, unknown>;
 }
 
 export interface CollectorResult {
@@ -257,6 +259,8 @@ export interface TransformDefinition {
   category: TransformCategory;
   riskLevel: 'low' | 'medium';
   enabled: boolean;
+  requiresApiKey?: boolean;
+  apiKeyName?: string;
 }
 
 export interface TransformResult {

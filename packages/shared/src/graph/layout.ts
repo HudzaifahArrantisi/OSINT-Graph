@@ -83,6 +83,7 @@ export function getSubCategoryKey<T extends Record<string, unknown>>(node: Simpl
     if (s.includes('phone') || s.includes('geo')) return 'subcat_phone';
     if (s.includes('social') || s.includes('username') || s.includes('mrholmes')) return 'subcat_social';
     if (s.includes('github') || s.includes('gitlab') || s.includes('developer')) return 'subcat_dev';
+    if (s.includes('shodan') || s.includes('port') || s.includes('service')) return 'subcat_tech';
     if (s.includes('dork') || s.includes('generate-dorks')) return 'subcat_dorks';
     if (s.includes('mention')) return 'subcat_mentions';
     return `subcat_${discoveredBy}`;

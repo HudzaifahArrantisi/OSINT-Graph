@@ -136,11 +136,23 @@ export const api = {
 
   // Discoveries
   discoveries: {
-    start: (caseId: string, data: { seed_type: string; seed_value: string }) =>
-      request<any>('POST', `/investigations/${caseId}/discover`, data),
+    start: (
+      caseId: string,
+      data: {
+        seed_type: string;
+        seed_value: string;
+        platforms?: string[];
+        selected_transforms?: string[];
+      },
+    ) => request<any>('POST', `/investigations/${caseId}/discover`, data),
     stream: async (
       caseId: string,
-      data: { seed_type: string; seed_value: string },
+      data: {
+        seed_type: string;
+        seed_value: string;
+        platforms?: string[];
+        selected_transforms?: string[];
+      },
       onEvent: (event: any) => void,
     ) => {
       const headers = await getAuthHeaders();
