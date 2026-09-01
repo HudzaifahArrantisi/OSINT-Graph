@@ -1,28 +1,29 @@
 /* Google Fonts */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* ─── Base Styles ────────────────────────────────────────────────── */
+/* ─── Modern Monochrome Styles ────────────────────────────────────── */
 
 :root {
-  --bg: #080c14;
-  --surface: #0d121c;
-  --surface-2: #121927;
-  --surface-3: #182234;
-  --border: #1e293b;
-  --border-subtle: #1a2334;
-  --text: #e2e8f0;
-  --text-secondary: #94a3b8;
-  --text-muted: #64748b;
-  --primary: #0284c7;
-  --primary-hover: #0369a1;
-  --cyan: #38bdf8;
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #f43f5e;
+  --bg: #050505;
+  --surface: #0a0a0a;
+  --surface-2: #121212;
+  --surface-3: #1a1a1a;
+  --border: #262626;
+  --border-subtle: #181818;
+  --border-strong: #404040;
+  --text: #ededed;
+  --text-secondary: #a1a1a1;
+  --text-muted: #666666;
+  --primary: #ffffff;
+  --primary-hover: #e5e5e5;
+  --cyan: #ededed;
+  --success: #ededed;
+  --warning: #d4d4d4;
+  --danger: #ffffff;
 }
 
 * {
@@ -32,7 +33,7 @@
 }
 
 html {
-  font-family: 'Inter', system-ui, sans-serif;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
   color: var(--text);
   background-color: var(--bg);
   font-size: 14px;
@@ -52,11 +53,11 @@ body {
   flex-direction: column;
 }
 
-/* ─── Scrollbar ──────────────────────────────────────────────────── */
+/* ─── Minimal Scrollbar ──────────────────────────────────────────── */
 
 ::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
+  width: 5px;
+  height: 5px;
 }
 
 ::-webkit-scrollbar-track {
@@ -64,38 +65,50 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--border);
-  border-radius: 3px;
+  background: #262626;
+  border-radius: 2px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: var(--text-muted);
+  background: #404040;
 }
 
 /* ─── Selection ──────────────────────────────────────────────────── */
 
 ::selection {
-  background: rgba(124, 108, 255, 0.3);
-  color: var(--text);
+  background: #ffffff;
+  color: #000000;
 }
 
 /* ─── Focus Styles ───────────────────────────────────────────────── */
 
 :focus-visible {
-  outline: 2px solid var(--primary);
-  outline-offset: 2px;
+  outline: 1px solid #ffffff;
+  outline-offset: 1px;
 }
 
-/* ─── React Flow Overrides ───────────────────────────────────────── */
+/* ─── React Flow Monochrome Overrides ────────────────────────────── */
 
 .react-flow__background {
-  background-color: var(--bg) !important;
+  background-color: #050505 !important;
+}
+
+.react-flow__background pattern circle {
+  fill: #1f1f1f !important;
 }
 
 .react-flow__minimap {
-  background-color: var(--surface) !important;
-  border-radius: 8px !important;
-  border: 1px solid var(--border) !important;
+  background-color: #0a0a0a !important;
+  border-radius: 6px !important;
+  border: 1px solid #262626 !important;
+}
+
+.react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.7) !important;
+}
+
+.react-flow__minimap-node {
+  fill: #333333 !important;
 }
 
 .react-flow__node-toolbar {
@@ -103,103 +116,103 @@ body {
 }
 
 .react-flow__controls {
-  background-color: var(--surface) !important;
-  border-radius: 8px !important;
-  border: 1px solid var(--border) !important;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+  background-color: #0a0a0a !important;
+  border-radius: 6px !important;
+  border: 1px solid #262626 !important;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.8) !important;
 }
 
 .react-flow__controls-button {
-  background-color: var(--surface) !important;
-  border-color: var(--border) !important;
-  color: var(--text-secondary) !important;
-  fill: var(--text-secondary) !important;
+  background-color: #0a0a0a !important;
+  border-color: #262626 !important;
+  color: #a1a1a1 !important;
+  fill: #a1a1a1 !important;
 }
 
 .react-flow__controls-button:hover {
-  background-color: var(--surface-2) !important;
-  color: var(--text) !important;
-  fill: var(--text) !important;
+  background-color: #1a1a1a !important;
+  color: #ffffff !important;
+  fill: #ffffff !important;
 }
 
 .react-flow__edge-path {
-  stroke: var(--border) !important;
-  stroke-width: 1.5 !important;
+  stroke: #2e2e2e !important;
+  stroke-width: 1.25 !important;
 }
 
 .react-flow__edge.selected .react-flow__edge-path {
-  stroke: var(--primary) !important;
-  stroke-width: 2 !important;
+  stroke: #ffffff !important;
+  stroke-width: 1.75 !important;
 }
 
 /* ─── Component Layer ────────────────────────────────────────────── */
 
 @layer components {
   .btn-primary {
-    @apply bg-primary hover:bg-primary-hover text-white font-medium px-4 py-2
-      rounded-button transition-colors duration-micro
-      focus:outline-none focus-visible:ring-2 focus-visible:ring-primary;
+    @apply bg-white hover:bg-neutral-200 text-black font-medium px-3.5 py-1.5
+      rounded-button transition-colors duration-micro select-none
+      focus:outline-none focus-visible:ring-1 focus-visible:ring-white;
   }
 
   .btn-secondary {
-    @apply bg-surface-2 hover:bg-surface-3 text-text-secondary
-      border border-border-subtle font-medium px-4 py-2
-      rounded-button transition-colors duration-micro;
+    @apply bg-surface-2 hover:bg-surface-3 text-text-secondary hover:text-text
+      border border-border font-medium px-3.5 py-1.5
+      rounded-button transition-colors duration-micro select-none;
   }
 
   .btn-ghost {
-    @apply bg-transparent hover:bg-surface-2 text-text-secondary
-      px-3 py-2 rounded-button transition-colors duration-micro;
+    @apply bg-transparent hover:bg-surface-2 text-text-secondary hover:text-text
+      px-2.5 py-1.5 rounded-button transition-colors duration-micro select-none;
   }
 
   .btn-danger {
-    @apply bg-status-danger/10 hover:bg-status-danger/20 text-status-danger
-      border border-status-danger/30 font-medium px-4 py-2
-      rounded-button transition-colors duration-micro;
+    @apply bg-transparent hover:bg-surface-2 text-text-secondary hover:text-white
+      border border-border hover:border-neutral-500 font-medium px-3.5 py-1.5
+      rounded-button transition-colors duration-micro select-none;
   }
 
   .btn-icon {
-    @apply p-2 rounded-button bg-transparent hover:bg-surface-2
-      text-text-muted hover:text-text transition-colors duration-micro;
+    @apply p-1.5 rounded-button bg-transparent hover:bg-surface-2
+      text-text-muted hover:text-text transition-colors duration-micro select-none;
   }
 
   .input-field {
-    @apply w-full bg-surface-2 border border-border-subtle rounded-input
-      px-3 py-2 text-text placeholder:text-text-muted
-      focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/30
+    @apply w-full bg-surface-2 border border-border rounded-input
+      px-3 py-1.5 text-text placeholder:text-text-muted text-sm
+      focus:outline-none focus:border-neutral-400 focus:ring-0
       transition-colors duration-micro;
   }
 
   .card {
-    @apply bg-surface border border-border-subtle rounded-card p-4;
+    @apply bg-surface border border-border rounded-card p-4;
   }
 
   .badge {
     @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-badge
-      text-xs font-medium;
+      text-[11px] font-mono select-none border;
   }
 
   .badge-primary {
-    @apply badge bg-primary/15 text-primary;
+    @apply badge bg-neutral-900 text-neutral-200 border-neutral-700;
   }
 
   .badge-success {
-    @apply badge bg-status-success/15 text-status-success;
+    @apply badge bg-neutral-900 text-neutral-300 border-neutral-700;
   }
 
   .badge-warning {
-    @apply badge bg-status-warning/15 text-status-warning;
+    @apply badge bg-neutral-900 text-neutral-300 border-neutral-700;
   }
 
   .badge-danger {
-    @apply badge bg-status-danger/15 text-status-danger;
+    @apply badge bg-neutral-900 text-neutral-300 border-neutral-700;
   }
 
   .badge-cyan {
-    @apply badge bg-accent-cyan/15 text-accent-cyan;
+    @apply badge bg-neutral-900 text-neutral-300 border-neutral-700;
   }
 
   .badge-muted {
-    @apply badge bg-surface-3 text-text-muted;
+    @apply badge bg-surface-2 text-text-muted border-border;
   }
 }

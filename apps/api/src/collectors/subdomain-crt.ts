@@ -22,10 +22,18 @@ import { normalizeDomain } from '@nexusgraph/shared';
 import { logger } from '../lib/logger.js';
 
 const REQUEST_TIMEOUT_MS = 20_000;
-const MAX_BODY_BYTES = 2 * 1024 * 1024; // crt.name can return very large lists
-const MAX_SUBDOMAINS = 1_000;
+const MAX_BODY_BYTES = 2 * 1024 * 1024;
+const MAX_SUBDOMAINS = 300;
+const DOH_URL = 'https://cloudflare-dns.com/dns-query';
 
 const HOSTNAME_REGEX = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/;
+
+export interface SubdomainProbeResult {
+  subdomain: string;
+  active: boolean;
+  ips: string[];
+  httpStatus?: number | null;
+}
 
 /** Derive the apex domain from any supported seed value. */
 export function deriveApexDomain(raw: string): string | null {
@@ -38,7 +46,6 @@ export function deriveApexDomain(raw: string): string | null {
   } catch {
     return null;
   }
-  // Strip ports/paths for bare-host inputs
   value = value.split('/')[0].split(':')[0].replace(/^www\./, '');
   const normalized = normalizeDomain(value);
   if (!normalized || !normalized.includes('.') || normalized.length > 253) return null;
@@ -50,14 +57,38 @@ export function parseCrtResponse(body: string, apex: string): string[] {
   const results = new Set<string>();
   for (const rawLine of body.split(/\r?\n/)) {
     const line = rawLine.trim().toLowerCase();
-    if (!line || !line.endsWith('.' + apex) && line !== apex) continue;
+    if (!line || (!line.endsWith('.' + apex) && line !== apex)) continue;
     if (!HOSTNAME_REGEX.test(line)) continue;
-    // Wildcard entries from CT logs are not concrete hosts
     if (line.startsWith('*.')) continue;
     results.add(line);
     if (results.size >= MAX_SUBDOMAINS) break;
   }
   return [...results];
+}
+
+/** Fast DNS A / AAAA probe via Cloudflare DoH to check if subdomain is currently active */
+async function probeSubdomainActive(
+  subdomain: string,
+  signal: AbortSignal,
+): Promise<{ active: boolean; ips: string[] }> {
+  try {
+    const res = await fetch(`${DOH_URL}?name=${encodeURIComponent(subdomain)}&type=A`, {
+      headers: { Accept: 'application/dns-json' },
+      signal: AbortSignal.any([signal, AbortSignal.timeout(3500)]),
+    });
+    if (!res.ok) return { active: false, ips: [] };
+    const json = (await res.json()) as { Answer?: Array<{ type: number; data: string }> };
+    const ips = (json.Answer || [])
+      .filter((ans) => ans.type === 1 || ans.type === 28)
+      .map((ans) => ans.data);
+
+    return {
+      active: ips.length > 0,
+      ips,
+    };
+  } catch {
+    return { active: false, ips: [] };
+  }
 }
 
 export const subdomainCrtCollector: Collector = {
@@ -112,66 +143,94 @@ export const subdomainCrtCollector: Collector = {
       return { source: 'subdomain-crt', collectedAt, entities, relationships, evidence, warnings };
     }
 
-    const subdomains = parseCrtResponse(body, apex);
+    const rawSubdomains = parseCrtResponse(body, apex);
 
-    for (const sub of subdomains) {
-      entities.push({
-        type: 'SUBDOMAIN',
-        value: sub,
-        title: sub,
-        confidence: 85,
-        metadata: {
-          apex,
-          discoveredVia: 'certificate-transparency',
-          source: {
-            url: apiUrl,
-            collector: 'subdomain-crt',
-            transform: 'domain.find-subdomains-crt',
-            derivedFrom: apex,
-            collectedAt,
-          },
-        },
-      });
+    // Concurrently probe active status in batches
+    const BATCH_SIZE = 15;
+    const probeResults: SubdomainProbeResult[] = [];
 
-      relationships.push({
-        source_value: sub,
-        source_type: 'SUBDOMAIN',
-        target_value: apex,
-        target_type: 'DOMAIN',
-        relationship_type: 'RESOLVES_TO',
-        confidence: 85,
-        reason: `Hostname listed in public Certificate Transparency logs under the apex ${apex} (crt.name).`,
-      });
+    for (let i = 0; i < rawSubdomains.length; i += BATCH_SIZE) {
+      const chunk = rawSubdomains.slice(i, i + BATCH_SIZE);
+      const chunkProbes = await Promise.all(
+        chunk.map(async (sub) => {
+          const { active, ips } = await probeSubdomainActive(sub, ctx.signal);
+          return {
+            subdomain: sub,
+            active,
+            ips,
+          };
+        }),
+      );
+      probeResults.push(...chunkProbes);
     }
+
+    const activeList = probeResults.filter((p) => p.active);
+    const inactiveList = probeResults.filter((p) => !p.active);
+
+    // Aggregate all subdomain items into ONE single dedicated node
+    const summaryTitle = `Subdomains (${activeList.length} Active / ${probeResults.length} Total)`;
+
+    entities.push({
+      type: 'SUBDOMAIN',
+      value: `Subdomains of ${apex}`,
+      title: summaryTitle,
+      confidence: 90,
+      metadata: {
+        apex,
+        isSubdomainAggregate: true,
+        totalFound: probeResults.length,
+        activeCount: activeList.length,
+        inactiveCount: inactiveList.length,
+        activeSubdomains: activeList,
+        inactiveSubdomains: inactiveList,
+        allSubdomains: probeResults,
+        source: {
+          url: apiUrl,
+          collector: 'subdomain-crt',
+          transform: 'domain.find-subdomains-crt',
+          derivedFrom: apex,
+          collectedAt,
+        },
+      },
+    });
+
+    relationships.push({
+      source_value: `Subdomains of ${apex}`,
+      source_type: 'SUBDOMAIN',
+      target_value: apex,
+      target_type: 'DOMAIN',
+      relationship_type: 'RESOLVES_TO',
+      confidence: 90,
+      reason: `Aggregated list of ${probeResults.length} subdomains (${activeList.length} currently active) discovered from public Certificate Transparency logs for ${apex}.`,
+    });
 
     evidence.push({
       source_url: apiUrl,
       source_type: 'SUBDOMAIN_ENUM',
-      title: `CT subdomain enumeration for ${apex}`,
-      extracted_value:
-        subdomains.length > 0
-          ? `${subdomains.length} unique subdomain(s): ${subdomains.slice(0, 25).join(', ')}${subdomains.length > 25 ? ', …' : ''}`
-          : `No subdomains listed for ${apex}`,
-      confidence: subdomains.length > 0 ? 85 : 40,
+      title: `CT subdomain discovery for ${apex}`,
+      extracted_value: `${activeList.length} active and ${inactiveList.length} inactive subdomain(s) enumerated under ${apex}.`,
+      confidence: 90,
       metadata: {
         provider: 'crt.name',
         apex,
-        totalFound: subdomains.length,
-        truncatedAt: MAX_SUBDOMAINS,
-        negativeResult: subdomains.length === 0,
+        totalFound: probeResults.length,
+        activeCount: activeList.length,
+        inactiveCount: inactiveList.length,
       },
     });
 
-    if (subdomains.length === 0) {
+    if (probeResults.length === 0) {
       warnings.push(`No subdomains found in CT logs for ${apex}`);
     }
 
     logger.info('crt.name subdomain enumeration completed', {
       requestId: ctx.requestId,
       apex,
-      found: subdomains.length,
+      total: probeResults.length,
+      active: activeList.length,
     });
 
     return { source: 'subdomain-crt', collectedAt, entities, relationships, evidence, warnings };
   },
 };
+

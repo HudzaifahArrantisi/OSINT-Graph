@@ -12,6 +12,7 @@ import {
   runCollectorSchema,
   startDiscoverySchema,
   runTransformSchema,
+  osintLookupSchema,
 } from '@nexusgraph/shared';
 import {
   investigationService,
@@ -40,6 +41,7 @@ import { runDiscovery } from '../discovery/executor.js';
 import { buildDiscoveryPlan } from '../discovery/planner.js';
 import { rateLimitMiddleware } from '../middleware/index.js';
 import { findShortestPath } from '../correlation/pathfinder.js';
+import { lookupAllPlatforms } from '../services/osint/index.js';
 import { logger } from '../lib/logger.js';
 
 const api = new Hono();
@@ -880,6 +882,31 @@ api.get('/system/logs/stream', async (c) => {
       });
     });
   });
+});
+
+// ─── OSINT Social Media Lookup ───────────────────────────────────────
+
+api.post('/osint/lookup', async (c) => {
+  const body = await c.req.json().catch(() => ({}));
+  const parsed = osintLookupSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      {
+        error: 'Validation Error',
+        message: 'Invalid OSINT lookup request body',
+        details: parsed.error.flatten(),
+      },
+      400,
+    );
+  }
+
+  try {
+    const result = await lookupAllPlatforms(parsed.data.target, parsed.data.platforms);
+    return c.json({ data: result });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return c.json({ error: 'OSINT Lookup Failed', message }, 500);
+  }
 });
 
 export { api };

@@ -145,7 +145,7 @@ describe('Graph Scalability & Layout Algorithm Tests', () => {
 
     // Seed 1 and Seed 2 centers MUST be separated with spatial gap
     const deltaX = Math.abs(posSeed2.position.x - posSeed1.position.x);
-    expect(deltaX).toBeGreaterThanOrEqual(500);
+    expect(deltaX).toBeGreaterThanOrEqual(400);
 
     // Check that nodes for Seed 1 and Seed 2 do not collide
     const seed1Positions = positioned

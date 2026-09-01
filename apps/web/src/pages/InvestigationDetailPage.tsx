@@ -10,6 +10,7 @@ import { EntityDetailPanel } from '../components/detail/EntityDetailPanel';
 import { DiscoveryLogsPanel } from '../components/detail/DiscoveryLogsPanel';
 import { StartDiscoveryModal } from '../components/modals/StartDiscoveryModal';
 import { ExportModal } from '../components/modals/ExportModal';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { Button } from '../components/ui/Button';
 import { Badge } from '../components/ui/Badge';
 import { LoadingState } from '../components/ui/LoadingState';
@@ -63,6 +64,19 @@ export function InvestigationDetailPage() {
   const [submittingNote, setSubmittingNote] = useState(false);
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const moreActionsRef = useRef<HTMLDivElement>(null);
+  const [deleteSeedConfirm, setDeleteSeedConfirm] = useState<{
+    isOpen: boolean;
+    seedId: string;
+    seedLabel: string;
+    count: number;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    seedId: '',
+    seedLabel: '',
+    count: 0,
+    loading: false,
+  });
 
   // Resizable sidebar dimensions with persistent storage
   const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(() => {
@@ -114,7 +128,7 @@ export function InvestigationDetailPage() {
       const finalWidth = Math.max(180, Math.min(600, startWidth + (upEvent.clientX - startX)));
       try {
         localStorage.setItem('nexusgraph_left_sidebar_width', finalWidth.toString());
-      } catch {}
+      } catch { }
     };
 
     window.addEventListener('mousemove', onMouseMove);
@@ -141,7 +155,7 @@ export function InvestigationDetailPage() {
       const finalWidth = Math.max(260, Math.min(700, startWidth - (upEvent.clientX - startX)));
       try {
         localStorage.setItem('nexusgraph_console_width', finalWidth.toString());
-      } catch {}
+      } catch { }
     };
 
     window.addEventListener('mousemove', onMouseMove);
@@ -282,27 +296,39 @@ export function InvestigationDetailPage() {
     });
   }, [graphData]);
 
-  const handleDeleteSeed = async (seedId: string, seedLabel: string, count: number) => {
-    if (!caseId) return;
-    const confirmMsg =
-      count > 1
-        ? `Hapus Seed Target "${seedLabel}" beserta seluruh ${count} node graf yang terhubung dengannya?`
-        : `Hapus Seed Target "${seedLabel}" dari investigasi ini?`;
+  const handleDeleteSeed = (seedId: string, seedLabel: string, count: number) => {
+    setDeleteSeedConfirm({
+      isOpen: true,
+      seedId,
+      seedLabel,
+      count,
+      loading: false,
+    });
+  };
 
-    if (window.confirm(confirmMsg)) {
-      try {
-        const res = await api.seeds.delete(caseId, seedId);
-        handleRefresh();
-        if (selectedNodeId === seedId) {
-          setSelectedNodeId(null);
-        }
-        addToast(
-          `Seed target "${res.seedValue}" dan ${res.deletedEntitiesCount} node terhubung berhasil dihapus`,
-          'info',
-        );
-      } catch (err: any) {
-        addToast(err.message || 'Gagal menghapus seed target', 'error');
+  const handleConfirmDeleteSeed = async () => {
+    if (!caseId || !deleteSeedConfirm.seedId) return;
+    setDeleteSeedConfirm((prev) => ({ ...prev, loading: true }));
+    try {
+      const res = await api.seeds.delete(caseId, deleteSeedConfirm.seedId);
+      handleRefresh();
+      if (selectedNodeId === deleteSeedConfirm.seedId) {
+        setSelectedNodeId(null);
       }
+      addToast(
+        `Seed target "${res.seedValue}" dan ${res.deletedEntitiesCount} node terhubung berhasil dihapus`,
+        'info',
+      );
+      setDeleteSeedConfirm({
+        isOpen: false,
+        seedId: '',
+        seedLabel: '',
+        count: 0,
+        loading: false,
+      });
+    } catch (err: any) {
+      addToast(err.message || 'Gagal menghapus seed target', 'error');
+      setDeleteSeedConfirm((prev) => ({ ...prev, loading: false }));
     }
   };
 
@@ -364,7 +390,7 @@ export function InvestigationDetailPage() {
         {/* Action buttons */}
         <div className="flex items-center gap-2">
           {/* Workspace view switcher */}
-          <div className="hidden sm:flex items-center bg-[#0d121c] p-0.5 rounded-lg border border-[#1e293b]">
+          <div className="hidden sm:flex items-center bg-[#0a0a0a] p-0.5 rounded-lg border border-[#222222]">
             {(
               [
                 { id: 'graph', label: 'Graph', icon: Network },
@@ -379,10 +405,10 @@ export function InvestigationDetailPage() {
                 <button
                   key={v.id}
                   onClick={() => setActiveWorkspaceView(v.id)}
-                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-colors ${
+                  className={`flex items-center gap-1.5 px-2.5 py-1 text-xs rounded-md transition-colors cursor-pointer ${
                     active
-                      ? 'bg-slate-800 text-slate-100 font-medium shadow-sm border border-slate-700/60'
-                      : 'text-slate-400 hover:text-slate-200'
+                      ? 'bg-[#222222] text-white font-medium shadow-sm border border-[#333333]'
+                      : 'text-neutral-400 hover:text-white'
                   }`}
                 >
                   <Icon className="w-3.5 h-3.5" />
@@ -394,25 +420,25 @@ export function InvestigationDetailPage() {
 
           <button
             onClick={handleRefresh}
-            className="p-2 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border border-transparent hover:border-slate-700/50 transition-colors"
+            className="p-2 rounded-lg text-neutral-400 hover:text-white hover:bg-[#181818] border border-transparent hover:border-[#262626] transition-colors cursor-pointer"
             title="Refresh graph"
           >
             <RefreshCw className="w-3.5 h-3.5" />
           </button>
 
           <button
-            onClick={() => setLiveLogsOpen((prev) => !prev)}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition-colors ${
+            onClick={() => setLiveLogsOpen(!liveLogsOpen)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 text-xs rounded-lg border transition-colors cursor-pointer ${
               liveLogsOpen
-                ? 'bg-slate-800 text-slate-100 border-slate-700 font-medium'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border-transparent hover:border-slate-700/50'
+                ? 'bg-[#222222] text-white border-[#333333] font-medium'
+                : 'text-neutral-400 hover:text-white hover:bg-[#181818] border-transparent hover:border-[#262626]'
             }`}
             title="Toggle Console Sidebar"
           >
             <Terminal className="w-3.5 h-3.5" />
             <span className="hidden md:inline">Console</span>
             {liveDiscoveryLogs.length > 0 && (
-              <span className="text-[9.5px] px-1 py-0.2 rounded bg-slate-800/90 text-slate-400 font-mono">
+              <span className="text-[9.5px] px-1 py-0.2 rounded bg-[#1c1c1c] text-neutral-400 font-mono border border-[#2b2b2b]">
                 {liveDiscoveryLogs.length}
               </span>
             )}
@@ -421,7 +447,7 @@ export function InvestigationDetailPage() {
           <Button
             variant="secondary"
             size="sm"
-            icon={<Download className="w-3.5 h-3.5 text-slate-400" />}
+            icon={<Download className="w-3.5 h-3.5 text-neutral-400" />}
             onClick={() => setExportModalOpen(true)}
           >
             <span className="hidden md:inline">Export Dossier</span>
@@ -577,10 +603,10 @@ export function InvestigationDetailPage() {
                     {seedTargets.map((seed) => (
                       <div
                         key={seed.id}
-                        className={`bg-surface-2 p-2 rounded-input border transition-all ${
+                        className={`bg-[#0d0d0d] p-2 rounded-input border transition-all ${
                           selectedNodeId === seed.id
-                            ? 'border-amber-500/60 bg-amber-500/5'
-                            : 'border-border-subtle hover:border-border'
+                            ? 'border-white bg-[#1a1a1a]'
+                            : 'border-[#222222] hover:border-neutral-500'
                         }`}
                       >
                         <div className="flex items-start justify-between gap-1.5">
@@ -589,18 +615,18 @@ export function InvestigationDetailPage() {
                               setSelectedNodeId(seed.id);
                               setSelectedEdgeId(null);
                             }}
-                            className="min-w-0 flex-1 text-left"
+                            className="min-w-0 flex-1 text-left cursor-pointer"
                             title={`Focus "${seed.label}" in graph`}
                           >
                             <div className="flex items-center gap-1.5 mb-0.5">
-                              <span className="text-[9px] font-mono uppercase text-amber-400 bg-amber-500/15 border border-amber-500/30 px-1 py-0.2 rounded font-semibold">
+                              <span className="text-[9px] font-mono uppercase text-black bg-white px-1 py-0.2 rounded font-semibold">
                                 {seed.type === 'SEED' ? 'SEED' : seed.type}
                               </span>
-                              <span className="text-[10px] text-text-muted font-mono">
+                              <span className="text-[10px] text-neutral-400 font-mono">
                                 {seed.connectedCount} {seed.connectedCount === 1 ? 'node' : 'nodes'}
                               </span>
                             </div>
-                            <div className="font-mono text-[11px] font-semibold text-text truncate">
+                            <div className="font-mono text-[11px] font-semibold text-white truncate">
                               {seed.label}
                             </div>
                           </button>
@@ -611,14 +637,14 @@ export function InvestigationDetailPage() {
                                 setSelectedNodeId(seed.id);
                                 setSelectedEdgeId(null);
                               }}
-                              className="p-1 text-text-muted hover:text-primary rounded hover:bg-surface-3 transition-colors"
+                              className="p-1 text-neutral-400 hover:text-white rounded hover:bg-[#1a1a1a] transition-colors cursor-pointer"
                               title="Focus node on graph"
                             >
                               <Target className="w-3.5 h-3.5" />
                             </button>
                             <button
                               onClick={() => handleDeleteSeed(seed.id, seed.label, seed.connectedCount)}
-                              className="p-1 text-status-danger/70 hover:text-status-danger hover:bg-status-danger/10 rounded transition-colors"
+                              className="p-1 text-neutral-400 hover:text-white rounded hover:bg-[#1a1a1a] transition-colors cursor-pointer"
                               title={`Hapus Seed Target "${seed.label}" dan ${seed.connectedCount} node graf terhubung`}
                             >
                               <Trash2 className="w-3.5 h-3.5" />
@@ -687,13 +713,12 @@ export function InvestigationDetailPage() {
                             {run.collector}
                           </span>
                           <span
-                            className={`text-[10px] ${
-                              run.status === 'COMPLETED'
+                            className={`text-[10px] ${run.status === 'COMPLETED'
                                 ? 'text-status-success'
                                 : run.status === 'FAILED'
                                   ? 'text-status-danger'
                                   : 'text-accent-cyan'
-                            }`}
+                              }`}
                           >
                             {run.status}
                           </span>
@@ -725,97 +750,97 @@ export function InvestigationDetailPage() {
           <div className="flex-1 flex overflow-hidden relative min-h-0">
             {/* Center: Interactive Graph View OR Notes View */}
             <div className="flex-1 h-full relative overflow-hidden bg-app">
-            {activeWorkspaceView === 'graph' ? (
-              isGraphLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <LoadingState message="Rendering investigation graph..." />
-                </div>
-              ) : !hasNodes ? (
-                <div className="flex items-center justify-center h-full">
-                  <EmptyState
-                    icon={<Compass className="w-10 h-10 text-primary" />}
-                    title="Investigation graph is empty"
-                    description="Enter an organization name, domain, email, username, or IP to start automated multi-category discovery."
-                    actionLabel="Start Discovery"
-                    actionIcon={<Sparkles className="w-4 h-4 text-amber-300" />}
-                    onAction={() => setDiscoveryModalOpen(true)}
-                  />
-                </div>
-              ) : (
-                <GraphView graphData={graphData!} onRefresh={handleRefresh} />
-              )
-            ) : activeWorkspaceView === 'map' ? (
-              graphData ? (
-                <PhoneMapPanel graphData={graphData} />
-              ) : (
-                <LoadingState message="Loading geolocation data..." />
-              )
-            ) : activeWorkspaceView === 'timeline' ? (
-              <TimelineView caseId={caseId!} />
-            ) : (
-              /* Analyst Notes View */
-              <div className="h-full overflow-y-auto p-6 max-w-4xl mx-auto space-y-6">
-                <div>
-                  <h3 className="text-lg font-bold text-text">Analyst Case Notes</h3>
-                  <p className="text-xs text-text-muted">
-                    Document hypotheses, observations, provenance trails, and investigation conclusions
-                  </p>
-                </div>
-
-                {/* Note input form */}
-                <form onSubmit={handleAddNote} className="bg-surface p-4 rounded-card border border-border-subtle space-y-3">
-                  <textarea
-                    rows={3}
-                    placeholder="Record an analyst observation or investigation note..."
-                    value={newNoteContent}
-                    onChange={(e) => setNewNoteContent(e.target.value)}
-                    className="input-field resize-none text-xs font-sans"
-                    disabled={submittingNote}
-                  />
-                  <div className="flex justify-end">
-                    <Button
-                      variant="primary"
-                      size="sm"
-                      type="submit"
-                      loading={submittingNote}
-                      icon={<Send className="w-3.5 h-3.5" />}
-                    >
-                      Save Note
-                    </Button>
+              {activeWorkspaceView === 'graph' ? (
+                isGraphLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <LoadingState message="Rendering investigation graph..." />
                   </div>
-                </form>
-
-                {/* Notes List */}
-                <div className="space-y-3">
-                  {notes.length === 0 ? (
-                    <p className="text-xs text-text-muted text-center py-8">
-                      No notes recorded yet.
+                ) : !hasNodes ? (
+                  <div className="flex items-center justify-center h-full">
+                    <EmptyState
+                      icon={<Compass className="w-10 h-10 text-primary" />}
+                      title="Investigation graph is empty"
+                      description="Enter an organization name, domain, email, username, or IP to start automated multi-category discovery."
+                      actionLabel="Start Discovery"
+                      actionIcon={<Sparkles className="w-4 h-4 text-amber-300" />}
+                      onAction={() => setDiscoveryModalOpen(true)}
+                    />
+                  </div>
+                ) : (
+                  <GraphView graphData={graphData!} onRefresh={handleRefresh} />
+                )
+              ) : activeWorkspaceView === 'map' ? (
+                graphData ? (
+                  <PhoneMapPanel graphData={graphData} />
+                ) : (
+                  <LoadingState message="Loading geolocation data..." />
+                )
+              ) : activeWorkspaceView === 'timeline' ? (
+                <TimelineView caseId={caseId!} />
+              ) : (
+                /* Analyst Notes View */
+                <div className="h-full overflow-y-auto p-6 max-w-4xl mx-auto space-y-6">
+                  <div>
+                    <h3 className="text-lg font-bold text-text">Analyst Case Notes</h3>
+                    <p className="text-xs text-text-muted">
+                      Document hypotheses, observations, provenance trails, and investigation conclusions
                     </p>
-                  ) : (
-                    notes.map((note) => (
-                      <div
-                        key={note.id}
-                        className="bg-surface p-4 rounded-card border border-border-subtle space-y-2"
+                  </div>
+
+                  {/* Note input form */}
+                  <form onSubmit={handleAddNote} className="bg-surface p-4 rounded-card border border-border-subtle space-y-3">
+                    <textarea
+                      rows={3}
+                      placeholder="Record an analyst observation or investigation note..."
+                      value={newNoteContent}
+                      onChange={(e) => setNewNoteContent(e.target.value)}
+                      className="input-field resize-none text-xs font-sans"
+                      disabled={submittingNote}
+                    />
+                    <div className="flex justify-end">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        type="submit"
+                        loading={submittingNote}
+                        icon={<Send className="w-3.5 h-3.5" />}
                       >
-                        <div className="flex items-center justify-between text-[11px] text-text-muted font-mono">
-                          <span>{new Date(note.created_at).toLocaleString()}</span>
-                          <button
-                            onClick={() => handleDeleteNote(note.id)}
-                            className="p-1 text-text-muted hover:text-status-danger transition-colors"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
+                        Save Note
+                      </Button>
+                    </div>
+                  </form>
+
+                  {/* Notes List */}
+                  <div className="space-y-3">
+                    {notes.length === 0 ? (
+                      <p className="text-xs text-text-muted text-center py-8">
+                        No notes recorded yet.
+                      </p>
+                    ) : (
+                      notes.map((note) => (
+                        <div
+                          key={note.id}
+                          className="bg-surface p-4 rounded-card border border-border-subtle space-y-2"
+                        >
+                          <div className="flex items-center justify-between text-[11px] text-text-muted font-mono">
+                            <span>{new Date(note.created_at).toLocaleString()}</span>
+                            <button
+                              onClick={() => handleDeleteNote(note.id)}
+                              className="p-1 text-text-muted hover:text-status-danger transition-colors"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                          <p className="text-xs text-text leading-relaxed whitespace-pre-wrap">
+                            {note.content}
+                          </p>
                         </div>
-                        <p className="text-xs text-text leading-relaxed whitespace-pre-wrap">
-                          {note.content}
-                        </p>
-                      </div>
-                    ))
-                  )}
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
 
             {/* Right Panel: Entity/Edge Detail Inspector (slide-over only when selected) */}
             {isDetailOpen && caseId && (
@@ -855,12 +880,11 @@ export function InvestigationDetailPage() {
             </div>
 
             <button
-              onClick={() => setLiveLogsOpen((prev) => !prev)}
-              className={`flex items-center gap-1.5 px-1.5 py-0.5 text-[10.5px] rounded transition-colors ${
-                liveLogsOpen
+              onClick={() => setLiveLogsOpen(!liveLogsOpen)}
+              className={`flex items-center gap-1.5 px-1.5 py-0.5 text-[10.5px] rounded transition-colors ${liveLogsOpen
                   ? 'text-slate-200 bg-slate-800/80 font-medium'
                   : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/50'
-              }`}
+                }`}
               title="Toggle Console Sidebar"
             >
               <Terminal className="w-3 h-3" />
@@ -889,6 +913,25 @@ export function InvestigationDetailPage() {
             onClose={() => setExportModalOpen(false)}
             caseId={caseId}
             caseTitle={investigation.title}
+          />
+          <ConfirmDialog
+            isOpen={deleteSeedConfirm.isOpen}
+            onClose={() => {
+              if (!deleteSeedConfirm.loading) {
+                setDeleteSeedConfirm((prev) => ({ ...prev, isOpen: false }));
+              }
+            }}
+            onConfirm={handleConfirmDeleteSeed}
+            title="Hapus Seed Target"
+            message={
+              deleteSeedConfirm.count > 1
+                ? `Hapus Seed Target "${deleteSeedConfirm.seedLabel}" beserta seluruh ${deleteSeedConfirm.count} node graf yang terhubung dengannya?`
+                : `Hapus Seed Target "${deleteSeedConfirm.seedLabel}" dari investigasi ini?`
+            }
+            confirmText="Hapus Seed"
+            cancelText="Batal"
+            variant="danger"
+            loading={deleteSeedConfirm.loading}
           />
         </>
       )}

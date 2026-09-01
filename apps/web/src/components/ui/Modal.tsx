@@ -42,22 +42,22 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
       {/* Backdrop */}
       <div
-        className="fixed inset-0 bg-black/70 backdrop-blur-xs transition-opacity animate-fade-in"
+        className="fixed inset-0 bg-black/80 backdrop-blur-xs transition-opacity animate-fade-in"
         onClick={onClose}
       />
 
       {/* Modal Dialog */}
       <div
-        className={`relative w-full ${maxWidthClasses[maxWidth]} bg-surface border border-border-subtle rounded-modal shadow-2xl p-6 z-10 animate-slide-in-up`}
+        className={`relative w-full ${maxWidthClasses[maxWidth]} bg-[#0a0a0a] border border-[#262626] rounded-modal shadow-2xl p-6 z-10 animate-slide-in-up`}
       >
-        <div className="flex items-start justify-between pb-4 border-b border-border-subtle">
+        <div className="flex items-start justify-between pb-4 border-b border-[#1c1c1c]">
           <div>
-            <h3 className="text-lg font-semibold text-text">{title}</h3>
-            {description && <p className="text-xs text-text-muted mt-1">{description}</p>}
+            <h3 className="text-sm font-semibold text-white tracking-tight">{title}</h3>
+            {description && <p className="text-xs text-neutral-400 mt-0.5">{description}</p>}
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded-button text-text-muted hover:text-text hover:bg-surface-2 transition-colors"
+            className="p-1 rounded text-neutral-400 hover:text-white hover:bg-[#1a1a1a] transition-colors cursor-pointer"
           >
             <X className="w-4 h-4" />
           </button>

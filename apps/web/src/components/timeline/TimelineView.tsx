@@ -63,64 +63,10 @@ const ENTITY_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   WEBSITE: Globe2,
 };
 
-// ─── Entity type color accents (matches EntityNode.tsx themes) ──────
+// ─── Entity type color accents (pure monochrome minimal) ──────
 
-const ENTITY_ACCENT_COLORS: Record<string, string> = {
-  SEED: 'border-l-amber-400 bg-amber-500/5',
-  DOMAIN: 'border-l-sky-400 bg-sky-500/5',
-  SUBDOMAIN: 'border-l-sky-400 bg-sky-500/5',
-  IP_ADDRESS: 'border-l-cyan-400 bg-cyan-500/5',
-  EMAIL: 'border-l-emerald-400 bg-emerald-500/5',
-  USERNAME: 'border-l-amber-400 bg-amber-500/5',
-  URL: 'border-l-blue-400 bg-blue-500/5',
-  SOCIAL_PROFILE: 'border-l-purple-400 bg-purple-500/5',
-  CERTIFICATE: 'border-l-teal-400 bg-teal-500/5',
-  TECHNOLOGY: 'border-l-amber-400 bg-amber-500/5',
-  PERSON: 'border-l-indigo-400 bg-indigo-500/5',
-  DOCUMENT: 'border-l-slate-400 bg-slate-500/5',
-  PHONE: 'border-l-emerald-400 bg-emerald-500/5',
-  LOCATION: 'border-l-orange-400 bg-orange-500/5',
-  ADDRESS: 'border-l-orange-400 bg-orange-500/5',
-  GITHUB_PROFILE: 'border-l-slate-300 bg-slate-500/5',
-  GITLAB_PROFILE: 'border-l-orange-400 bg-orange-500/5',
-  YOUTUBE_CHANNEL: 'border-l-red-400 bg-red-500/5',
-  REPOSITORY: 'border-l-slate-300 bg-slate-500/5',
-  ORGANIZATION: 'border-l-indigo-400 bg-indigo-500/5',
-  MX_RECORD: 'border-l-cyan-400 bg-cyan-500/5',
-  NS_RECORD: 'border-l-cyan-400 bg-cyan-500/5',
-  PUBLIC_MENTION: 'border-l-blue-400 bg-blue-500/5',
-  WEBSITE: 'border-l-sky-400 bg-sky-500/5',
-};
-
-const ENTITY_BADGE_COLORS: Record<string, string> = {
-  SEED: 'bg-amber-500/15 text-amber-300 border-amber-500/30',
-  DOMAIN: 'bg-sky-500/15 text-sky-300 border-sky-500/25',
-  SUBDOMAIN: 'bg-sky-500/15 text-sky-300 border-sky-500/25',
-  IP_ADDRESS: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/25',
-  EMAIL: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25',
-  USERNAME: 'bg-amber-500/15 text-amber-300 border-amber-500/25',
-  URL: 'bg-blue-500/15 text-blue-300 border-blue-500/25',
-  SOCIAL_PROFILE: 'bg-purple-500/15 text-purple-300 border-purple-500/25',
-  CERTIFICATE: 'bg-teal-500/15 text-teal-300 border-teal-500/25',
-  TECHNOLOGY: 'bg-amber-500/15 text-amber-300 border-amber-500/25',
-  PERSON: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/25',
-  DOCUMENT: 'bg-slate-500/15 text-slate-300 border-slate-500/25',
-  PHONE: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25',
-  LOCATION: 'bg-orange-500/15 text-orange-300 border-orange-500/25',
-  ADDRESS: 'bg-orange-500/15 text-orange-300 border-orange-500/25',
-  GITHUB_PROFILE: 'bg-slate-500/15 text-slate-300 border-slate-500/25',
-  GITLAB_PROFILE: 'bg-orange-500/15 text-orange-300 border-orange-500/25',
-  YOUTUBE_CHANNEL: 'bg-red-500/15 text-red-300 border-red-500/25',
-  REPOSITORY: 'bg-slate-500/15 text-slate-300 border-slate-500/25',
-  ORGANIZATION: 'bg-indigo-500/15 text-indigo-300 border-indigo-500/25',
-  MX_RECORD: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/25',
-  NS_RECORD: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/25',
-  PUBLIC_MENTION: 'bg-blue-500/15 text-blue-300 border-blue-500/25',
-  WEBSITE: 'bg-sky-500/15 text-sky-300 border-sky-500/25',
-};
-
-const DEFAULT_ACCENT = 'border-l-slate-500 bg-slate-500/5';
-const DEFAULT_BADGE = 'bg-slate-500/15 text-slate-300 border-slate-500/25';
+const DEFAULT_ACCENT = 'border-l-neutral-400 bg-neutral-900/40';
+const DEFAULT_BADGE = 'bg-[#181818] text-neutral-300 border-[#262626]';
 
 // ─── Helpers ────────────────────────────────────────────────────────
 
@@ -395,36 +341,34 @@ export function TimelineView({ caseId }: TimelineViewProps) {
                   const linkedEntity = event.entity_id ? entityMap.get(event.entity_id) : null;
                   const entityType = linkedEntity?.type || '';
                   const Icon = ENTITY_ICONS[entityType] || Clock;
-                  const accentClass = ENTITY_ACCENT_COLORS[entityType] || DEFAULT_ACCENT;
-                  const badgeClass = ENTITY_BADGE_COLORS[entityType] || DEFAULT_BADGE;
 
                   return (
                     <div
                       key={event.id}
-                      className={`relative bg-surface border border-border-subtle rounded-card p-3 transition-all hover:border-border cursor-default border-l-2 ${accentClass}`}
+                      className={`relative bg-[#0d0d0d] border border-[#222222] rounded-card p-3 transition-all hover:border-[#383838] cursor-default border-l-2 ${DEFAULT_ACCENT}`}
                     >
                       {/* Timeline dot */}
-                      <div className="absolute -left-[31px] top-4 w-2.5 h-2.5 rounded-full bg-surface-2 border-2 border-border z-10" />
+                      <div className="absolute -left-[31px] top-4 w-2.5 h-2.5 rounded-full bg-[#121212] border-2 border-[#333333] z-10" />
 
                       {/* Header row */}
                       <div className="flex items-start justify-between gap-3">
                         <div className="flex items-start gap-2 min-w-0 flex-1">
-                          <div className="p-1 rounded bg-surface-2 border border-border-subtle shrink-0 mt-0.5">
-                            <Icon className="w-3 h-3 text-slate-400" />
+                          <div className="p-1 rounded bg-[#181818] border border-[#262626] shrink-0 mt-0.5">
+                            <Icon className="w-3 h-3 text-neutral-300" />
                           </div>
                           <div className="min-w-0">
-                            <div className="text-xs font-semibold text-text leading-tight">
+                            <div className="text-xs font-semibold text-white leading-tight">
                               {event.title}
                             </div>
                             {event.description && (
-                              <p className="text-[11px] text-text-secondary mt-0.5 leading-relaxed">
+                              <p className="text-[11px] text-neutral-400 mt-0.5 leading-relaxed">
                                 {event.description}
                               </p>
                             )}
                           </div>
                         </div>
 
-                        <span className="text-[10px] font-mono text-text-muted whitespace-nowrap shrink-0">
+                        <span className="text-[10px] font-mono text-neutral-500 whitespace-nowrap shrink-0">
                           {formatTime(event.event_at)}
                         </span>
                       </div>
@@ -434,13 +378,13 @@ export function TimelineView({ caseId }: TimelineViewProps) {
                         <div className="mt-2 flex items-center gap-2">
                           <button
                             onClick={() => handleEntityClick(event.entity_id)}
-                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-mono uppercase rounded border transition-colors hover:opacity-80 ${badgeClass}`}
+                            className={`inline-flex items-center gap-1 px-1.5 py-0.5 text-[9px] font-mono uppercase rounded border transition-colors hover:bg-[#262626] cursor-pointer ${DEFAULT_BADGE}`}
                             title={`Focus "${linkedEntity.value}" in graph`}
                           >
                             <Target className="w-2.5 h-2.5" />
                             <span>{linkedEntity.type}</span>
                           </button>
-                          <span className="text-[10px] font-mono text-text-muted truncate max-w-xs" title={linkedEntity.value}>
+                          <span className="text-[10px] font-mono text-neutral-400 truncate max-w-xs" title={linkedEntity.value}>
                             {linkedEntity.value}
                           </span>
                         </div>

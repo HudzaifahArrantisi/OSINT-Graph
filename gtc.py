@@ -175,7 +175,7 @@ def load_store() -> dict:
     return json.loads(CRED_FILE.read_text("utf-8"))
 
 
-def save_store(store: dict) -> None:
+def save_store(store: dict) -> None:z
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     CRED_FILE.write_text(json.dumps(store, indent=2), "utf-8")
     try:
@@ -213,7 +213,7 @@ def api_search(cred: dict, phone: str, source: str) -> dict:
         "token": cred["token"],
     }
     code, body = gtc_call(endpoint, payload, token=cred["token"],
-                          final_key=cred["finalKey"], device_id=cred["clientDeviceId"])
+                          final_key=cred["finalkey"], device_id=cred["clientDeviceId"])
     meta = dig(body, "meta.httpStatusCode")
     if code != 200 or meta != 200:
         raise GtcError(f"HTTP {code}/{meta}: {dig(body, 'meta.errorMessage', 'unknown error')}")

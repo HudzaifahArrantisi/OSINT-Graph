@@ -9,6 +9,7 @@ import { Input } from '../components/ui/Input';
 import { Badge } from '../components/ui/Badge';
 import { EmptyState } from '../components/ui/EmptyState';
 import { LoadingState } from '../components/ui/LoadingState';
+import { ConfirmDialog } from '../components/ui/ConfirmDialog';
 import { useAppStore } from '../stores/appStore';
 import {
   FolderKanban,
@@ -29,6 +30,17 @@ export function InvestigationsPage() {
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('ALL');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    isBulk: boolean;
+    targetId?: string;
+    targetTitle?: string;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    isBulk: false,
+    loading: false,
+  });
 
   const { data: investigations = [], isLoading } = useQuery<Investigation[]>({
     queryKey: ['investigations'],
@@ -65,39 +77,54 @@ export function InvestigationsPage() {
     }
   };
 
-  const handleDeleteSingle = async (id: string, title: string, e: React.MouseEvent) => {
+  const handleDeleteSingle = (id: string, title: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (window.confirm(`Delete investigation dossier "${title}"?`)) {
-      try {
-        await api.investigations.delete(id);
-        queryClient.invalidateQueries({ queryKey: ['investigations'] });
-        setSelectedIds((prev) => {
-          const next = new Set(prev);
-          next.delete(id);
-          return next;
-        });
-        addToast(`Deleted dossier "${title}"`, 'info');
-      } catch (err: any) {
-        addToast(err.message || 'Failed to delete investigation', 'error');
-      }
-    }
+    setDeleteConfirm({
+      isOpen: true,
+      isBulk: false,
+      targetId: id,
+      targetTitle: title,
+      loading: false,
+    });
   };
 
-  const handleBulkDelete = async () => {
+  const handleBulkDelete = () => {
     if (selectedIds.size === 0) return;
-    const count = selectedIds.size;
-    if (
-      window.confirm(
-        `Are you sure you want to permanently delete ${count} selected investigation dossier(s)?`,
-      )
-    ) {
+    setDeleteConfirm({
+      isOpen: true,
+      isBulk: true,
+      loading: false,
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    setDeleteConfirm((prev) => ({ ...prev, loading: true }));
+    if (deleteConfirm.isBulk) {
+      const count = selectedIds.size;
       try {
         await api.investigations.bulkDelete(Array.from(selectedIds));
         queryClient.invalidateQueries({ queryKey: ['investigations'] });
         setSelectedIds(new Set());
         addToast(`Deleted ${count} investigation dossier(s)`, 'info');
+        setDeleteConfirm({ isOpen: false, isBulk: false, loading: false });
       } catch (err: any) {
         addToast(err.message || 'Failed to delete investigations', 'error');
+        setDeleteConfirm((prev) => ({ ...prev, loading: false }));
+      }
+    } else if (deleteConfirm.targetId) {
+      try {
+        await api.investigations.delete(deleteConfirm.targetId);
+        queryClient.invalidateQueries({ queryKey: ['investigations'] });
+        setSelectedIds((prev) => {
+          const next = new Set(prev);
+          if (deleteConfirm.targetId) next.delete(deleteConfirm.targetId);
+          return next;
+        });
+        addToast(`Deleted dossier "${deleteConfirm.targetTitle}"`, 'info');
+        setDeleteConfirm({ isOpen: false, isBulk: false, loading: false });
+      } catch (err: any) {
+        addToast(err.message || 'Failed to delete investigation', 'error');
+        setDeleteConfirm((prev) => ({ ...prev, loading: false }));
       }
     }
   };
@@ -267,6 +294,26 @@ export function InvestigationsPage() {
           </div>
         )}
       </main>
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => {
+          if (!deleteConfirm.loading) {
+            setDeleteConfirm((prev) => ({ ...prev, isOpen: false }));
+          }
+        }}
+        onConfirm={handleConfirmDelete}
+        title={deleteConfirm.isBulk ? 'Hapus Berkas Terpilih' : 'Hapus Investigasi'}
+        message={
+          deleteConfirm.isBulk
+            ? `Apakah Anda yakin ingin menghapus ${selectedIds.size} berkas dossier investigasi yang dipilih secara permanen?`
+            : `Hapus berkas dossier investigasi "${deleteConfirm.targetTitle}" secara permanen?`
+        }
+        confirmText={deleteConfirm.isBulk ? `Hapus ${selectedIds.size} Kasus` : 'Hapus'}
+        cancelText="Batal"
+        variant="danger"
+        loading={deleteConfirm.loading}
+      />
     </div>
   );
 }

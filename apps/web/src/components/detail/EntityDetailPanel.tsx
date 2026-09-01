@@ -5,6 +5,8 @@ import { useAppStore } from '../../stores/appStore';
 import { ConfidenceBadge } from '../ui/ConfidenceBadge';
 import { EvidenceCard } from './EvidenceCard';
 import { TransformPanel } from './TransformPanel';
+import { ConfirmDialog } from '../ui/ConfirmDialog';
+import { SubdomainsInventory } from './SubdomainsInventory';
 import {
   X,
   Globe2,
@@ -40,6 +42,12 @@ export function getNavigableUrl(entity?: { type?: string; value: string; metadat
   if (val.startsWith('http://') || val.startsWith('https://')) return val;
   if (metaUrl && (String(metaUrl).startsWith('http://') || String(metaUrl).startsWith('https://'))) return String(metaUrl);
 
+  // If this is an aggregate subdomain node like "Subdomains of nurulfikri.ac.id"
+  if (meta.isSubdomainAggregate || val.toLowerCase().startsWith('subdomains of ')) {
+    if (meta.apex) return `https://${meta.apex}`;
+    return null;
+  }
+
   const t = String(entity.type || '').toUpperCase();
   if (['DOMAIN', 'WEBSITE', 'SUBDOMAIN'].includes(t)) {
     return `https://${val}`;
@@ -68,6 +76,15 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
   const { selectedNodeId, selectedEdgeId, setSelectedNodeId, addToast } = useAppStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'transforms' | 'relationships' | 'evidence' | 'timeline' | 'raw'>('overview');
   const [copied, setCopied] = useState(false);
+  const [deleteConfirm, setDeleteConfirm] = useState<{
+    isOpen: boolean;
+    isSeedMode: boolean;
+    loading: boolean;
+  }>({
+    isOpen: false,
+    isSeedMode: false,
+    loading: false,
+  });
 
   // Fetch entities, relationships, evidence, and timeline for this case
   const { data: entities = [] } = useQuery<Entity[]>({
@@ -142,14 +159,29 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
     return visited.size;
   }, [selectedEntity, entities, relationships]);
 
-  const handleDeleteSeed = async () => {
+  const handleDeleteSeed = () => {
     if (!selectedEntity) return;
-    const confirmMessage =
-      connectedCount > 1
-        ? `Hapus Seed Target "${selectedEntity.value}" beserta seluruh ${connectedCount} entitas dan graph yang terhubung dengannya?`
-        : `Hapus Seed Target "${selectedEntity.value}" dari investigasi ini?`;
+    setDeleteConfirm({
+      isOpen: true,
+      isSeedMode: true,
+      loading: false,
+    });
+  };
 
-    if (window.confirm(confirmMessage)) {
+  const handleDeleteIndividualEntity = () => {
+    if (!selectedEntity) return;
+    setDeleteConfirm({
+      isOpen: true,
+      isSeedMode: false,
+      loading: false,
+    });
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!selectedEntity) return;
+    setDeleteConfirm((prev) => ({ ...prev, loading: true }));
+
+    if (deleteConfirm.isSeedMode) {
       try {
         const res = await api.seeds.delete(caseId, selectedEntity.id);
         queryClient.invalidateQueries({ queryKey: ['graph', caseId] });
@@ -164,16 +196,13 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
           'info',
         );
         setSelectedNodeId(null);
+        setDeleteConfirm({ isOpen: false, isSeedMode: false, loading: false });
         onClose();
       } catch (err: any) {
         addToast(err.message || 'Failed to delete seed and connected graph', 'error');
+        setDeleteConfirm((prev) => ({ ...prev, loading: false }));
       }
-    }
-  };
-
-  const handleDeleteIndividualEntity = async () => {
-    if (!selectedEntity) return;
-    if (window.confirm(`Delete entity "${selectedEntity.value}" from this investigation?`)) {
+    } else {
       try {
         await api.entities.delete(caseId, selectedEntity.id);
         queryClient.invalidateQueries({ queryKey: ['graph', caseId] });
@@ -181,9 +210,11 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
         queryClient.invalidateQueries({ queryKey: ['relationships', caseId] });
         addToast(`Deleted entity "${selectedEntity.value}"`, 'info');
         setSelectedNodeId(null);
+        setDeleteConfirm({ isOpen: false, isSeedMode: false, loading: false });
         onClose();
       } catch (err: any) {
         addToast(err.message || 'Failed to delete entity', 'error');
+        setDeleteConfirm((prev) => ({ ...prev, loading: false }));
       }
     }
   };
@@ -345,23 +376,35 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
 
                 {/* Direct Link Banner */}
                 {navUrl && (
-                  <div className="p-2.5 rounded-card bg-[#0e1628] border border-sky-500/30 space-y-1.5">
-                    <div className="flex items-center justify-between text-[11px] text-sky-300 font-semibold font-mono">
-                      <div className="flex items-center gap-1">
-                        <Compass className="w-3.5 h-3.5 text-sky-400" />
+                  <div className="p-2.5 rounded-card bg-[#0f0f0f] border border-[#262626] space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px] text-neutral-300 font-semibold font-mono">
+                      <div className="flex items-center gap-1.5 text-white">
+                        <Compass className="w-3.5 h-3.5 text-neutral-400" />
                         <span>Direct Target Link</span>
                       </div>
-                      <span className="text-[10px] text-sky-400/80">External Target</span>
+                      <span className="text-[10px] text-neutral-400">External Target</span>
                     </div>
                     <a
                       href={navUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="block text-xs font-mono text-sky-300 hover:text-sky-200 hover:underline break-all"
+                      className="block text-xs font-mono text-neutral-200 hover:text-white hover:underline break-all transition-colors"
                     >
                       {navUrl}
                     </a>
                   </div>
+                )}
+
+                {/* SUBDOMAIN AGGREGATE TABLE VIEW */}
+                {Boolean((selectedEntity.metadata as any)?.isSubdomainAggregate || (selectedEntity.metadata as any)?.allSubdomains) && (
+                  <SubdomainsInventory
+                    allSubdomains={(selectedEntity.metadata as any)?.allSubdomains}
+                    activeSubdomains={(selectedEntity.metadata as any)?.activeSubdomains}
+                    inactiveSubdomains={(selectedEntity.metadata as any)?.inactiveSubdomains}
+                    activeCount={(selectedEntity.metadata as any)?.activeCount}
+                    inactiveCount={(selectedEntity.metadata as any)?.inactiveCount}
+                    apex={(selectedEntity.metadata as any)?.apex}
+                  />
                 )}
 
                 <div className="bg-surface-2 rounded-card p-3 border border-border-subtle space-y-2 text-xs">
@@ -558,6 +601,28 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
           </div>
         )}
       </div>
+
+      <ConfirmDialog
+        isOpen={deleteConfirm.isOpen}
+        onClose={() => {
+          if (!deleteConfirm.loading) {
+            setDeleteConfirm((prev) => ({ ...prev, isOpen: false }));
+          }
+        }}
+        onConfirm={handleConfirmDelete}
+        title={deleteConfirm.isSeedMode ? 'Hapus Seed Target' : 'Hapus Entitas'}
+        message={
+          deleteConfirm.isSeedMode
+            ? connectedCount > 1
+              ? `Hapus Seed Target "${selectedEntity?.value}" beserta seluruh ${connectedCount} entitas dan graph yang terhubung dengannya?`
+              : `Hapus Seed Target "${selectedEntity?.value}" dari investigasi ini?`
+            : `Hapus entitas "${selectedEntity?.value}" dari investigasi ini?`
+        }
+        confirmText={deleteConfirm.isSeedMode ? 'Hapus Seed' : 'Hapus'}
+        cancelText="Batal"
+        variant="danger"
+        loading={deleteConfirm.loading}
+      />
     </aside>
   );
 }

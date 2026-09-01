@@ -255,10 +255,129 @@ function GraphViewInner({ graphData }: GraphViewProps) {
         layouted = applyForceLayout(currentNodes, currentEdges);
       }
 
+      // If Radial Layout is active, ensure edges flow hierarchically:
+      // Seed Target (Root) -> Category Hub Node -> Leaf/Member Subnodes
+      let edgeList = [...currentEdges];
+
+      if (layout === 'radial') {
+        const seedNodes = layouted.filter((n) => (n.data as any)?.isSeed || n.type === 'seed');
+        if (seedNodes.length > 0) {
+          const rootSeed = seedNodes[0];
+
+          // Group non-root nodes by their category key
+          const catGroups = new Map<string, Node[]>();
+          layouted.forEach((node) => {
+            if (node.id === rootSeed.id) return;
+            const meta = (node.data as any)?.metadata || {};
+            const discoveredBy = meta.discoveredBy || meta.source?.transform || meta.source?.collector;
+            const entityType = String((node.data as any)?.entityType || node.type || '').toUpperCase();
+            const label = String((node.data as any)?.label || (node.data as any)?.value || '').toLowerCase();
+
+            let catKey = 'subcat_other';
+            if (label.startsWith('inurl:') || label.includes('site:') || label.includes('filetype:') || label.includes('intitle:')) {
+              catKey = 'subcat_dorks';
+            } else if (entityType === 'IP_ADDRESS' || entityType === 'IP') {
+              catKey = 'subcat_ip';
+            } else if (entityType === 'SUBDOMAIN') {
+              catKey = 'subcat_subdomain';
+            } else if (entityType === 'DOMAIN' || entityType === 'WEBSITE') {
+              catKey = 'subcat_domain';
+            } else if (entityType === 'URL') {
+              catKey = 'subcat_url';
+            } else if (entityType === 'DOCUMENT') {
+              catKey = 'subcat_document';
+            } else if (entityType === 'LOCATION' || entityType === 'ADDRESS') {
+              catKey = 'subcat_location';
+            } else if (['NS_RECORD', 'MX_RECORD', 'DNS_RECORD'].includes(entityType)) {
+              catKey = 'subcat_dns';
+            } else if (['CERTIFICATE', 'TLS_CERTIFICATE'].includes(entityType)) {
+              catKey = 'subcat_tls';
+            } else if (entityType === 'TECHNOLOGY') {
+              catKey = 'subcat_tech';
+            } else if (['EMAIL', 'PERSON', 'ORGANIZATION'].includes(entityType)) {
+              catKey = 'subcat_contact';
+            } else if (entityType === 'PHONE') {
+              catKey = 'subcat_phone';
+            } else if (['SOCIAL_PROFILE', 'GITHUB_PROFILE', 'GITLAB_PROFILE', 'YOUTUBE_CHANNEL', 'USERNAME'].includes(entityType)) {
+              catKey = 'subcat_social';
+            } else if (entityType === 'PUBLIC_MENTION') {
+              catKey = 'subcat_mentions';
+            } else if (discoveredBy) {
+              const s = String(discoveredBy).toLowerCase();
+              if (s.includes('subdomain') || s.includes('crt')) catKey = 'subcat_subdomain';
+              else if (s.includes('dns')) catKey = 'subcat_dns';
+              else if (s.includes('tls') || s.includes('cert')) catKey = 'subcat_tls';
+              else if (s.includes('tech')) catKey = 'subcat_tech';
+              else if (s.includes('recon')) catKey = 'subcat_recon';
+              else if (s.includes('contact') || s.includes('email')) catKey = 'subcat_contact';
+              else if (s.includes('phone') || s.includes('geo')) catKey = 'subcat_phone';
+              else if (s.includes('social') || s.includes('mrholmes')) catKey = 'subcat_social';
+              else catKey = `subcat_${discoveredBy}`;
+            }
+
+            if (!catGroups.has(catKey)) catGroups.set(catKey, []);
+            catGroups.get(catKey)!.push(node);
+          });
+
+          // In Radial layout, clean up direct seed-to-all-subnode messy cross-lines:
+          // 1. First node of each category group acts as the Category Parent / Satellite Center
+          // 2. Connect Seed -> Category Center Node
+          // 3. Connect Category Center Node -> Sub-nodes in its concentric starburst
+          const newEdges: Edge[] = [];
+          catGroups.forEach((groupNodes, catKey) => {
+            if (groupNodes.length === 0) return;
+            const catParentNode = groupNodes[0];
+
+            // Edge: Seed -> Category Parent Node
+            newEdges.push({
+              id: `edge-seed-to-cat-${catParentNode.id}`,
+              source: rootSeed.id,
+              target: catParentNode.id,
+              type: 'relationship',
+              data: {
+                relationshipType: 'EXECUTES_TRANSFORM',
+                confidence: 100,
+                reason: `Discovery category: ${catKey.replace('subcat_', '').toUpperCase()}`,
+                evidenceCount: 0,
+                relationshipId: `edge-seed-to-cat-${catParentNode.id}`,
+              },
+            });
+
+            // Edge: Category Parent Node -> Child Sub-nodes in this category
+            for (let i = 1; i < groupNodes.length; i++) {
+              const childNode = groupNodes[i];
+              newEdges.push({
+                id: `edge-cat-to-child-${catParentNode.id}-${childNode.id}`,
+                source: catParentNode.id,
+                target: childNode.id,
+                type: 'relationship',
+                data: {
+                  relationshipType: 'CONTAINS',
+                  confidence: (childNode.data as any)?.confidence || 90,
+                  reason: `Discovered under ${(catParentNode.data as any)?.label || catKey}`,
+                  evidenceCount: 0,
+                  relationshipId: `edge-cat-to-child-${catParentNode.id}-${childNode.id}`,
+                },
+              });
+            }
+          });
+
+          // Preserve any existing inter-entity edges that do not connect to the root seed
+          currentEdges.forEach((e) => {
+            if (e.source !== rootSeed.id && e.target !== rootSeed.id) {
+              if (!newEdges.some((ne) => (ne.source === e.source && ne.target === e.target) || (ne.source === e.target && ne.target === e.source))) {
+                newEdges.push(e);
+              }
+            }
+          });
+
+          edgeList = newEdges;
+        }
+      }
+
       // Automatically construct edges to Hub nodes and from Hub nodes to member leaf nodes
       const hubNodes = layouted.filter((n) => n.type === 'cluster_hub' || (n.data as any)?.isHub);
       const seedNodes = layouted.filter((n) => (n.data as any)?.isSeed || n.type === 'seed');
-      const edgeList = [...currentEdges];
 
       // Inject onToggleCollapse into hub nodes data
       layouted = layouted.map((n) => {

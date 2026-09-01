@@ -87,42 +87,42 @@ export function GraphToolbar({
     : `All Targets (${seedTargets.length})`;
 
   return (
-    <div className="absolute top-4 left-4 z-10 flex items-center gap-1.5 p-1 bg-[#0b101b]/90 backdrop-blur-md border border-[#1e293b] rounded-lg shadow-lg select-none">
+    <div className="absolute top-4 left-4 z-10 flex items-center gap-1.5 p-1 bg-[#0a0a0a]/90 backdrop-blur-md border border-[#222222] rounded-lg shadow-2xl select-none">
       {/* Zoom Controls */}
       <div className="flex items-center gap-0.5">
         <button
           onClick={() => zoomIn()}
-          className="p-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 transition-colors"
+          className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-[#181818] transition-colors"
           title="Zoom In (+)"
         >
           <ZoomIn className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => zoomOut()}
-          className="p-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 transition-colors"
+          className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-[#181818] transition-colors"
           title="Zoom Out (-)"
         >
           <ZoomOut className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => fitView({ duration: 300 })}
-          className="p-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 transition-colors"
+          className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-[#181818] transition-colors"
           title="Fit View (F)"
         >
           <Maximize2 className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      <div className="w-[1px] h-4 bg-[#1e293b] mx-0.5" />
+      <div className="w-[1px] h-4 bg-[#222222] mx-0.5" />
 
       {/* Layout Presets */}
-      <div className="flex items-center gap-0.5 bg-[#080d16] border border-[#1e293b] rounded-md p-0.5">
+      <div className="flex items-center gap-0.5 bg-[#050505] border border-[#222222] rounded-md p-0.5">
         <button
           onClick={() => handleLayoutChange('force')}
           className={`px-2 py-1 rounded text-xs transition-colors flex items-center gap-1.5 font-sans ${
             graphLayout === 'force'
-              ? 'bg-slate-800 text-slate-100 font-medium shadow-sm'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'bg-[#222222] text-white font-medium shadow-sm'
+              : 'text-neutral-400 hover:text-white'
           }`}
           title="Force-directed layout"
         >
@@ -133,8 +133,8 @@ export function GraphToolbar({
           onClick={() => handleLayoutChange('hierarchical')}
           className={`px-2 py-1 rounded text-xs transition-colors flex items-center gap-1.5 font-sans ${
             graphLayout === 'hierarchical'
-              ? 'bg-slate-800 text-slate-100 font-medium shadow-sm'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'bg-[#222222] text-white font-medium shadow-sm'
+              : 'text-neutral-400 hover:text-white'
           }`}
           title="Hierarchical layout"
         >
@@ -145,8 +145,8 @@ export function GraphToolbar({
           onClick={() => handleLayoutChange('radial')}
           className={`px-2 py-1 rounded text-xs transition-colors flex items-center gap-1.5 font-sans ${
             graphLayout === 'radial'
-              ? 'bg-slate-800 text-slate-100 font-medium shadow-sm'
-              : 'text-slate-400 hover:text-slate-200'
+              ? 'bg-[#222222] text-white font-medium shadow-sm'
+              : 'text-neutral-400 hover:text-white'
           }`}
           title="Radial layout"
         >
@@ -155,9 +155,9 @@ export function GraphToolbar({
         </button>
       </div>
 
-      <div className="w-[1px] h-4 bg-[#1e293b] mx-0.5" />
+      <div className="w-[1px] h-4 bg-[#222222] mx-0.5" />
 
-      {/* Target Cluster Dropdown — replaces the floating pill bar */}
+      {/* Target Cluster Dropdown */}
       {seedTargets.length > 1 && onSelectSeedFilter && (
         <>
           <div className="relative" ref={seedDropdownRef}>
@@ -165,18 +165,18 @@ export function GraphToolbar({
               onClick={() => setSeedDropdownOpen((prev) => !prev)}
               className={`px-2 py-1 rounded-md text-xs transition-colors flex items-center gap-1.5 font-mono border ${
                 selectedSeedFilter
-                  ? 'bg-amber-500/15 text-amber-200 border-amber-500/40 font-medium'
-                  : 'bg-[#080d16] text-slate-300 hover:text-slate-100 border-[#1e293b] hover:border-slate-600'
+                  ? 'bg-white text-black border-white font-medium'
+                  : 'bg-[#050505] text-neutral-300 hover:text-white border-[#222222] hover:border-neutral-500'
               }`}
               title="Filter graph by target seed cluster"
             >
-              <Target className="w-3 h-3 text-amber-400" />
+              <Target className={`w-3 h-3 ${selectedSeedFilter ? 'text-black' : 'text-neutral-300'}`} />
               <span className="text-[11px] max-w-[140px] truncate">{selectedSeedLabel}</span>
-              <ChevronDown className={`w-3 h-3 text-slate-400 transition-transform ${seedDropdownOpen ? 'rotate-180' : ''}`} />
+              <ChevronDown className={`w-3 h-3 ${selectedSeedFilter ? 'text-black' : 'text-neutral-400'} transition-transform ${seedDropdownOpen ? 'rotate-180' : ''}`} />
             </button>
 
             {seedDropdownOpen && (
-              <div className="absolute top-full left-0 mt-1.5 w-64 bg-[#0d1220]/98 backdrop-blur-xl border border-[#1e293b] rounded-lg shadow-2xl py-1 z-50 animate-in fade-in slide-in-from-top-1 duration-100">
+              <div className="absolute top-full left-0 mt-1.5 w-64 bg-[#0a0a0a]/98 backdrop-blur-xl border border-[#262626] rounded-lg shadow-2xl py-1 z-50 animate-fade-in">
                 <button
                   onClick={() => {
                     onSelectSeedFilter(null);
@@ -184,15 +184,15 @@ export function GraphToolbar({
                   }}
                   className={`w-full text-left px-3 py-2 text-xs flex items-center gap-2 transition-colors ${
                     selectedSeedFilter === null
-                      ? 'bg-sky-500/10 text-sky-200 font-medium'
-                      : 'text-slate-300 hover:bg-slate-800/60 hover:text-slate-100'
+                      ? 'bg-[#1c1c1c] text-white font-medium'
+                      : 'text-neutral-300 hover:bg-[#141414] hover:text-white'
                   }`}
                 >
-                  <Layers className="w-3.5 h-3.5 text-sky-400" />
+                  <Layers className="w-3.5 h-3.5 text-neutral-300" />
                   <span className="font-mono">All Targets ({seedTargets.length})</span>
                 </button>
 
-                <div className="h-[1px] bg-[#1e293b] mx-2 my-1" />
+                <div className="h-[1px] bg-[#222222] mx-2 my-1" />
 
                 {seedTargets.map((seed) => (
                   <button
@@ -203,18 +203,18 @@ export function GraphToolbar({
                     }}
                     className={`w-full text-left px-3 py-2 text-xs flex items-center justify-between gap-2 transition-colors ${
                       selectedSeedFilter === seed.id
-                        ? 'bg-amber-500/10 text-amber-200 font-medium'
-                        : 'text-slate-300 hover:bg-slate-800/60 hover:text-slate-100'
+                        ? 'bg-[#1c1c1c] text-white font-medium'
+                        : 'text-neutral-300 hover:bg-[#141414] hover:text-white'
                     }`}
                   >
                     <div className="flex items-center gap-2 min-w-0">
-                      <Target className={`w-3 h-3 shrink-0 ${selectedSeedFilter === seed.id ? 'text-amber-400' : 'text-amber-500/60'}`} />
+                      <Target className="w-3 h-3 shrink-0 text-neutral-400" />
                       <span className="font-mono truncate">{seed.label}</span>
                     </div>
                     <span className={`text-[10px] px-1.5 py-0.5 rounded font-mono shrink-0 ${
                       selectedSeedFilter === seed.id
-                        ? 'bg-amber-500/20 text-amber-300'
-                        : 'bg-slate-800 text-slate-400'
+                        ? 'bg-white text-black font-semibold'
+                        : 'bg-[#1a1a1a] text-neutral-400'
                     }`}>
                       {seed.count}
                     </span>
@@ -224,7 +224,7 @@ export function GraphToolbar({
             )}
           </div>
 
-          <div className="w-[1px] h-4 bg-[#1e293b] mx-0.5" />
+          <div className="w-[1px] h-4 bg-[#222222] mx-0.5" />
         </>
       )}
 
@@ -234,8 +234,8 @@ export function GraphToolbar({
           onClick={onToggleClusterMode}
           className={`px-2 py-1 rounded-md text-xs transition-colors flex items-center gap-1.5 font-sans border ${
             clusterMode
-              ? 'bg-slate-800/90 text-sky-300 border-sky-500/40 font-medium'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border-transparent'
+              ? 'bg-white text-black border-white font-medium'
+              : 'text-neutral-400 hover:text-white hover:bg-[#181818] border-transparent'
           }`}
           title={
             clusterMode
@@ -246,7 +246,7 @@ export function GraphToolbar({
           <Layers className="w-3.5 h-3.5" />
           <span className="text-[11px]">{clusterMode ? 'Clusters' : 'All Nodes'}</span>
           {totalNodeCount > 50 && (
-            <span className="text-[9px] px-1 py-0.2 rounded bg-slate-800 text-slate-400 font-mono">
+            <span className={`text-[9px] px-1 py-0.2 rounded font-mono ${clusterMode ? 'bg-black/20 text-black' : 'bg-[#1c1c1c] text-neutral-400'}`}>
               {totalNodeCount}
             </span>
           )}
@@ -259,10 +259,10 @@ export function GraphToolbar({
           onClick={onToggleLabelMode}
           className={`px-2 py-1 rounded-md text-xs transition-colors flex items-center gap-1 font-mono border ${
             labelMode === 'always'
-              ? 'bg-slate-800 text-slate-200 border-slate-700 font-medium'
+              ? 'bg-[#222222] text-white border-[#333333] font-medium'
               : labelMode === 'hover'
-                ? 'bg-amber-500/10 text-amber-300 border-amber-500/30'
-                : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border-transparent'
+                ? 'bg-[#181818] text-neutral-300 border-[#262626]'
+                : 'text-neutral-400 hover:text-white hover:bg-[#181818] border-transparent'
           }`}
           title="Toggle label visibility"
         >
@@ -273,7 +273,7 @@ export function GraphToolbar({
         </button>
       )}
 
-      <div className="w-[1px] h-4 bg-[#1e293b] mx-0.5" />
+      <div className="w-[1px] h-4 bg-[#222222] mx-0.5" />
 
       {/* Path Finder Toggle */}
       {onTogglePathFinder && (
@@ -281,12 +281,12 @@ export function GraphToolbar({
           onClick={onTogglePathFinder}
           className={`px-2 py-1 rounded-md text-xs transition-colors flex items-center gap-1.5 font-sans border ${
             pathFinderOpen
-              ? 'bg-sky-500/20 text-sky-200 border-sky-500/50 font-medium'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 border-transparent'
+              ? 'bg-white text-black border-white font-medium'
+              : 'text-neutral-400 hover:text-white hover:bg-[#181818] border-transparent'
           }`}
           title="Find shortest path between entities"
         >
-          <Route className="w-3.5 h-3.5 text-sky-400" />
+          <Route className="w-3.5 h-3.5" />
           <span className="text-[11px] hidden sm:inline">Path</span>
         </button>
       )}
@@ -294,23 +294,11 @@ export function GraphToolbar({
       {/* Filter & Search Toggles */}
       <div className="flex items-center gap-0.5">
         <button
-          onClick={onToggleSearch}
-          className={`p-1.5 rounded-md transition-colors ${
-            searchOpen
-              ? 'bg-slate-800 text-slate-100 border border-slate-700'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/70'
-          }`}
-          title="Search entities (/)"
-        >
-          <Search className="w-3.5 h-3.5" />
-        </button>
-
-        <button
           onClick={onToggleFilter}
           className={`p-1.5 rounded-md transition-colors ${
             filterOpen
-              ? 'bg-slate-800 text-slate-100 border border-slate-700'
-              : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/70'
+              ? 'bg-[#222222] text-white border border-[#333333]'
+              : 'text-neutral-400 hover:text-white hover:bg-[#181818]'
           }`}
           title="Filter graph"
         >
@@ -319,7 +307,7 @@ export function GraphToolbar({
 
         <button
           onClick={resetGraphFilter}
-          className="p-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-800/70 transition-colors"
+          className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-[#181818] transition-colors"
           title="Reset filters"
         >
           <RotateCcw className="w-3.5 h-3.5" />

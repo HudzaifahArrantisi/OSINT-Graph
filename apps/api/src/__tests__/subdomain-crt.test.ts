@@ -57,7 +57,11 @@ describe('subdomain-crt collector', () => {
     expect(result.entities.length).toBeLessThanOrEqual(1000);
     for (const e of result.entities) {
       expect(e.type).toBe('SUBDOMAIN');
-      expect(e.value.endsWith('.github.com') || e.value === 'github.com').toBe(true);
+      expect(
+        e.value.endsWith('.github.com') ||
+          e.value === 'github.com' ||
+          e.value.startsWith('Subdomains of '),
+      ).toBe(true);
       expect((e.metadata as any)?.source?.collector).toBe('subdomain-crt');
     }
     for (const rel of result.relationships) {

@@ -5,43 +5,44 @@ export default {
   theme: {
     extend: {
       colors: {
-        // Design system semantic tokens — Tactical OSINT cyber theme
-        app: '#080c14',
+        // Pure Monochrome Dark & White Design System — Modern, Minimalist, Anti-Slop
+        app: '#050505',
         surface: {
-          DEFAULT: '#0d121c',
-          2: '#121927',
-          3: '#182234',
-          hover: '#1b263a',
+          DEFAULT: '#0a0a0a',
+          2: '#121212',
+          3: '#1a1a1a',
+          hover: '#222222',
         },
         border: {
-          subtle: '#1a2334',
-          DEFAULT: '#253248',
+          subtle: '#181818',
+          DEFAULT: '#262626',
+          strong: '#404040',
         },
         text: {
-          DEFAULT: '#e2e8f0',
-          secondary: '#94a3b8',
-          muted: '#64748b',
+          DEFAULT: '#ededed',
+          secondary: '#a1a1a1',
+          muted: '#666666',
         },
         primary: {
-          DEFAULT: '#0284c7',
-          hover: '#0369a1',
-          muted: '#0284c725',
+          DEFAULT: '#ffffff',
+          hover: '#e5e5e5',
+          muted: '#ffffff15',
         },
         accent: {
-          cyan: '#38bdf8',
-          'cyan-muted': '#38bdf820',
+          cyan: '#ffffff',
+          'cyan-muted': '#ffffff15',
         },
         status: {
-          success: '#10b981',
-          'success-muted': '#10b98120',
-          warning: '#f59e0b',
-          'warning-muted': '#f59e0b20',
-          danger: '#f43f5e',
-          'danger-muted': '#f43f5e20',
+          success: '#ededed',
+          'success-muted': '#ffffff12',
+          warning: '#d4d4d4',
+          'warning-muted': '#ffffff12',
+          danger: '#ffffff',
+          'danger-muted': '#ffffff12',
         },
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'system-ui', '-apple-system', 'sans-serif'],
         mono: ['JetBrains Mono', 'Fira Code', 'monospace'],
       },
       fontSize: {
@@ -60,18 +61,17 @@ export default {
         '5xl': '48px',
       },
       borderRadius: {
-        card: '10px',
-        input: '8px',
-        button: '8px',
+        card: '8px',
+        input: '6px',
+        button: '6px',
         badge: '999px',
-        'graph-node': '10px',
-        modal: '12px',
+        'graph-node': '8px',
+        modal: '10px',
       },
       animation: {
-        'fade-in': 'fadeIn 200ms ease-out',
-        'slide-in-right': 'slideInRight 200ms ease-out',
-        'slide-in-up': 'slideInUp 180ms ease-out',
-        'pulse-subtle': 'pulseSubtle 2s ease-in-out infinite',
+        'fade-in': 'fadeIn 150ms ease-out',
+        'slide-in-right': 'slideInRight 150ms ease-out',
+        'slide-in-up': 'slideInUp 150ms ease-out',
       },
       keyframes: {
         fadeIn: {
@@ -79,22 +79,18 @@ export default {
           to: { opacity: '1' },
         },
         slideInRight: {
-          from: { transform: 'translateX(16px)', opacity: '0' },
+          from: { transform: 'translateX(12px)', opacity: '0' },
           to: { transform: 'translateX(0)', opacity: '1' },
         },
         slideInUp: {
-          from: { transform: 'translateY(8px)', opacity: '0' },
+          from: { transform: 'translateY(6px)', opacity: '0' },
           to: { transform: 'translateY(0)', opacity: '1' },
-        },
-        pulseSubtle: {
-          '0%, 100%': { opacity: '1' },
-          '50%': { opacity: '0.7' },
         },
       },
       transitionDuration: {
-        micro: '120ms',
-        panel: '200ms',
-        modal: '220ms',
+        micro: '100ms',
+        panel: '150ms',
+        modal: '180ms',
       },
     },
   },

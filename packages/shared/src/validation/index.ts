@@ -159,6 +159,15 @@ export const graphFilterSchema = z.object({
   date_to: z.string().optional(),
 });
 
+// ─── OSINT Lookup ───────────────────────────────────────────────────
+
+export const osintLookupSchema = z.object({
+  target: z.string().min(1).max(2000).trim(),
+  platforms: z.array(z.string()).default(['instagram', 'tiktok', 'linkedin']),
+});
+
+export type OsintLookupInput = z.infer<typeof osintLookupSchema>;
+
 // Re-export collector/status enums as Zod schemas for reuse
 export const entityTypeSchema = z.enum(ENTITY_TYPES);
 export const relationshipTypeSchema = z.enum(RELATIONSHIP_TYPES);

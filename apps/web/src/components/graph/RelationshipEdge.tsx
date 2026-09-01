@@ -44,18 +44,18 @@ export const RelationshipEdge = memo(
           onMouseLeave={() => setHovered(false)}
         />
 
-        {/* Visible clean straight ray edge */}
+        {/* Visible clean straight ray edge in monochrome */}
         <BaseEdge
           id={id}
           path={edgePath}
           markerEnd={markerEnd}
           style={{
             ...(style || {}),
-            stroke: selected ? '#38bdf8' : hovered ? '#60a5fa' : 'rgba(100, 116, 139, 0.45)',
-            strokeWidth: selected ? 2 : hovered ? 1.6 : 1,
+            stroke: selected ? '#ffffff' : hovered ? '#a3a3a3' : '#333333',
+            strokeWidth: selected ? 1.75 : hovered ? 1.5 : 1,
             strokeDasharray: relType === 'CONTAINS' ? '3 3' : undefined,
-            opacity: selected ? 1 : hovered ? 0.95 : 0.7,
-            transition: 'stroke 0.15s ease, stroke-width 0.15s ease, opacity 0.15s ease',
+            opacity: selected ? 1 : hovered ? 0.9 : 0.6,
+            transition: 'stroke 0.1s ease, stroke-width 0.1s ease, opacity 0.1s ease',
           }}
         />
 
@@ -73,15 +73,15 @@ export const RelationshipEdge = memo(
               className="z-30 cursor-pointer animate-fade-in"
             >
               <div
-                className={`px-2 py-0.5 rounded text-[10px] font-mono font-medium border flex items-center gap-1.5 shadow-lg select-none backdrop-blur-sm ${
+                className={`px-2 py-0.5 rounded text-[9.5px] font-mono font-medium border flex items-center gap-1.5 shadow-md select-none backdrop-blur-sm ${
                   selected
-                    ? 'bg-[#111827]/95 border-sky-500 text-sky-300 shadow-sky-950/40'
-                    : 'bg-[#0e1420]/95 border-slate-700 text-slate-200 shadow-black/50'
+                    ? 'bg-[#181818]/95 border-white text-white'
+                    : 'bg-[#0f0f0f]/95 border-[#2c2c2c] text-neutral-300 shadow-black/80'
                 }`}
                 title={`${relType} · ${confidence}% confidence\n${edgeData.reason || ''}`}
               >
                 <span>{relType}</span>
-                <span className="text-[9px] text-slate-400">({confidence}%)</span>
+                <span className="text-[9px] text-neutral-500">({confidence}%)</span>
               </div>
             </div>
           </EdgeLabelRenderer>

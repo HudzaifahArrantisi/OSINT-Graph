@@ -23,11 +23,15 @@ import { normalizePhone } from '@nexusgraph/shared';
 import { parsePhoneNumberWithError, isPossiblePhoneNumber } from 'libphonenumber-js/max';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
+import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import fs from 'node:fs';
 import os from 'node:os';
 import { safeFetch } from '../security/ssrf.js';
 import { logger } from '../lib/logger.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const execFileAsync = promisify(execFile);
 

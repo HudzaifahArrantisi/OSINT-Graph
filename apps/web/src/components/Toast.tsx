@@ -11,26 +11,20 @@ export function ToastContainer() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className={`pointer-events-auto flex items-start gap-3 p-3 rounded-lg border shadow-xl backdrop-blur-md transition-all animate-in slide-in-from-top-3 fade-in duration-200 ${
-            toast.type === 'success'
-              ? 'bg-status-success/15 border-status-success/40 text-status-success shadow-status-success/10'
-              : toast.type === 'error'
-                ? 'bg-status-danger/15 border-status-danger/40 text-status-danger shadow-status-danger/10'
-                : 'bg-surface/95 border-border text-text shadow-black/40'
-          }`}
+          className="pointer-events-auto flex items-start gap-3 p-3 rounded-card border bg-[#0d0d0d]/95 backdrop-blur-md border-[#262626] text-neutral-200 shadow-2xl transition-all animate-fade-in"
         >
           <div className="shrink-0 mt-0.5">
-            {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-status-success" />}
-            {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-status-danger" />}
-            {toast.type === 'info' && <Info className="w-4 h-4 text-sky-400" />}
+            {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-white" />}
+            {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-neutral-400" />}
+            {toast.type === 'info' && <Info className="w-4 h-4 text-neutral-400" />}
           </div>
-          <span className="text-xs font-medium leading-relaxed flex-1 break-words">
+          <span className="text-xs font-medium leading-relaxed flex-1 break-words text-neutral-200">
             {toast.message}
           </span>
           <button
             onClick={() => removeToast(toast.id)}
-            className="shrink-0 p-1 -mr-1 -mt-1 rounded hover:bg-white/10 text-text-muted hover:text-text transition-colors"
-            title="Tutup notifikasi"
+            className="shrink-0 p-1 -mr-1 -mt-1 rounded hover:bg-[#1f1f1f] text-neutral-400 hover:text-white transition-colors cursor-pointer"
+            title="Dismiss notification"
           >
             <X className="w-3.5 h-3.5" />
           </button>

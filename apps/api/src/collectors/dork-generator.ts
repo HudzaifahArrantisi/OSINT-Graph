@@ -54,10 +54,6 @@ export function buildDorkUrls(categories: string[], seed: string): { url: string
   return urls;
 }
 
-function seedTypeToEntityType(seedType: SeedType): EntityCandidate['type'] {
-  return seedType === 'NAME' ? 'PERSON' : seedType;
-}
-
 export const dorkGeneratorCollector: Collector = {
   name: 'dork-generator',
 
@@ -95,16 +91,21 @@ export const dorkGeneratorCollector: Collector = {
 
     logger.debug('Dork generation context', { requestId: ctx.requestId, caseId: ctx.caseId, seedType });
 
+    // In accordance with OSINT investigation best practices and anti-slop guidelines:
+    // Store all dork URL templates in evidence records only (visible in detail panel & evidence tabs),
+    // rather than cluttering the graph with 100+ raw search engine URL nodes.
     for (const dork of dorks) {
-      entities.push({
-        type: 'URL',
-        value: dork.url,
-        title: `Dork [${dork.engine}/website]`,
+      evidence.push({
+        source_url: dork.url,
+        source_type: 'DORK_TEMPLATE',
+        title: `${dork.engine} website dork: ${seed}`,
+        extracted_value: dork.url,
         confidence: 100,
         metadata: {
-          kind: 'SEARCH_DORK',
           engine: dork.engine,
-          category: 'website',
+          category: dork.category || 'website',
+          target: seed,
+          deterministic: true,
           source: {
             url: dork.url,
             collector: 'dork-generator',
@@ -112,29 +113,6 @@ export const dorkGeneratorCollector: Collector = {
             derivedFrom: seed,
             collectedAt,
           },
-        },
-      });
-
-      relationships.push({
-        source_value: seed,
-        source_type: seedTypeToEntityType(seedType),
-        target_value: dork.url,
-        target_type: 'URL',
-        relationship_type: 'LINKS_TO',
-        confidence: 100,
-        reason: `Deterministic ${dork.engine} website dork URL generated for domain/URL reconnaissance.`,
-      });
-
-      evidence.push({
-        source_url: dork.url,
-        source_type: 'DORK_TEMPLATE',
-        title: `${dork.engine} website dork`,
-        extracted_value: dork.url,
-        confidence: 100,
-        metadata: {
-          engine: dork.engine,
-          category: 'website',
-          deterministic: true,
         },
       });
     }
