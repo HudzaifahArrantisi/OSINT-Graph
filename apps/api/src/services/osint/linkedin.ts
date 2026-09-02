@@ -1,6 +1,6 @@
 import { callRapidAPI } from '../../lib/rapidapi.js';
 
-export const HOST = 'linkedin-data-api.p.rapidapi.com';
+export const HOST = process.env.LINKEDIN_RAPIDAPI_HOST || 'linkedin-api8.p.rapidapi.com';
 
 /**
  * Get LinkedIn full profile data by username (Main Endpoint).

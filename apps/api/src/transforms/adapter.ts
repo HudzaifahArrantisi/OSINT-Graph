@@ -202,12 +202,19 @@ const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
     deriveInput: (v) => v.trim(),
     collectors: [{ name: 'dork-generator' }],
   },
+  'contact.holehe-email-crawl': {
+    deriveInput: (v, st, analysis) => {
+      if (st !== 'EMAIL' && !analysis.isEmail) return null;
+      return v.trim();
+    },
+    collectors: [{ name: 'holehe-engine' }],
+  },
   'contact.email-breach-lookup': {
     deriveInput: (v, st, analysis) => {
       if (st !== 'EMAIL' && !analysis.isEmail) return null;
       return v.trim();
     },
-    collectors: [{ name: 'email-lookup' }, { name: 'mrholmes-engine' }],
+    collectors: [{ name: 'email-lookup' }, { name: 'mrholmes-engine' }, { name: 'holehe-engine' }],
   },
   'domain.website-recon': {
     deriveInput: (_v, _st, analysis) => {

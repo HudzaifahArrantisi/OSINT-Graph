@@ -6,7 +6,7 @@ import { Input } from '../ui/Input';
 import { SeedType, TransformDefinition } from '@nexusgraph/shared';
 import {
   Sparkles,
-  ShieldAlert,
+  ShieldCheck,
   Globe2,
   Mail,
   Network,
@@ -18,7 +18,6 @@ import {
   XCircle,
   Loader2,
   Key,
-  AlertTriangle,
   CheckSquare2,
   Square,
   Layers,
@@ -43,45 +42,45 @@ interface SeedCategoryOption {
 const SEED_CATEGORY_OPTIONS: SeedCategoryOption[] = [
   {
     id: 'USERNAME',
-    label: 'Person / Social',
+    label: 'Username / Profil',
     icon: UserRound,
-    placeholder: 'e.g. candalenaa, John Doe, or https://instagram.com/candalenaa',
+    placeholder: 'Contoh: candalenaa atau https://instagram.com/candalenaa',
   },
   {
     id: 'EMAIL',
     label: 'Email',
     icon: Mail,
-    placeholder: 'e.g. target@domain.com',
+    placeholder: 'Contoh: target@domain.com',
   },
   {
     id: 'DOMAIN',
     label: 'Domain',
     icon: Globe2,
-    placeholder: 'e.g. example.com',
+    placeholder: 'Contoh: target-site.com',
   },
   {
     id: 'IP_ADDRESS',
     label: 'IP Address',
     icon: Network,
-    placeholder: 'e.g. 192.168.1.1 or 8.8.8.8',
+    placeholder: 'Contoh: 192.168.1.1 atau 8.8.8.8',
   },
   {
     id: 'URL',
-    label: 'URL',
+    label: 'URL Web',
     icon: Link,
-    placeholder: 'e.g. https://example.com/target',
+    placeholder: 'Contoh: https://example.com/target',
   },
   {
     id: 'ORGANIZATION',
-    label: 'Organization',
+    label: 'Organisasi',
     icon: Building,
-    placeholder: 'e.g. OpenAI, CyberCorp, Google',
+    placeholder: 'Contoh: Nama Perusahaan / Organisasi',
   },
   {
     id: 'PHONE',
-    label: 'Phone',
+    label: 'No. Telepon',
     icon: Phone,
-    placeholder: 'e.g. +628123456789',
+    placeholder: 'Contoh: +628123456789',
   },
 ];
 
@@ -90,19 +89,16 @@ const SOCIAL_PLATFORMS = [
     id: 'instagram',
     name: 'Instagram',
     badge: '4 Engines',
-    selectedStyle: 'bg-gradient-to-r from-pink-950/70 to-purple-950/70 border-pink-500/80 text-pink-200',
   },
   {
     id: 'tiktok',
     name: 'TikTok',
     badge: '2 Engines',
-    selectedStyle: 'bg-gradient-to-r from-cyan-950/70 to-teal-950/70 border-cyan-500/80 text-cyan-200',
   },
   {
     id: 'linkedin',
     name: 'LinkedIn',
     badge: '5 Endpoints',
-    selectedStyle: 'bg-gradient-to-r from-blue-950/70 to-indigo-950/70 border-blue-500/80 text-blue-200',
   },
 ];
 
@@ -193,25 +189,17 @@ export function StartDiscoveryModal({
     }
   };
 
-  const isRapidApiSelected =
-    selectedTransformIds.includes('social.rapidapi-social-lookup') ||
-    plannedTransforms.some(
-      (t) =>
-        selectedTransformIds.includes(t.id) &&
-        (t.requiresApiKey || t.apiKeyName || t.id.includes('rapidapi')),
-    );
-
   const isSocialIdentity = seedType === 'USERNAME';
 
   const handleStartDiscovery = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!seedValue.trim()) {
-      setError('Please enter an investigation seed target value');
+      setError('Masukkan nilai target / seed investigasi terlebih dahulu');
       return;
     }
 
     if (selectedTransformIds.length === 0) {
-      setError('Please select at least 1 transform to execute');
+      setError('Pilih minimal 1 modul penelusuran');
       return;
     }
 
@@ -220,7 +208,7 @@ export function StartDiscoveryModal({
       selectedPlatforms.length === 0 &&
       selectedTransformIds.includes('social.rapidapi-social-lookup')
     ) {
-      setError('Please select at least 1 social media platform (Instagram, TikTok, or LinkedIn)');
+      setError('Pilih minimal 1 platform media sosial (Instagram, TikTok, atau LinkedIn)');
       return;
     }
 
@@ -231,7 +219,7 @@ export function StartDiscoveryModal({
     clearLiveLogs();
     setIsDiscovering(true);
     setLiveLogsOpen(true);
-    addToast('Multi-Vector Discovery started in background...', 'info');
+    addToast('Proses penelusuran OSINT dimulai...', 'info');
 
     // Close modal after triggering so user immediately sees graph updating
     onClose();
@@ -288,15 +276,15 @@ export function StartDiscoveryModal({
       });
 
       addToast(
-        `Discovery finished: Found ${entitiesCount} entities and ${relCount} relationships`,
+        `Penelusuran selesai: Ditemukan ${entitiesCount} entitas dan ${relCount} relasi`,
         'success',
       );
       onSuccess?.();
     } catch (err: any) {
-      setError(err.message || 'Discovery run failed');
+      setError(err.message || 'Proses penelusuran gagal');
       setDiscoveryState('idle');
       setIsDiscovering(false);
-      addToast(err.message || 'Discovery failed', 'error');
+      addToast(err.message || 'Penelusuran gagal', 'error');
     }
   };
 
@@ -318,107 +306,109 @@ export function StartDiscoveryModal({
     <Modal
       isOpen={isOpen}
       onClose={discoveryState === 'running' ? () => {} : onClose}
-      title="OSINT Multi-Vector Discovery"
-      description="Plan and execute targeted public reconnaissance across verified data sources & RapidAPI engines"
-      maxWidth="xl"
+      title="Mulai Penelusuran OSINT"
+      description="Pilih kategori target dan modul investigasi untuk memetakan jejak digital ke dalam graph"
+      maxWidth="lg"
     >
       {discoveryState === 'complete' && discoveryResult ? (
         /* DISCOVERY SUMMARY VIEW */
-        <div className="space-y-3">
-          <div className="p-3.5 rounded-card bg-[#121212] border border-[#262626] space-y-2.5">
+        <div className="space-y-4">
+          <div className="p-4 rounded-lg bg-[#0d0d0d] border border-[#262626] space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                <CheckCircle2 className="w-4 h-4 text-white" />
                 <span className="font-semibold text-white text-xs">
-                  Discovery {discoveryResult.status}
+                  Penelusuran Selesai
                 </span>
               </div>
               <span className="text-[11px] font-mono text-neutral-400">
-                Job ID: {discoveryResult.jobId?.slice(0, 8)}...
+                ID: {discoveryResult.jobId?.slice(0, 8)}...
               </span>
             </div>
 
             {/* Metric counters */}
             <div className="grid grid-cols-4 gap-2 text-center">
-              <div className="p-2 bg-[#0a0a0a] rounded-input border border-[#222222]">
-                <div className="text-sm font-bold text-white font-mono">
+              <div className="p-2.5 bg-[#141414] rounded border border-[#222222]">
+                <div className="text-base font-bold text-white font-mono">
                   {discoveryResult.totalTransforms}
                 </div>
-                <div className="text-[9px] text-neutral-400 uppercase">Transforms</div>
+                <div className="text-[10px] text-neutral-400 uppercase tracking-wider">Modul</div>
               </div>
-              <div className="p-2 bg-[#0a0a0a] rounded-input border border-[#222222]">
-                <div className="text-sm font-bold text-white font-mono">
+              <div className="p-2.5 bg-[#141414] rounded border border-[#222222]">
+                <div className="text-base font-bold text-white font-mono">
                   {discoveryResult.foundEntities}
                 </div>
-                <div className="text-[9px] text-neutral-400 uppercase">Entities</div>
+                <div className="text-[10px] text-neutral-400 uppercase tracking-wider">Entitas</div>
               </div>
-              <div className="p-2 bg-[#0a0a0a] rounded-input border border-[#222222]">
-                <div className="text-sm font-bold text-white font-mono">
+              <div className="p-2.5 bg-[#141414] rounded border border-[#222222]">
+                <div className="text-base font-bold text-white font-mono">
                   {discoveryResult.foundRelationships}
                 </div>
-                <div className="text-[9px] text-neutral-400 uppercase">Relationships</div>
+                <div className="text-[10px] text-neutral-400 uppercase tracking-wider">Relasi</div>
               </div>
-              <div className="p-2 bg-[#0a0a0a] rounded-input border border-[#222222]">
-                <div className="text-sm font-bold text-white font-mono">
+              <div className="p-2.5 bg-[#141414] rounded border border-[#222222]">
+                <div className="text-base font-bold text-white font-mono">
                   {discoveryResult.foundEvidence}
                 </div>
-                <div className="text-[9px] text-neutral-400 uppercase">Evidence</div>
+                <div className="text-[10px] text-neutral-400 uppercase tracking-wider">Bukti</div>
               </div>
             </div>
           </div>
 
           {/* Transform Execution Breakdown */}
-          <div>
-            <label className="block text-xs font-medium text-neutral-300 mb-1.5">
-              Execution Details
-            </label>
-            <div className="space-y-1 max-h-44 overflow-y-auto pr-1">
-              {discoveryResult.transformRuns?.map((run: any) => (
-                <div
-                  key={run.transformId}
-                  className="flex items-center justify-between p-2 rounded-input bg-[#121212] border border-[#262626] text-xs"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    {run.status === 'COMPLETED' ? (
-                      <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                    ) : run.status === 'NOT_FOUND' ? (
-                      <span className="text-[9px] px-1 py-0.5 rounded bg-[#1a1a1a] text-neutral-400 font-mono shrink-0">
-                        NOT FOUND
-                      </span>
-                    ) : (
-                      <XCircle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                    )}
-                    <span className="font-medium text-white truncate text-xs">{run.transformName}</span>
+          {discoveryResult.transformRuns && discoveryResult.transformRuns.length > 0 && (
+            <div>
+              <label className="block text-xs font-medium text-neutral-300 mb-1.5">
+                Rincian Eksekusi
+              </label>
+              <div className="space-y-1 max-h-40 overflow-y-auto pr-1">
+                {discoveryResult.transformRuns.map((run: any) => (
+                  <div
+                    key={run.transformId}
+                    className="flex items-center justify-between p-2 rounded bg-[#0d0d0d] border border-[#222222] text-xs"
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      {run.status === 'COMPLETED' ? (
+                        <CheckCircle2 className="w-3.5 h-3.5 text-white shrink-0" />
+                      ) : run.status === 'NOT_FOUND' ? (
+                        <span className="text-[9px] px-1.5 py-0.5 rounded bg-[#1a1a1a] text-neutral-400 font-mono shrink-0">
+                          TIDAK ADA DATA
+                        </span>
+                      ) : (
+                        <XCircle className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                      )}
+                      <span className="font-medium text-white truncate text-xs">{run.transformName}</span>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0 text-neutral-400 font-mono text-[10px]">
+                      <span>+{run.entitiesFound} entitas</span>
+                      {run.relationshipsFound > 0 && (
+                        <span className="text-neutral-500">· +{run.relationshipsFound} relasi</span>
+                      )}
+                    </div>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0 text-neutral-400 font-mono text-[10px]">
-                    <span>+{run.entitiesFound} entities</span>
-                    {run.relationshipsFound > 0 && (
-                      <span className="text-neutral-500">· +{run.relationshipsFound} rels</span>
-                    )}
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
 
-          <div className="flex justify-between items-center pt-2 border-t border-[#1c1c1c]">
+          <div className="flex justify-between items-center pt-3 border-t border-[#1c1c1c]">
             <Button variant="secondary" onClick={handleReset}>
-              Run Another Discovery
+              Penelusuran Lain
             </Button>
             <Button variant="primary" onClick={handleFinish}>
-              View Graph Results
+              Lihat di Graph
             </Button>
           </div>
         </div>
       ) : (
         /* FORM & PLANNER PREVIEW VIEW */
-        <form onSubmit={handleStartDiscovery} className="space-y-3">
+        <form onSubmit={handleStartDiscovery} className="space-y-4">
           {/* Seed Category Selection */}
           <div>
             <label className="block text-xs font-medium text-neutral-300 mb-1.5">
-              Target Category
+              1. Kategori Target
             </label>
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-1.5">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
               {SEED_CATEGORY_OPTIONS.map((cat) => {
                 const Icon = cat.icon;
                 const active = seedType === cat.id;
@@ -428,77 +418,26 @@ export function StartDiscoveryModal({
                     type="button"
                     disabled={discoveryState === 'running'}
                     onClick={() => setSeedType(cat.id)}
-                    className={`flex items-center justify-center gap-1.5 px-2 py-1.5 rounded-input border text-xs font-medium transition-all cursor-pointer select-none ${
+                    className={`flex items-center gap-2 px-3 py-2 rounded-lg border text-xs font-medium transition-all cursor-pointer select-none ${
                       active
-                        ? 'bg-white text-black border-white shadow-xs font-semibold'
-                        : 'bg-[#121212] border-[#262626] text-neutral-400 hover:text-white hover:border-neutral-500'
+                        ? 'bg-white text-black border-white shadow-sm font-semibold'
+                        : 'bg-[#101010] border-[#242424] text-neutral-400 hover:text-white hover:border-neutral-500'
                     }`}
                   >
                     <Icon className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate text-[11px]">{cat.label}</span>
+                    <span className="truncate">{cat.label}</span>
                   </button>
                 );
               })}
             </div>
           </div>
 
-          {/* Social Media Platform Selection (When Person/Social is chosen) */}
-          {isSocialIdentity && (
-            <div className="p-2.5 rounded-card bg-[#101010] border border-[#222222] space-y-1.5">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-neutral-300 flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-cyan-400" />
-                  Target Platforms (RapidAPI):
-                </span>
-                <button
-                  type="button"
-                  onClick={handleToggleAllPlatforms}
-                  className="text-[11px] text-cyan-400 hover:text-cyan-300 font-medium cursor-pointer transition-colors"
-                >
-                  {selectedPlatforms.length === SOCIAL_PLATFORMS.length
-                    ? 'Deselect All'
-                    : 'Select All (3 Concurrent)'}
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1.5">
-                {SOCIAL_PLATFORMS.map((platform) => {
-                  const isChecked = selectedPlatforms.includes(platform.id);
-                  return (
-                    <button
-                      key={platform.id}
-                      type="button"
-                      onClick={() => togglePlatform(platform.id)}
-                      className={`flex items-center justify-between px-2.5 py-1.5 rounded-md border text-xs font-medium transition-all cursor-pointer select-none ${
-                        isChecked
-                          ? `${platform.selectedStyle} shadow-xs`
-                          : 'bg-[#090909] border-[#1e1e1e] text-neutral-400 opacity-60 hover:opacity-90'
-                      }`}
-                    >
-                      <div className="flex items-center gap-1.5 min-w-0">
-                        {isChecked ? (
-                          <CheckSquare2 className="w-3.5 h-3.5 text-cyan-300 shrink-0" />
-                        ) : (
-                          <Square className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
-                        )}
-                        <span className="font-semibold text-white truncate text-xs">
-                          {platform.name}
-                        </span>
-                      </div>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/40 border border-white/10 text-neutral-300 shrink-0">
-                        {platform.badge}
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
           {/* Seed Target Input Value */}
           <div>
+            <label className="block text-xs font-medium text-neutral-300 mb-1.5">
+              2. Nilai Target / Seed
+            </label>
             <Input
-              label="Seed Target (Starting Point)"
               placeholder={selectedCategory.placeholder}
               value={seedValue}
               onChange={(e) => setSeedValue(e.target.value)}
@@ -508,38 +447,106 @@ export function StartDiscoveryModal({
             />
           </div>
 
+          {/* Social Media Platform Selection (When Person/Social is chosen) */}
+          {isSocialIdentity && (
+            <div className="p-3 rounded-lg bg-[#0d0d0d] border border-[#222222] space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-medium text-white flex items-center gap-1.5">
+                  <Layers className="w-3.5 h-3.5 text-neutral-400" />
+                  Target Platform Media Sosial:
+                </span>
+                <button
+                  type="button"
+                  onClick={handleToggleAllPlatforms}
+                  className="text-[11px] text-neutral-400 hover:text-white font-medium cursor-pointer transition-colors"
+                >
+                  {selectedPlatforms.length === SOCIAL_PLATFORMS.length
+                    ? 'Batal Pilih Semua'
+                    : 'Pilih Semua'}
+                </button>
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                {SOCIAL_PLATFORMS.map((platform) => {
+                  const isChecked = selectedPlatforms.includes(platform.id);
+                  return (
+                    <button
+                      key={platform.id}
+                      type="button"
+                      onClick={() => togglePlatform(platform.id)}
+                      className={`flex items-center justify-between px-3 py-2 rounded-md border text-xs font-medium transition-all cursor-pointer select-none ${
+                        isChecked
+                          ? 'bg-[#1e1e1e] border-neutral-400 text-white'
+                          : 'bg-[#0a0a0a] border-[#1f1f1f] text-neutral-500 hover:text-neutral-300 hover:border-neutral-700'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 min-w-0">
+                        {isChecked ? (
+                          <CheckSquare2 className="w-3.5 h-3.5 text-white shrink-0" />
+                        ) : (
+                          <Square className="w-3.5 h-3.5 text-neutral-600 shrink-0" />
+                        )}
+                        <span className="truncate">{platform.name}</span>
+                      </div>
+                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/60 text-neutral-400 border border-neutral-800 shrink-0">
+                        {platform.badge}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Email Discovery Info Banner */}
+          {seedType === 'EMAIL' && (
+            <div className="p-3 rounded-lg bg-[#0d0d0d] border border-[#222222] space-y-1">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-medium text-white flex items-center gap-1.5">
+                  <Mail className="w-3.5 h-3.5 text-neutral-400" />
+                  Pemeriksaan Registrasi Akun (Holehe)
+                </span>
+                <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-neutral-800 text-neutral-300 border border-neutral-700">
+                  120+ Platform
+                </span>
+              </div>
+              <p className="text-[11px] text-neutral-400 leading-relaxed">
+                Mengecek apakah email terdaftar di GitHub, Instagram, Twitter/X, Spotify, dan 100+ layanan lainnya tanpa mengirim notifikasi ke target.
+              </p>
+            </div>
+          )}
+
           {/* Discovery Plan Selection & Checklist */}
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-medium text-neutral-300 flex items-center gap-1.5">
-                <Sparkles className="w-3.5 h-3.5 text-neutral-400" />
-                <span>
-                  Discovery Plan ({selectedTransformIds.length} of {plannedTransforms.length}{' '}
-                  Selected)
-                </span>
-              </label>
+              <div>
+                <label className="text-xs font-medium text-neutral-300 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-neutral-400" />
+                  <span>3. Modul Penelusuran ({selectedTransformIds.length} dipilih)</span>
+                </label>
+              </div>
               {plannedTransforms.length > 0 && (
                 <button
                   type="button"
                   onClick={handleToggleAllTransforms}
                   disabled={discoveryState === 'running'}
-                  className="text-[11px] text-cyan-400 hover:text-cyan-300 font-medium cursor-pointer transition-colors"
+                  className="text-[11px] text-neutral-400 hover:text-white font-medium cursor-pointer transition-colors"
                 >
                   {selectedTransformIds.length === plannedTransforms.length
-                    ? 'Deselect All'
-                    : 'Select All'}
+                    ? 'Batal Pilih Semua'
+                    : 'Pilih Semua'}
                 </button>
               )}
             </div>
 
-            <div className="p-2 rounded-card bg-[#0d0d0d] border border-[#222222] space-y-1 max-h-36 overflow-y-auto">
+            <div className="p-2 rounded-lg bg-[#0a0a0a] border border-[#222222] space-y-1 max-h-40 overflow-y-auto">
               {loadingPlan ? (
-                <div className="text-xs text-neutral-400 flex items-center gap-2 py-2 px-1">
+                <div className="text-xs text-neutral-400 flex items-center gap-2 py-3 px-2">
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                  Formulating transform discovery plan...
+                  Menyiapkan modul penelusuran...
                 </div>
               ) : plannedTransforms.length === 0 ? (
-                <div className="text-xs text-neutral-500 py-1 px-1">No transforms configured</div>
+                <div className="text-xs text-neutral-500 py-2 px-2">Tidak ada modul penelusuran yang tersedia</div>
               ) : (
                 plannedTransforms.map((t) => {
                   const isSelected = selectedTransformIds.includes(t.id);
@@ -550,28 +557,25 @@ export function StartDiscoveryModal({
                     <div
                       key={t.id}
                       onClick={() => toggleTransform(t.id)}
-                      className={`flex items-center justify-between text-xs py-1.5 px-2 rounded border transition-all cursor-pointer select-none ${
+                      className={`flex items-center justify-between text-xs py-1.5 px-2.5 rounded border transition-all cursor-pointer select-none ${
                         isSelected
-                          ? 'bg-[#151515] border-[#303030] hover:border-neutral-500'
-                          : 'bg-[#090909] border-[#181818] opacity-50 hover:opacity-80'
+                          ? 'bg-[#141414] border-[#333333] hover:border-neutral-500'
+                          : 'bg-[#0d0d0d] border-[#1a1a1a] opacity-40 hover:opacity-75'
                       }`}
                     >
                       <div className="flex items-center gap-2 min-w-0 pr-2">
-                        {/* Checkbox Icon */}
                         <div className="text-neutral-400 shrink-0">
                           {isSelected ? (
-                            <CheckSquare2 className="w-3.5 h-3.5 text-cyan-400" />
+                            <CheckSquare2 className="w-3.5 h-3.5 text-white" />
                           ) : (
                             <Square className="w-3.5 h-3.5 text-neutral-600" />
                           )}
                         </div>
 
-                        {/* Category Badge */}
-                        <span className="text-[9px] font-mono uppercase px-1 py-0.2 rounded bg-[#1a1a1a] border border-[#2a2a2a] text-neutral-400 shrink-0">
+                        <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-[#1f1f1f] border border-[#2e2e2e] text-neutral-400 shrink-0">
                           {t.category}
                         </span>
 
-                        {/* Transform Name */}
                         <span
                           className={`font-medium truncate text-xs ${
                             isSelected ? 'text-white' : 'text-neutral-400'
@@ -581,19 +585,18 @@ export function StartDiscoveryModal({
                         </span>
                       </div>
 
-                      {/* API Key / Status Badges */}
-                      <div className="flex items-center gap-1.5 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
                         {isApiRequired && (
                           <span
-                            title={`Requires ${t.apiKeyName || 'RAPIDAPI_KEY'} in .env`}
-                            className="text-[9px] font-medium px-1 py-0.5 rounded bg-amber-950/70 border border-amber-500/50 text-amber-300 flex items-center gap-1"
+                            title="Membutuhkan API Key pada file .env"
+                            className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-neutral-800 border border-neutral-700 text-neutral-300 flex items-center gap-1"
                           >
-                            <Key className="w-2.5 h-2.5 text-amber-400" />
-                            <span>API Required</span>
+                            <Key className="w-2.5 h-2.5 text-neutral-400" />
+                            <span>API</span>
                           </span>
                         )}
-                        <span className="text-[10px] text-neutral-400 font-mono">
-                          {isSelected ? 'Selected' : 'Skipped'}
+                        <span className="text-[10px] text-neutral-500 font-mono">
+                          {isSelected ? 'Aktif' : 'Lewati'}
                         </span>
                       </div>
                     </div>
@@ -603,25 +606,11 @@ export function StartDiscoveryModal({
             </div>
           </div>
 
-          {/* API Key Warning Notification (Compact) */}
-          {isRapidApiSelected && (
-            <div className="flex items-center gap-2 py-1.5 px-2.5 rounded-card bg-amber-950/20 border border-amber-500/30 text-[11px] text-amber-300">
-              <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
-              <span className="truncate">
-                <strong className="text-amber-200">API Key:</strong> RapidAPI transforms require{' '}
-                <code className="font-mono bg-amber-950/80 px-1 py-0.5 rounded text-amber-100 text-[10px]">
-                  RAPIDAPI_KEY
-                </code>{' '}
-                in <code className="font-mono text-amber-100 text-[10px]">.env</code>.
-              </span>
-            </div>
-          )}
-
           {/* Action Buttons */}
-          <div className="flex items-center justify-between pt-2 border-t border-[#1c1c1c]">
-            <div className="flex items-center gap-1.5 text-[10px] text-neutral-500">
-              <ShieldAlert className="w-3 h-3 text-neutral-400 shrink-0" />
-              <span>Evidence-backed OSINT</span>
+          <div className="flex items-center justify-between pt-3 border-t border-[#1c1c1c]">
+            <div className="flex items-center gap-1.5 text-[11px] text-neutral-500">
+              <ShieldCheck className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+              <span>Penyelidikan OSINT Publik</span>
             </div>
 
             <div className="flex items-center gap-2">
@@ -631,7 +620,7 @@ export function StartDiscoveryModal({
                 onClick={onClose}
                 disabled={discoveryState === 'running'}
               >
-                Cancel
+                Batal
               </Button>
               <Button
                 variant="primary"
@@ -646,10 +635,10 @@ export function StartDiscoveryModal({
                 icon={<Sparkles className="w-3.5 h-3.5" />}
               >
                 {discoveryState === 'running'
-                  ? 'Executing Discovery...'
+                  ? 'Menjalankan...'
                   : selectedTransformIds.length === 0
-                    ? 'Select at least 1 transform'
-                    : `Start Discovery (${selectedTransformIds.length})`}
+                    ? 'Pilih minimal 1 modul'
+                    : `Mulai Penelusuran (${selectedTransformIds.length})`}
               </Button>
             </div>
           </div>

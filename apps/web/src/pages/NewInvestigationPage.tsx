@@ -6,8 +6,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { api } from '../lib/api';
 import { useAppStore } from '../stores/appStore';
-import { INVESTIGATION_PRIORITIES, InvestigationPriority } from '@nexusgraph/shared';
-import { ArrowLeft, FolderPlus, ShieldCheck, Tag } from 'lucide-react';
+import { ArrowLeft, FolderPlus, ShieldCheck } from 'lucide-react';
 
 export function NewInvestigationPage() {
   const navigate = useNavigate();
@@ -15,38 +14,31 @@ export function NewInvestigationPage() {
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [priority, setPriority] = useState<InvestigationPriority>('MEDIUM');
-  const [tagsInput, setTagsInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!title.trim()) {
-      setError('Investigation title is required');
+      setError('Nama atau target investigasi wajib diisi');
       return;
     }
 
     setError('');
     setLoading(true);
 
-    const tags = tagsInput
-      .split(',')
-      .map((t) => t.trim())
-      .filter(Boolean);
-
     try {
       const created = await api.investigations.create({
         title: title.trim(),
         description: description.trim() || undefined,
-        priority,
-        tags,
+        priority: 'MEDIUM',
+        tags: [],
       });
 
-      addToast('Investigation created successfully', 'success');
+      addToast('Kasus investigasi baru berhasil dibuat', 'success');
       navigate(`/investigations/${created.id}`);
     } catch (err: any) {
-      setError(err.message || 'Failed to create investigation');
+      setError(err.message || 'Gagal membuat kasus investigasi');
     } finally {
       setLoading(false);
     }
@@ -56,19 +48,19 @@ export function NewInvestigationPage() {
     <div className="min-h-screen bg-app flex flex-col">
       <Navbar />
 
-      <main className="flex-1 max-w-3xl w-full mx-auto p-4 sm:p-6 lg:p-8 space-y-6">
+      <main className="flex-1 max-w-xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col justify-center -mt-12 space-y-5">
         <button
           onClick={() => navigate(-1)}
-          className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs text-text-muted hover:text-text transition-colors self-start"
         >
           <ArrowLeft className="w-3.5 h-3.5" />
-          <span>Back</span>
+          <span>Kembali</span>
         </button>
 
-        <div className="pb-3 border-b border-border-subtle">
-          <h1 className="text-xl font-bold text-text">New Investigation Case</h1>
-          <p className="text-xs text-text-muted mt-0.5">
-            Initialize an investigation dossier to start correlating public artifacts
+        <div className="space-y-1">
+          <h1 className="text-xl font-bold text-text">Buat Investigasi Baru</h1>
+          <p className="text-xs text-text-muted">
+            Mulai workspace baru untuk memetakan dan mengumpulkan relasi intelijen OSINT.
           </p>
         </div>
 
@@ -81,8 +73,8 @@ export function NewInvestigationPage() {
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <Input
-              label="Investigation Title"
-              placeholder="e.g. Infrastructure Audit — target-domain.org"
+              label="Judul / Nama Target Investigasi"
+              placeholder="Contoh: Investigasi target-domain.org atau Nama Target"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               disabled={loading}
@@ -91,62 +83,26 @@ export function NewInvestigationPage() {
 
             <div>
               <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                Description / Investigation Hypothesis
+                Catatan / Deskripsi Singkat <span className="text-text-muted font-normal">(opsional)</span>
               </label>
               <textarea
-                rows={4}
+                rows={3}
                 className="input-field resize-none text-xs font-sans"
-                placeholder="Document the objective, scope, seed sources, or hypothesis..."
+                placeholder="Tuliskan catatan singkat, hipotesis awal, atau lingkup penyelidikan..."
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 disabled={loading}
               />
             </div>
 
-            {/* Priority selection */}
-            <div>
-              <label className="block text-xs font-medium text-text-secondary mb-1.5">
-                Priority Level
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                {INVESTIGATION_PRIORITIES.map((p) => {
-                  const active = priority === p;
-                  return (
-                    <button
-                      key={p}
-                      type="button"
-                      onClick={() => setPriority(p)}
-                      className={`p-2.5 rounded-input border text-xs font-mono font-medium transition-all ${
-                        active
-                          ? 'bg-primary/15 border-primary text-primary shadow-sm'
-                          : 'bg-surface-2 border-border-subtle text-text-muted hover:text-text'
-                      }`}
-                    >
-                      {p}
-                    </button>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Tags input */}
-            <Input
-              label="Tags (comma-separated)"
-              placeholder="incident, defensive-audit, domain-pivot"
-              value={tagsInput}
-              onChange={(e) => setTagsInput(e.target.value)}
-              leftIcon={<Tag className="w-4 h-4" />}
-              disabled={loading}
-            />
-
-            <div className="pt-4 border-t border-border-subtle flex items-center justify-between">
+            <div className="pt-4 border-t border-border-subtle flex items-center justify-between gap-3">
               <div className="flex items-center gap-1.5 text-[11px] text-text-muted">
                 <ShieldCheck className="w-3.5 h-3.5 text-status-success" />
-                <span>Private user-isolated workspace</span>
+                <span>Private Workspace</span>
               </div>
               <div className="flex gap-2">
                 <Button variant="secondary" type="button" onClick={() => navigate(-1)} disabled={loading}>
-                  Cancel
+                  Batal
                 </Button>
                 <Button
                   variant="primary"
@@ -154,7 +110,7 @@ export function NewInvestigationPage() {
                   loading={loading}
                   icon={<FolderPlus className="w-4 h-4" />}
                 >
-                  Create Dossier
+                  Mulai Kasus
                 </Button>
               </div>
             </div>

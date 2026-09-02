@@ -179,6 +179,16 @@ export const TRANSFORM_DEFINITIONS: TransformDefinition[] = [
     enabled: true,
   },
   {
+    id: 'contact.holehe-email-crawl',
+    name: 'Holehe Email Account Crawler',
+    description: 'Crawl 120+ web platforms, social networks, and online services to discover registered accounts for an email address',
+    inputTypes: ['EMAIL'],
+    outputTypes: ['SOCIAL_PROFILE', 'URL', 'GITHUB_PROFILE', 'PHONE', 'EMAIL'],
+    category: 'contact',
+    riskLevel: 'medium',
+    enabled: true,
+  },
+  {
     id: 'contact.email-breach-lookup',
     name: 'Mr.Holmes Email Lookup',
     description: 'Find GitHub accounts listing the email publicly, check Gravatar existence, and persist breach-lookup reference links',

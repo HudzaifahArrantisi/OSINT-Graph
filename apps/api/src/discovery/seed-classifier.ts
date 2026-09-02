@@ -49,12 +49,38 @@ export function parseSeed(seedType: SeedType, seedValue: string): ParsedSeed {
       const parts = trimmed.split('@');
       const domainPart = parts[parts.length - 1];
       const domain = normalizeDomain(domainPart);
-      if (domain) {
+      // Free/common webmail providers (gmail, yahoo, outlook, icloud, hotmail, proton, etc.)
+      // should NOT be created as a shared DOMAIN node because they cross-connect unrelated email seeds
+      const commonPublicProviders = new Set([
+        'gmail.com',
+        'googlemail.com',
+        'yahoo.com',
+        'yahoo.co.id',
+        'ymail.com',
+        'outlook.com',
+        'hotmail.com',
+        'live.com',
+        'msn.com',
+        'icloud.com',
+        'me.com',
+        'proton.me',
+        'protonmail.com',
+        'aol.com',
+        'zoho.com',
+        'mail.com',
+        'gmx.com',
+        'gmx.net',
+        'yandex.com',
+        'yandex.ru',
+        'tutanota.com',
+        'tutamail.com',
+      ]);
+      if (domain && !commonPublicProviders.has(domain.toLowerCase())) {
         derivedEntities.push({
           type: 'DOMAIN',
           value: domain,
           relationshipType: 'OBSERVED_ON',
-          reason: `Deterministic derivation: Email "${trimmed}" uses mail provider domain "${domain}"`,
+          reason: `Deterministic derivation: Email "${trimmed}" uses custom domain "${domain}"`,
         });
       }
     }

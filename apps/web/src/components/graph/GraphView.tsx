@@ -202,11 +202,12 @@ function GraphViewInner({ graphData }: GraphViewProps) {
   const seedSubgraphNodeIds = useMemo(() => {
     if (seedTargets.length === 0) return new Map<string, Set<string>>();
 
-    const forwardAdj = new Map<string, string[]>();
-    initialNodes.forEach((n) => forwardAdj.set(n.id, []));
+    const undirectedAdj = new Map<string, string[]>();
+    initialNodes.forEach((n) => undirectedAdj.set(n.id, []));
     initialEdges.forEach((e) => {
-      if (forwardAdj.has(e.source) && forwardAdj.has(e.target)) {
-        forwardAdj.get(e.source)!.push(e.target);
+      if (undirectedAdj.has(e.source) && undirectedAdj.has(e.target)) {
+        undirectedAdj.get(e.source)!.push(e.target);
+        undirectedAdj.get(e.target)!.push(e.source);
       }
     });
 
@@ -219,7 +220,7 @@ function GraphViewInner({ graphData }: GraphViewProps) {
 
       while (queue.length > 0) {
         const curr = queue.shift()!;
-        const neighbors = forwardAdj.get(curr) || [];
+        const neighbors = undirectedAdj.get(curr) || [];
         for (const nb of neighbors) {
           if (seedIds.has(nb) && nb !== seed.id) continue;
           if (!visited.has(nb)) {

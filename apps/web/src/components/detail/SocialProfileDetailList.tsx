@@ -387,6 +387,45 @@ export function SocialProfileDetailList({ entity, onCopy }: SocialProfileDetailL
             </div>
           )}
 
+          {/* Holehe Masked Recovery Email */}
+          {meta.emailrecovery && (
+            <div className="p-2.5 flex items-center justify-between hover:bg-surface-3/30 transition-colors bg-amber-500/5">
+              <div className="flex items-center gap-2 text-amber-300">
+                <Mail className="w-4 h-4 text-amber-400 shrink-0" />
+                <span>Recovery Email (Masked):</span>
+              </div>
+              <span className="font-mono font-semibold text-amber-200 bg-amber-500/15 px-2 py-0.5 rounded border border-amber-500/30">
+                {String(meta.emailrecovery)}
+              </span>
+            </div>
+          )}
+
+          {/* Holehe Masked Recovery Phone */}
+          {meta.phoneNumber && (
+            <div className="p-2.5 flex items-center justify-between hover:bg-surface-3/30 transition-colors bg-emerald-500/5">
+              <div className="flex items-center gap-2 text-emerald-300">
+                <Phone className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Recovery Phone (Masked):</span>
+              </div>
+              <span className="font-mono font-semibold text-emerald-200 bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30">
+                {String(meta.phoneNumber)}
+              </span>
+            </div>
+          )}
+
+          {/* Holehe Verified Engine Attribution */}
+          {meta.engine === 'holehe-python' && (
+            <div className="p-2.5 flex items-center justify-between hover:bg-surface-3/30 transition-colors bg-primary/5">
+              <div className="flex items-center gap-2 text-text-muted">
+                <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Account Status:</span>
+              </div>
+              <span className="font-semibold text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 text-[11px]">
+                Registered & Active (Holehe Verified)
+              </span>
+            </div>
+          )}
+
           {/* Post Node Specific Details */}
           {isPostNode && (
             <>

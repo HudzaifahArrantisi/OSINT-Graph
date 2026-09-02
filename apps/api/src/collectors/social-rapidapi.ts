@@ -1051,33 +1051,61 @@ export const socialRapidapiCollector: Collector = {
             let liData: any = {};
             if (profileRes.status === 'fulfilled' && profileRes.value) {
               const val = profileRes.value;
-              liData = { ...liData, ...(val.data || val) };
+              if (val.success === false) {
+                warnings.push(`LinkedIn RapidAPI: ${val.message || 'Profile lookup unsuccessful'}`);
+              } else if (val.data && typeof val.data === 'object') {
+                liData = { ...liData, ...val.data };
+              } else if (val && typeof val === 'object' && !val.message) {
+                liData = { ...liData, ...val };
+              }
             }
             if (aboutRes.status === 'fulfilled' && aboutRes.value) {
               const val = aboutRes.value;
-              liData = { ...liData, ...(val.data || val) };
+              if (val.success === false) {
+                warnings.push(`LinkedIn About API: ${val.message || 'About lookup unsuccessful'}`);
+              } else if (val.data && typeof val.data === 'object') {
+                liData = { ...liData, ...val.data };
+              } else if (val && typeof val === 'object' && !val.message) {
+                liData = { ...liData, ...val };
+              }
             }
             if (postsRes.status === 'fulfilled' && postsRes.value) {
-              liData.recent_posts = postsRes.value?.data || postsRes.value;
+              const val = postsRes.value;
+              if (val && val.success !== false) {
+                liData.recent_posts = val.data || val;
+              }
             }
             if (connCountRes.status === 'fulfilled' && connCountRes.value) {
               const val = connCountRes.value;
-              const count = val.connection_count ?? val.connections ?? val.count ?? val.data?.connection_count;
-              if (count !== undefined) liData.connection_count = count;
+              if (val && val.success !== false) {
+                const count = val.connection_count ?? val.connections ?? val.count ?? val.data?.connection_count;
+                if (count !== undefined) liData.connection_count = count;
+              }
             }
             if (dataConnRes.status === 'fulfilled' && dataConnRes.value) {
               const val = dataConnRes.value;
-              const count = val.connection_count ?? val.connections ?? val.count ?? val.data?.connection_count;
-              if (count !== undefined) liData.connection_count = count;
+              if (val && val.success !== false) {
+                const count = val.connection_count ?? val.connections ?? val.count ?? val.data?.connection_count;
+                if (count !== undefined) liData.connection_count = count;
+              }
             }
             if (activityRes.status === 'fulfilled' && activityRes.value) {
-              liData.recent_activity_time = activityRes.value?.recent_activity_time || activityRes.value?.timestamp;
+              const val = activityRes.value;
+              if (val && val.success !== false) {
+                liData.recent_activity_time = val.recent_activity_time || val.timestamp;
+              }
             }
             if (schoolsRes.status === 'fulfilled' && schoolsRes.value) {
-              liData.interests_schools = schoolsRes.value?.data || schoolsRes.value;
+              const val = schoolsRes.value;
+              if (val && val.success !== false) {
+                liData.interests_schools = val.data || val;
+              }
             }
             if (companiesRes.status === 'fulfilled' && companiesRes.value) {
-              liData.interests_companies = companiesRes.value?.data || companiesRes.value;
+              const val = companiesRes.value;
+              if (val && val.success !== false) {
+                liData.interests_companies = val.data || val;
+              }
             }
 
             const liFullName =
@@ -1116,6 +1144,27 @@ export const socialRapidapiCollector: Collector = {
               liData.country ||
               null;
 
+            // Zero-fake-data invariant: only create profile entity if real profile data was returned
+            const hasRealData = Boolean(
+              liFullName ||
+              liHeadline ||
+              liSummary ||
+              liAvatar ||
+              liConnections !== null ||
+              liCity ||
+              liCountry ||
+              (Array.isArray(liData.recent_posts) && liData.recent_posts.length > 0) ||
+              (Array.isArray(liData.interests_schools) && liData.interests_schools.length > 0) ||
+              (Array.isArray(liData.interests_companies) && liData.interests_companies.length > 0)
+            );
+
+            if (!hasRealData) {
+              warnings.push(
+                `LinkedIn engine did not find verified profile intelligence for "${handle}" (upstream provider returned no profile data or service is unavailable).`,
+              );
+              return;
+            }
+
             // 3.1 Main LinkedIn Profile Node
             entities.push({
               type: 'SOCIAL_PROFILE',
@@ -1137,6 +1186,17 @@ export const socialRapidapiCollector: Collector = {
                   collectedAt,
                 },
               },
+            });
+
+            // Connect seed target to LinkedIn profile
+            relationships.push({
+              source_type: input.startsWith('http') ? 'SOCIAL_PROFILE' : 'USERNAME',
+              source_value: input.trim(),
+              target_type: 'SOCIAL_PROFILE',
+              target_value: liProfileUrl,
+              relationship_type: 'USES_USERNAME',
+              confidence: 90,
+              reason: 'Public profile exists on LinkedIn',
             });
 
             evidence.push({

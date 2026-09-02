@@ -200,6 +200,7 @@ export const COLLECTOR_NAMES = [
   'ip-geolocation',
   'social-rapidapi',
   'shodan-recon',
+  'holehe-engine',
 ] as const;
 
 export type CollectorName = (typeof COLLECTOR_NAMES)[number];

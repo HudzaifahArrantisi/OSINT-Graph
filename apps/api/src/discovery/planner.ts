@@ -42,9 +42,10 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'intelligence.generate-dorks',
   ],
   EMAIL: [
-    'domain.resolve-dns',
-    'developer.github-profile',
+    'contact.holehe-email-crawl',
     'contact.email-breach-lookup',
+    'developer.github-profile',
+    'domain.resolve-dns',
   ],
   USERNAME: [
     'social.rapidapi-social-lookup',

@@ -266,10 +266,11 @@ export function InvestigationDetailPage() {
     );
     const seedIds = new Set(seeds.map((s) => s.id));
 
-    const forwardAdj = new Map<string, Set<string>>();
-    for (const n of graphData.nodes) forwardAdj.set(n.id, new Set());
+    const undirectedAdj = new Map<string, Set<string>>();
+    for (const n of graphData.nodes) undirectedAdj.set(n.id, new Set());
     for (const e of graphData.edges || []) {
-      forwardAdj.get(e.source)?.add(e.target);
+      undirectedAdj.get(e.source)?.add(e.target);
+      undirectedAdj.get(e.target)?.add(e.source);
     }
 
     return seeds.map((seed) => {
@@ -277,7 +278,7 @@ export function InvestigationDetailPage() {
       const queue = [seed.id];
       while (queue.length > 0) {
         const curr = queue.shift()!;
-        const neighbors = forwardAdj.get(curr) || new Set();
+        const neighbors = undirectedAdj.get(curr) || new Set();
         for (const n of neighbors) {
           if (seedIds.has(n) && n !== seed.id) continue;
           if (!visited.has(n)) {
