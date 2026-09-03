@@ -175,7 +175,7 @@ def load_store() -> dict:
     return json.loads(CRED_FILE.read_text("utf-8"))
 
 
-def save_store(store: dict) -> None:z
+def save_store(store: dict) -> None:
     CONFIG_DIR.mkdir(parents=True, exist_ok=True)
     CRED_FILE.write_text(json.dumps(store, indent=2), "utf-8")
     try:
@@ -212,8 +212,11 @@ def api_search(cred: dict, phone: str, source: str) -> dict:
         "source": "profile" if source == "tags" else "search",
         "token": cred["token"],
     }
+    final_key = cred.get("finalKey") or cred.get("finalkey")
+    if not final_key:
+        raise GtcError("Missing finalKey in credential")
     code, body = gtc_call(endpoint, payload, token=cred["token"],
-                          final_key=cred["finalkey"], device_id=cred["clientDeviceId"])
+                          final_key=final_key, device_id=cred["clientDeviceId"])
     meta = dig(body, "meta.httpStatusCode")
     if code != 200 or meta != 200:
         raise GtcError(f"HTTP {code}/{meta}: {dig(body, 'meta.errorMessage', 'unknown error')}")
@@ -221,8 +224,9 @@ def api_search(cred: dict, phone: str, source: str) -> dict:
 
 
 def api_subscription(cred: dict) -> dict:
+    final_key = cred.get("finalKey") or cred.get("finalkey")
     code, body = gtc_call("/v2.8/subscription", {"token": cred["token"]},
-                          token=cred["token"], final_key=cred["finalKey"],
+                          token=cred["token"], final_key=final_key,
                           device_id=cred["clientDeviceId"])
     if code != 200:
         raise GtcError(f"HTTP {code}: {dig(body, 'meta.errorMessage', 'unknown error')}")
@@ -321,7 +325,8 @@ def cmd_quota(args) -> int:
 def cmd_captcha(args) -> int:
     store = load_store()
     name, cred = get_cred(store, args.account)
-    common = dict(token=cred["token"], final_key=cred["finalKey"], device_id=cred["clientDeviceId"])
+    final_key = cred.get("finalKey") or cred.get("finalkey")
+    common = dict(token=cred["token"], final_key=final_key, device_id=cred["clientDeviceId"])
     code, body = gtc_call("/v2.8/refresh-code", {"token": cred["token"]}, **common)
     image = dig(body, "result.image")
     if not image:

@@ -1,5 +1,5 @@
 import { getSupabaseAdmin } from '../lib/supabase.js';
-import { normalize } from '@nexusgraph/shared';
+import { normalize, normalizePhone } from '@nexusgraph/shared';
 import type {
   Investigation,
   CreateInvestigationInput,
@@ -373,10 +373,43 @@ export const entityService = {
       adj.get(r.target_entity_id)?.add(r.source_entity_id);
     }
 
-    // 5. BFS from target seed to find all reachable nodes
+    // 5. Query discovery jobs matching this seed to identify generated entities
+    const { data: jobs } = await db()
+      .from('discovery_jobs')
+      .select('id')
+      .eq('case_id', caseId)
+      .or(`seed_entity_id.eq.${seedEntityId},seed_value.eq.${targetEntity.value}`);
+
+    const seedJobIds = new Set((jobs || []).map((j) => j.id));
+
+    // 6. BFS from target seed to find all reachable nodes
+    // Pre-populate queue with target seed and any entities explicitly generated from this seed
     const reachableFromTarget = new Set<string>();
-    const queue = [seedEntityId];
+    const queue: string[] = [seedEntityId];
     reachableFromTarget.add(seedEntityId);
+
+    const isPhoneSeed =
+      targetEntity.type === 'PHONE' || (targetEntity.metadata as any)?.declaredType === 'PHONE';
+    const targetPhoneNorm = isPhoneSeed ? normalizePhone(targetEntity.value) : null;
+
+    for (const e of allEntities) {
+      if (e.id === seedEntityId) continue;
+      const meta = (e.metadata || {}) as Record<string, any>;
+      const matchesMeta =
+        meta.derivedFromSeed === targetEntity.value ||
+        meta.seedValue === targetEntity.value ||
+        meta.source?.derivedFrom === targetEntity.value ||
+        (meta.discoveryJobId && seedJobIds.has(meta.discoveryJobId));
+
+      const matchesPhone =
+        targetPhoneNorm && e.type === 'PHONE' && normalizePhone(e.value) === targetPhoneNorm;
+
+      if ((matchesMeta || matchesPhone) && !reachableFromTarget.has(e.id)) {
+        reachableFromTarget.add(e.id);
+        queue.push(e.id);
+      }
+    }
+
     while (queue.length > 0) {
       const current = queue.shift()!;
       const neighbors = adj.get(current) || new Set();
@@ -388,19 +421,7 @@ export const entityService = {
       }
     }
 
-    // Also include entities whose metadata explicitly traces back to this seed
-    for (const e of allEntities) {
-      const meta = (e.metadata || {}) as Record<string, any>;
-      if (
-        meta.derivedFromSeed === targetEntity.value ||
-        meta.seedValue === targetEntity.value ||
-        meta.source?.derivedFrom === targetEntity.value
-      ) {
-        reachableFromTarget.add(e.id);
-      }
-    }
-
-    // 6. BFS from other seeds (if any) to protect nodes shared with / reachable from other seeds
+    // 7. BFS from other seeds (if any) to protect nodes shared with / reachable from other seeds
     const reachableFromOtherSeeds = new Set<string>();
     if (otherSeeds.length > 0) {
       const otherQueue = otherSeeds.map((s) => s.id);
@@ -417,7 +438,7 @@ export const entityService = {
       }
     }
 
-    // 7. Entities to delete = reachableFromTarget EXCEPT reachableFromOtherSeeds (always including seedEntityId)
+    // 8. Entities to delete = reachableFromTarget EXCEPT reachableFromOtherSeeds (always including seedEntityId)
     const entitiesToDelete = new Set<string>();
     entitiesToDelete.add(seedEntityId);
     for (const id of reachableFromTarget) {
@@ -428,14 +449,8 @@ export const entityService = {
 
     const idsToDelete = Array.from(entitiesToDelete);
 
-    // 8. Delete discovery jobs & transform runs matching this seed
+    // 9. Delete discovery jobs & transform runs matching this seed
     let deletedJobsCount = 0;
-    const { data: jobs } = await db()
-      .from('discovery_jobs')
-      .select('id')
-      .eq('case_id', caseId)
-      .or(`seed_entity_id.eq.${seedEntityId},seed_value.eq.${targetEntity.value}`);
-
     if (jobs && jobs.length > 0) {
       const jobIds = jobs.map((j) => j.id);
       deletedJobsCount = jobIds.length;

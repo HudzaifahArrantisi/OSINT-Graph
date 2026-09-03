@@ -134,6 +134,11 @@ export function normalizePhone(input: string): string {
     return `+${phone}`;
   }
 
+  // Indonesian local trunk prefix (e.g. 08...)
+  if (!hasPlus && phone.startsWith('08') && phone.length >= 10) {
+    return `+62${phone.slice(1)}`;
+  }
+
   return hasPlus ? `+${phone}` : phone;
 }
 

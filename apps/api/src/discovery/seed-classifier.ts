@@ -5,7 +5,7 @@
  */
 
 import type { SeedType, EntityType, CreateEntityInput, RelationshipType } from '@nexusgraph/shared';
-import { normalizeDomain } from '@nexusgraph/shared';
+import { normalizeDomain, normalizePhone } from '@nexusgraph/shared';
 import { analyzeValue } from './value-analyzer.js';
 
 export interface DerivedSeedEntity {
@@ -85,7 +85,15 @@ export function parseSeed(seedType: SeedType, seedValue: string): ParsedSeed {
       }
     }
   } else if (seedType === 'PHONE') {
-    // Phone normalization and geo attribution are handled by the phone-geo collector
+    const normalized = normalizePhone(trimmed);
+    if (normalized) {
+      derivedEntities.push({
+        type: 'PHONE',
+        value: normalized,
+        relationshipType: 'RESOLVES_TO',
+        reason: `Deterministic derivation: Phone seed "${trimmed}" resolves to "${normalized}"`,
+      });
+    }
   } else if (seedType === 'SOCIAL_PROFILE') {
     if (analysis.isUrl) {
       if (analysis.extractedDomain) {
