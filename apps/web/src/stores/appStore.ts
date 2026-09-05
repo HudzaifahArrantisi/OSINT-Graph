@@ -43,6 +43,17 @@ interface AppState {
   setIsDiscovering: (discovering: boolean) => void;
   discoveryProgress: DiscoveryProgressEvent | null;
   setDiscoveryProgress: (progress: DiscoveryProgressEvent | null) => void;
+  discoverySummary: {
+    jobId?: string;
+    status: 'COMPLETED' | 'PARTIAL' | 'FAILED';
+    totalTransforms: number;
+    foundEntities: number;
+    foundRelationships: number;
+    foundEvidence: number;
+    completedAt: string;
+  } | null;
+  setDiscoverySummary: (summary: AppState['discoverySummary']) => void;
+  clearDiscoverySummary: () => void;
 
   // Graph filters
   graphFilter: GraphFilter;
@@ -108,11 +119,14 @@ export const useAppStore = create<AppState>((set) => ({
     set({
       liveDiscoveryLogs: logs.slice(-600),
     }),
-  clearLiveLogs: () => set({ liveDiscoveryLogs: [], discoveryProgress: null }),
+  clearLiveLogs: () => set({ liveDiscoveryLogs: [], discoveryProgress: null, discoverySummary: null }),
   isDiscovering: false,
   setIsDiscovering: (discovering) => set({ isDiscovering: discovering }),
   discoveryProgress: null,
   setDiscoveryProgress: (progress) => set({ discoveryProgress: progress }),
+  discoverySummary: null,
+  setDiscoverySummary: (summary) => set({ discoverySummary: summary }),
+  clearDiscoverySummary: () => set({ discoverySummary: null }),
 
   graphFilter: { ...defaultFilter },
   setGraphFilter: (filter) =>

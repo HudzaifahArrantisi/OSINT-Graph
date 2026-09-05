@@ -283,7 +283,7 @@ export const socialRapidapiCollector: Collector = {
               if (followersCount !== null) statsParts.push(`${Number(followersCount).toLocaleString()} Followers`);
               if (followingCount !== null) statsParts.push(`${Number(followingCount).toLocaleString()} Following`);
               if (postsCount !== null) statsParts.push(`${Number(postsCount).toLocaleString()} Posts`);
-              const statsTitle = `📊 Instagram Stats (@${igUsername}): ${statsParts.join(' · ')}`;
+              const statsTitle = `Instagram Stats (@${igUsername}): ${statsParts.join(' · ')}`;
 
               entities.push({
                 type: 'DOCUMENT',

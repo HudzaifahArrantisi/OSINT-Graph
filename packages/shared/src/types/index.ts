@@ -350,6 +350,15 @@ export interface DiscoveryLogEntry {
   raw?: string;
 }
 
+export interface DiscoveryTransformProgressItem {
+  id: string;
+  name: string;
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'not_found';
+  entitiesFound?: number;
+  relationshipsFound?: number;
+  error?: string | null;
+}
+
 export interface DiscoveryProgressEvent {
   type: 'log' | 'transform_start' | 'transform_complete' | 'transform_failed' | 'discovery_start' | 'discovery_complete' | 'discovery_progress';
   jobId: string;
@@ -359,6 +368,13 @@ export interface DiscoveryProgressEvent {
   foundEntities?: number;
   foundRelationships?: number;
   foundEvidence?: number;
+  currentTransform?: {
+    id: string;
+    name: string;
+    index: number;
+  };
+  transforms?: DiscoveryTransformProgressItem[];
+  status?: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'PARTIAL';
 }
 
 // ─── Graph (React Flow compatible) ──────────────────────────────────

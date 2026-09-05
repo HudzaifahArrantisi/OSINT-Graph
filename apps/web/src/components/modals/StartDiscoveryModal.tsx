@@ -84,21 +84,31 @@ const SEED_CATEGORY_OPTIONS: SeedCategoryOption[] = [
   },
 ];
 
-const SOCIAL_PLATFORMS = [
+interface SocialPlatformOption {
+  id: string;
+  name: string;
+  badge: string;
+  detail: string;
+}
+
+const SOCIAL_PLATFORMS: SocialPlatformOption[] = [
   {
     id: 'instagram',
     name: 'Instagram',
-    badge: '4 Engines',
+    badge: '4 Engine API',
+    detail: 'Profil, bio & kontak',
   },
   {
     id: 'tiktok',
     name: 'TikTok',
-    badge: '2 Engines',
+    badge: '2 Engine API',
+    detail: 'Profil, bio & stats',
   },
   {
     id: 'linkedin',
     name: 'LinkedIn',
     badge: '5 Endpoints',
+    detail: 'Karir & riwayat kerja',
   },
 ];
 
@@ -116,6 +126,7 @@ export function StartDiscoveryModal({
     setLiveLogsOpen,
     setIsDiscovering,
     setDiscoveryProgress,
+    setDiscoverySummary,
   } = useAppStore();
 
   const [seedType, setSeedType] = useState<SeedType>('USERNAME');
@@ -273,6 +284,16 @@ export function StartDiscoveryModal({
         foundRelationships: relCount,
         foundEvidence: evCount,
         totalTransforms: total,
+      });
+
+      setDiscoverySummary({
+        jobId: finalJobId,
+        status: 'COMPLETED',
+        foundEntities: entitiesCount,
+        foundRelationships: relCount,
+        foundEvidence: evCount,
+        totalTransforms: total,
+        completedAt: new Date().toISOString(),
       });
 
       addToast(
@@ -449,16 +470,21 @@ export function StartDiscoveryModal({
 
           {/* Social Media Platform Selection (When Person/Social is chosen) */}
           {isSocialIdentity && (
-            <div className="p-3 rounded-lg bg-[#0d0d0d] border border-[#222222] space-y-2">
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-white flex items-center gap-1.5">
-                  <Layers className="w-3.5 h-3.5 text-neutral-400" />
-                  Target Platform Media Sosial:
-                </span>
+            <div className="p-3 rounded-lg bg-[#0d0d0d] border border-[#222222] space-y-2.5">
+              <div className="flex items-start justify-between gap-2 text-xs">
+                <div>
+                  <span className="font-medium text-white flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-neutral-400" />
+                    Target Platform Media Sosial (RapidAPI Recon):
+                  </span>
+                  <p className="text-[11px] text-neutral-400 mt-0.5">
+                    Pilih target platform media sosial yang akan dipindai secara mendalam
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={handleToggleAllPlatforms}
-                  className="text-[11px] text-neutral-400 hover:text-white font-medium cursor-pointer transition-colors"
+                  className="text-[11px] text-neutral-400 hover:text-white font-medium cursor-pointer transition-colors shrink-0 whitespace-nowrap pt-0.5"
                 >
                   {selectedPlatforms.length === SOCIAL_PLATFORMS.length
                     ? 'Batal Pilih Semua'
@@ -466,7 +492,7 @@ export function StartDiscoveryModal({
                 </button>
               </div>
 
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                 {SOCIAL_PLATFORMS.map((platform) => {
                   const isChecked = selectedPlatforms.includes(platform.id);
                   return (
@@ -474,23 +500,31 @@ export function StartDiscoveryModal({
                       key={platform.id}
                       type="button"
                       onClick={() => togglePlatform(platform.id)}
-                      className={`flex items-center justify-between px-3 py-2 rounded-md border text-xs font-medium transition-all cursor-pointer select-none ${
+                      className={`flex flex-col text-left p-2.5 rounded-lg border transition-all cursor-pointer select-none ${
                         isChecked
-                          ? 'bg-[#1e1e1e] border-neutral-400 text-white'
-                          : 'bg-[#0a0a0a] border-[#1f1f1f] text-neutral-500 hover:text-neutral-300 hover:border-neutral-700'
+                          ? 'bg-[#181818] border-neutral-400 text-white shadow-xs'
+                          : 'bg-[#0a0a0a] border-[#222222] text-neutral-400 hover:text-neutral-200 hover:border-neutral-700'
                       }`}
                     >
-                      <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="flex items-center gap-2 w-full">
                         {isChecked ? (
-                          <CheckSquare2 className="w-3.5 h-3.5 text-white shrink-0" />
+                          <CheckSquare2 className="w-4 h-4 text-white shrink-0" />
                         ) : (
-                          <Square className="w-3.5 h-3.5 text-neutral-600 shrink-0" />
+                          <Square className="w-4 h-4 text-neutral-600 shrink-0" />
                         )}
-                        <span className="truncate">{platform.name}</span>
+                        <span className="font-semibold text-xs text-white">
+                          {platform.name}
+                        </span>
                       </div>
-                      <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-black/60 text-neutral-400 border border-neutral-800 shrink-0">
-                        {platform.badge}
-                      </span>
+
+                      <div className="mt-1.5 pl-6 flex flex-col gap-0.5">
+                        <span className="text-[10px] font-mono text-neutral-400">
+                          {platform.badge}
+                        </span>
+                        <span className="text-[10px] text-neutral-400 leading-tight">
+                          {platform.detail}
+                        </span>
+                      </div>
                     </button>
                   );
                 })}

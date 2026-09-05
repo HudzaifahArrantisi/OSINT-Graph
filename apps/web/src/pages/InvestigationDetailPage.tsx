@@ -35,6 +35,7 @@ import {
   Target,
   MapPin,
   MoreVertical,
+  Loader2,
 } from 'lucide-react';
 import type { Investigation, GraphPayload, CollectorRun, Note, DiscoveryJob } from '@nexusgraph/shared';
 
@@ -54,6 +55,7 @@ export function InvestigationDetailPage() {
     liveLogsOpen,
     setLiveLogsOpen,
     isDiscovering,
+    discoveryProgress,
     liveDiscoveryLogs,
   } = useAppStore();
 
@@ -438,6 +440,12 @@ export function InvestigationDetailPage() {
           >
             <Terminal className="w-3.5 h-3.5" />
             <span className="hidden md:inline">Console</span>
+            {isDiscovering && (
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+              </span>
+            )}
             {liveDiscoveryLogs.length > 0 && (
               <span className="text-[9.5px] px-1 py-0.2 rounded bg-[#1c1c1c] text-neutral-400 font-mono border border-[#2b2b2b]">
                 {liveDiscoveryLogs.length}
@@ -751,6 +759,34 @@ export function InvestigationDetailPage() {
           <div className="flex-1 flex overflow-hidden relative min-h-0">
             {/* Center: Interactive Graph View OR Notes View */}
             <div className="flex-1 h-full relative overflow-hidden bg-app">
+              {/* Floating Real-time Discovery Progress Chip (when console sidebar is closed) */}
+              {isDiscovering && !liveLogsOpen && (
+                <div className="absolute top-3 left-1/2 -translate-x-1/2 z-30 bg-[#0c0c0c]/95 backdrop-blur-md border border-[#262626] rounded-full px-3.5 py-1.5 shadow-2xl flex items-center gap-2.5 animate-fade-in text-xs select-none">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-3.5 h-3.5 text-white animate-spin" />
+                    <span className="text-white font-medium text-[11px] truncate max-w-[220px]">
+                      {discoveryProgress?.currentTransform?.name || 'Menjalankan Transform...'}
+                    </span>
+                    <span className="font-mono text-neutral-400 text-[10px]">
+                      [{discoveryProgress?.completedTransforms || 0}/{discoveryProgress?.totalTransforms || 0}]
+                    </span>
+                  </div>
+
+                  {(discoveryProgress?.foundEntities || 0) > 0 && (
+                    <span className="text-[10px] font-mono px-1.5 py-0.2 rounded bg-[#141414] text-white border border-[#262626]">
+                      +{discoveryProgress?.foundEntities} entitas
+                    </span>
+                  )}
+
+                  <button
+                    onClick={() => setLiveLogsOpen(true)}
+                    className="text-[10.5px] text-neutral-300 hover:text-white underline cursor-pointer ml-0.5"
+                  >
+                    Buka Konsol
+                  </button>
+                </div>
+              )}
+
               {activeWorkspaceView === 'graph' ? (
                 isGraphLoading ? (
                   <div className="flex items-center justify-center h-full">

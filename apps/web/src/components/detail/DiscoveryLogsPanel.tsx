@@ -10,8 +10,15 @@ import {
   Download,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Filter,
   Code2,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  Clock,
+  Layers,
+  Sparkles,
 } from 'lucide-react';
 import type { DiscoveryLogEntry } from '@nexusgraph/shared';
 import { api } from '../../lib/api';
@@ -52,6 +59,8 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
     clearLiveLogs,
     isDiscovering,
     discoveryProgress,
+    discoverySummary,
+    clearDiscoverySummary,
     setIsLiveStreaming,
     addToast,
   } = useAppStore();
@@ -62,6 +71,24 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
   const [activeTab, setActiveTab] = useState<'ALL' | 'ACTIVITY' | 'HTTP' | 'ERRORS'>('ALL');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [expandedLogIds, setExpandedLogIds] = useState<Record<string, boolean>>({});
+  const [showPipeline, setShowPipeline] = useState<boolean>(false);
+  const [elapsedSeconds, setElapsedSeconds] = useState<number>(0);
+
+  // Real-time elapsed duration timer while discovery is active
+  useEffect(() => {
+    let interval: ReturnType<typeof setInterval> | null = null;
+    if (isDiscovering) {
+      setElapsedSeconds(0);
+      interval = setInterval(() => {
+        setElapsedSeconds((prev) => prev + 1);
+      }, 1000);
+    } else {
+      if (interval) clearInterval(interval);
+    }
+    return () => {
+      if (interval) clearInterval(interval);
+    };
+  }, [isDiscovering]);
 
   // Background SSE listener for live server logs
   useEffect(() => {
@@ -181,12 +208,29 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
     return true;
   });
 
-  const totalTransforms = discoveryProgress?.totalTransforms || 0;
-  const completedTransforms = discoveryProgress?.completedTransforms || 0;
+  const totalTransforms = discoveryProgress?.totalTransforms || discoverySummary?.totalTransforms || 0;
+  const completedTransforms = discoveryProgress?.completedTransforms || (discoverySummary ? discoverySummary.totalTransforms : 0);
   const progressPercent =
     totalTransforms > 0
       ? Math.min(100, Math.round((completedTransforms / totalTransforms) * 100))
       : 0;
+
+  const currentTransformName =
+    discoveryProgress?.currentTransform?.name ||
+    discoveryProgress?.log?.transformName ||
+    (isDiscovering ? 'Menjalankan pemindaian vektor target...' : null);
+
+  const currentTransformIndex =
+    discoveryProgress?.currentTransform?.index || Math.min(completedTransforms + 1, Math.max(totalTransforms, 1));
+
+  const pipelineTransforms = discoveryProgress?.transforms || [];
+  const liveEntities = discoveryProgress?.foundEntities ?? 0;
+  const liveRelationships = discoveryProgress?.foundRelationships ?? 0;
+  const liveEvidence = discoveryProgress?.foundEvidence ?? 0;
+
+  const formattedElapsed = `${Math.floor(elapsedSeconds / 60)
+    .toString()
+    .padStart(2, '0')}:${(elapsedSeconds % 60).toString().padStart(2, '0')}`;
 
   const warnErrCount = liveDiscoveryLogs.filter((l) => l.level === 'warn' || l.level === 'error').length;
   const activityCount = liveDiscoveryLogs.filter((l) => l.level !== 'http' && l.tag !== 'HTTP').length;
@@ -262,21 +306,173 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
         </div>
       </div>
 
-      {/* Progress Bar */}
-      {isDiscovering && totalTransforms > 0 && (
-        <div className="px-3 py-1.5 bg-[#0a0a0a] border-b border-[#1c1c1c] font-sans text-xs">
-          <div className="flex items-center justify-between text-neutral-400 mb-1">
-            <span className="text-white text-[11px] font-medium">Running Transforms</span>
-            <span className="font-mono text-neutral-400 text-[10px]">
-              {completedTransforms} / {totalTransforms} ({progressPercent}%)
-            </span>
+      {/* Real-time Discovery Progress Widget */}
+      {(isDiscovering || discoverySummary) && totalTransforms > 0 && (
+        <div className="p-3 bg-[#0a0a0a] border-b border-[#1c1c1c] font-sans text-xs space-y-2.5">
+          {/* Header Row: Status, Step Counter, Elapsed Timer */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2 min-w-0">
+              {isDiscovering ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-white opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-white"></span>
+                  </span>
+                  <span className="text-white text-[11px] font-semibold tracking-wider uppercase">
+                    Running Transforms
+                  </span>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                  <span className="text-white text-[11px] font-semibold tracking-wider uppercase">
+                    Discovery Selesai
+                  </span>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              {isDiscovering && (
+                <div className="flex items-center gap-1 text-[10px] font-mono text-neutral-400 bg-[#141414] px-1.5 py-0.5 rounded border border-[#222222]">
+                  <Clock className="w-2.5 h-2.5 text-neutral-500" />
+                  <span>{formattedElapsed}</span>
+                </div>
+              )}
+              <span className="font-mono text-white text-[11px] font-medium">
+                {isDiscovering
+                  ? `${completedTransforms} / ${totalTransforms} (${progressPercent}%)`
+                  : `${discoverySummary?.totalTransforms || totalTransforms} / ${discoverySummary?.totalTransforms || totalTransforms} (100%)`}
+              </span>
+              {!isDiscovering && discoverySummary && (
+                <button
+                  onClick={clearDiscoverySummary}
+                  className="p-0.5 text-neutral-500 hover:text-white rounded transition-colors cursor-pointer"
+                  title="Tutup ringkasan"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="w-full h-1 bg-[#1a1a1a] rounded-full overflow-hidden">
+
+          {/* Animated Progress Bar */}
+          <div className="w-full h-1.5 bg-[#171717] rounded-full overflow-hidden relative">
             <div
-              className="h-full bg-white transition-all duration-300 rounded-full"
-              style={{ width: `${progressPercent}%` }}
+              className={`h-full rounded-full transition-all duration-500 ${
+                isDiscovering ? 'bg-white animate-shimmer-bar' : 'bg-white'
+              }`}
+              style={{
+                width: isDiscovering
+                  ? `${Math.max(progressPercent, 10)}%`
+                  : '100%',
+              }}
             />
           </div>
+
+          {/* Current Active Transform Spotlight (When running) */}
+          {isDiscovering && currentTransformName && (
+            <div className="flex items-center justify-between p-2 rounded bg-[#121212] border border-[#222222]">
+              <div className="flex items-center gap-2 min-w-0">
+                <Loader2 className="w-3.5 h-3.5 text-white animate-spin shrink-0" />
+                <div className="min-w-0">
+                  <div className="text-[9.5px] text-neutral-400 uppercase tracking-wider font-mono">
+                    Modul Aktif [{currentTransformIndex}/{totalTransforms}]
+                  </div>
+                  <div className="text-[11px] font-medium text-white truncate">
+                    {currentTransformName}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Real-time Discovery Metric Counters & Pipeline Toggle */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#141414] border border-[#222222] text-[10.5px]">
+              <span className="text-neutral-400">Entitas:</span>
+              <span className="font-mono font-semibold text-white">
+                +{isDiscovering ? liveEntities : discoverySummary?.foundEntities ?? liveEntities}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#141414] border border-[#222222] text-[10.5px]">
+              <span className="text-neutral-400">Relasi:</span>
+              <span className="font-mono font-semibold text-white">
+                +{isDiscovering ? liveRelationships : discoverySummary?.foundRelationships ?? liveRelationships}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 px-2 py-0.5 rounded bg-[#141414] border border-[#222222] text-[10.5px]">
+              <span className="text-neutral-400">Evidence:</span>
+              <span className="font-mono font-semibold text-white">
+                +{isDiscovering ? liveEvidence : discoverySummary?.foundEvidence ?? liveEvidence}
+              </span>
+            </div>
+
+            {/* Pipeline Accordion Toggle */}
+            {pipelineTransforms.length > 0 && (
+              <button
+                onClick={() => setShowPipeline(!showPipeline)}
+                className="ml-auto text-[10px] font-mono text-neutral-400 hover:text-white flex items-center gap-0.5 py-0.5 px-1.5 rounded bg-[#141414] border border-[#222222] hover:border-[#383838] transition-colors cursor-pointer"
+              >
+                <Layers className="w-2.5 h-2.5" />
+                <span>Modul ({pipelineTransforms.length})</span>
+                {showPipeline ? (
+                  <ChevronUp className="w-2.5 h-2.5" />
+                ) : (
+                  <ChevronDown className="w-2.5 h-2.5" />
+                )}
+              </button>
+            )}
+          </div>
+
+          {/* Pipeline Checklist Breakdown Drawer */}
+          {showPipeline && pipelineTransforms.length > 0 && (
+            <div className="p-2 rounded bg-[#090909] border border-[#1f1f1f] space-y-1 max-h-48 overflow-y-auto animate-fade-in">
+              {pipelineTransforms.map((t, idx) => (
+                <div
+                  key={t.id || idx}
+                  className={`flex items-center justify-between text-[10.5px] p-1.5 rounded transition-colors ${
+                    t.status === 'running'
+                      ? 'bg-[#1a1a1a] border border-[#333333] text-white font-medium'
+                      : 'text-neutral-400 hover:bg-[#121212]'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    {t.status === 'running' ? (
+                      <Loader2 className="w-3 h-3 text-white animate-spin shrink-0" />
+                    ) : t.status === 'completed' ? (
+                      <CheckCircle2 className="w-3 h-3 text-white shrink-0" />
+                    ) : t.status === 'failed' ? (
+                      <AlertCircle className="w-3 h-3 text-neutral-400 shrink-0" />
+                    ) : (
+                      <span className="w-2.5 h-2.5 rounded-full border border-neutral-600 inline-block shrink-0" />
+                    )}
+                    <span className="truncate">{t.name}</span>
+                  </div>
+
+                  <div className="flex items-center gap-1 shrink-0 ml-2 font-mono text-[9.5px]">
+                    {t.status === 'running' && (
+                      <span className="text-white animate-pulse">Running</span>
+                    )}
+                    {t.status === 'completed' && (
+                      <span className="text-neutral-300">
+                        +{t.entitiesFound || 0} entitas
+                      </span>
+                    )}
+                    {t.status === 'not_found' && (
+                      <span className="text-neutral-500">0 hasil</span>
+                    )}
+                    {t.status === 'failed' && (
+                      <span className="text-neutral-400">Gagal</span>
+                    )}
+                    {t.status === 'pending' && (
+                      <span className="text-neutral-600">Antrean</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

@@ -18,6 +18,7 @@ import type {
   TransformRun,
   DiscoveryProgressEvent,
   DiscoveryLogEntry,
+  DiscoveryTransformProgressItem,
   LogLevel,
 } from '@nexusgraph/shared';
 import { normalize } from '@nexusgraph/shared';
@@ -176,6 +177,19 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
   let failedCount = 0;
   let notFoundCount = 0;
 
+  // Real-time pipeline state tracking for every transform
+  const transformPipeline: DiscoveryTransformProgressItem[] = plan.transforms.map((t) => ({
+    id: t.id,
+    name: t.name,
+    status: 'pending',
+    entitiesFound: 0,
+    relationshipsFound: 0,
+    error: null,
+  }));
+
+  let currentTransformInfo: { id: string; name: string; index: number } | undefined = undefined;
+  let jobState: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED' | 'PARTIAL' = 'RUNNING';
+
   const emitProgress = (
     level: LogLevel,
     message: string,
@@ -195,8 +209,8 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
         timestamp: new Date().toISOString(),
         level,
         message,
-        transformId: extra?.transformId,
-        transformName: extra?.transformName,
+        transformId: extra?.transformId || currentTransformInfo?.id,
+        transformName: extra?.transformName || currentTransformInfo?.name,
         entityCount: extra?.entityCount,
         relationshipCount: extra?.relationshipCount,
         data: extra?.data,
@@ -211,6 +225,9 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
         foundEntities: totalEntities,
         foundRelationships: totalRelationships,
         foundEvidence: totalEvidence,
+        currentTransform: currentTransformInfo,
+        transforms: transformPipeline.map((t) => ({ ...t })),
+        status: jobState,
       });
     } catch {
       // Ignore callback errors
@@ -256,7 +273,20 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
   // 5. Execute transforms sequentially
   const transformResults: DiscoveryOutput['transformRuns'] = [];
 
-  for (const { record, transformId, transformName } of runRecords) {
+  for (let i = 0; i < runRecords.length; i++) {
+    const { record, transformId, transformName } = runRecords[i];
+
+    currentTransformInfo = {
+      id: transformId,
+      name: transformName,
+      index: i + 1,
+    };
+
+    const pipelineItem = transformPipeline.find((p) => p.id === transformId);
+    if (pipelineItem) {
+      pipelineItem.status = 'running';
+    }
+
     // Mark transform as running
     await transformRunService.update(record.id, {
       status: 'RUNNING',
@@ -453,6 +483,11 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
 
       if (finalStatus === 'COMPLETED') {
         completedCount++;
+        if (pipelineItem) {
+          pipelineItem.status = 'completed';
+          pipelineItem.entitiesFound = entityCount;
+          pipelineItem.relationshipsFound = relCount;
+        }
         emitProgress(
           'success',
           `[${transformName}] Completed - ${entityCount} entities, ${relCount} relationships found`,
@@ -466,6 +501,11 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
         );
       } else if (finalStatus === 'NOT_FOUND') {
         notFoundCount++;
+        if (pipelineItem) {
+          pipelineItem.status = 'not_found';
+          pipelineItem.entitiesFound = 0;
+          pipelineItem.relationshipsFound = 0;
+        }
         emitProgress(
           'info',
           `[${transformName}] Completed - 0 results found on this vector`,
@@ -479,6 +519,10 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
         );
       } else {
         failedCount++;
+        if (pipelineItem) {
+          pipelineItem.status = 'failed';
+          pipelineItem.error = result.error || 'Vector unavailable';
+        }
         emitProgress(
           'warn',
           `[${transformName}] Completed with warning: ${result.error || 'Vector unavailable'}`,
@@ -526,6 +570,10 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
       });
 
       failedCount++;
+      if (pipelineItem) {
+        pipelineItem.status = 'failed';
+        pipelineItem.error = message;
+      }
       emitProgress('warn', `[${transformName}] Failed: ${message}`, {
         type: 'transform_failed',
         transformId,
@@ -556,6 +604,9 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
       : failedCount > 0 || notFoundCount > 0
         ? 'PARTIAL'
         : 'COMPLETED';
+
+  jobState = finalStatus;
+  currentTransformInfo = undefined;
 
   await discoveryJobService.update(job.id, {
     status: finalStatus,

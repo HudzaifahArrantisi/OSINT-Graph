@@ -307,7 +307,7 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
         <div className="p-3 bg-[#0d1627] border-b border-border-subtle flex items-center gap-2">
           <button
             onClick={() => handleOpenUrl(navUrl)}
-            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-button bg-primary hover:bg-primary-hover text-white text-xs font-semibold shadow-md shadow-primary/20 transition-all cursor-pointer"
+            className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-button bg-primary hover:bg-primary-hover text-black text-xs font-semibold shadow-md shadow-primary/20 transition-all cursor-pointer"
             title={`Buka langsung di tab baru: ${navUrl}`}
           >
             <ExternalLink className="w-3.5 h-3.5 shrink-0" />
