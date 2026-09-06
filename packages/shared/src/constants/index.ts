@@ -175,6 +175,7 @@ export const EVIDENCE_SOURCE_TYPES = [
   'IP_GEOLOCATION',
   'SUBDOMAIN_ENUM',
   'SHODAN_HOST',
+  'JS_ENDPOINT_ANALYSIS',
 ] as const;
 
 export type EvidenceSourceType = (typeof EVIDENCE_SOURCE_TYPES)[number];
@@ -201,6 +202,7 @@ export const COLLECTOR_NAMES = [
   'social-rapidapi',
   'shodan-recon',
   'holehe-engine',
+  'xnlinkfinder',
 ] as const;
 
 export type CollectorName = (typeof COLLECTOR_NAMES)[number];

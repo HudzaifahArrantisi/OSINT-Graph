@@ -21,7 +21,7 @@ import type {
   DiscoveryTransformProgressItem,
   LogLevel,
 } from '@nexusgraph/shared';
-import { normalize } from '@nexusgraph/shared';
+import { normalize, normalizeDomain } from '@nexusgraph/shared';
 import { buildDiscoveryPlan } from './planner.js';
 import { parseSeed } from './seed-classifier.js';
 import { executeTransform } from '../transforms/adapter.js';
@@ -78,8 +78,46 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
 
   // Map for tracking entities within this run
   const entityMap = new Map<string, string>();
+  const seedNorm = normalize(seedType, seedValue);
   entityMap.set(normalize('SEED', seedValue), seedEntity.id);
-  entityMap.set(normalize(seedType, seedValue), seedEntity.id);
+  entityMap.set(seedNorm, seedEntity.id);
+  entityMap.set(seedValue.trim().toLowerCase(), seedEntity.id);
+  entityMap.set(seedValue.trim(), seedEntity.id);
+
+  // If seed is a URL, also map its hostname/domain and protocol variations
+  try {
+    const rawUrl = seedValue.startsWith('http') ? seedValue : `https://${seedValue}`;
+    const urlObj = new URL(rawUrl);
+    const host = urlObj.hostname.toLowerCase();
+    const hostNorm = normalizeDomain(host);
+    entityMap.set(normalize('DOMAIN', host), seedEntity.id);
+    entityMap.set(normalize('DOMAIN', hostNorm), seedEntity.id);
+    entityMap.set(host, seedEntity.id);
+    entityMap.set(hostNorm, seedEntity.id);
+    entityMap.set(normalize('URL', `https://${host}`), seedEntity.id);
+    entityMap.set(normalize('URL', `https://${host}/`), seedEntity.id);
+    entityMap.set(normalize('URL', `http://${host}`), seedEntity.id);
+    entityMap.set(normalize('URL', `http://${host}/`), seedEntity.id);
+    entityMap.set(`https://${host}`, seedEntity.id);
+    entityMap.set(`https://${host}/`, seedEntity.id);
+  } catch {
+    // Non-URL seed
+  }
+
+  // If seed is a DOMAIN, also map its URL representations
+  if (seedType === 'DOMAIN' || !seedValue.includes('://')) {
+    const d = normalizeDomain(seedValue);
+    if (d) {
+      entityMap.set(normalize('DOMAIN', d), seedEntity.id);
+      entityMap.set(d, seedEntity.id);
+      entityMap.set(normalize('URL', `https://${d}`), seedEntity.id);
+      entityMap.set(normalize('URL', `https://${d}/`), seedEntity.id);
+      entityMap.set(normalize('URL', `http://${d}`), seedEntity.id);
+      entityMap.set(normalize('URL', `http://${d}/`), seedEntity.id);
+      entityMap.set(`https://${d}`, seedEntity.id);
+      entityMap.set(`https://${d}/`, seedEntity.id);
+    }
+  }
 
   let totalEntities = 0;
   let totalRelationships = 0;
@@ -377,16 +415,49 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
           const sourceNorm = normalize(rel.source_type, rel.source_value);
           const targetNorm = normalize(rel.target_type, rel.target_value);
 
-          let sourceId = entityMap.get(sourceNorm);
-          let targetId = entityMap.get(targetNorm);
+          let sourceId = entityMap.get(sourceNorm) || entityMap.get(rel.source_value.trim());
+          let targetId = entityMap.get(targetNorm) || entityMap.get(rel.target_value.trim());
 
+          // Smart fallback for sourceId
+          if (!sourceId) {
+            const dNorm = normalizeDomain(rel.source_value);
+            if (dNorm) {
+              sourceId = entityMap.get(normalize('DOMAIN', dNorm)) || entityMap.get(dNorm);
+            }
+          }
+          if (!sourceId && rel.source_type === 'URL') {
+            try {
+              const u = new URL(rel.source_value.startsWith('http') ? rel.source_value : `https://${rel.source_value}`);
+              sourceId = entityMap.get(normalize('DOMAIN', u.hostname)) || entityMap.get(u.hostname);
+            } catch {
+              // Ignore invalid url
+            }
+          }
           if (!sourceId) {
             const src = await entityService.findByNormalizedValue(sourceNorm, caseId, userId);
             sourceId = src?.id;
           }
+          if (!sourceId) {
+            const seedDomain = normalizeDomain(seedValue);
+            const sourceDomain = normalizeDomain(rel.source_value);
+            if (
+              rel.source_value.trim().toLowerCase() === seedValue.trim().toLowerCase() ||
+              (seedDomain && sourceDomain && seedDomain === sourceDomain)
+            ) {
+              sourceId = seedEntity.id;
+            }
+          }
+
+          // Smart fallback for targetId
           if (!targetId) {
             const tgt = await entityService.findByNormalizedValue(targetNorm, caseId, userId);
             targetId = tgt?.id;
+          }
+          if (!targetId) {
+            const dNorm = normalizeDomain(rel.target_value);
+            if (dNorm) {
+              targetId = entityMap.get(normalize('DOMAIN', dNorm)) || entityMap.get(dNorm);
+            }
           }
 
           if (sourceId && targetId && sourceId !== targetId) {
@@ -418,6 +489,38 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
             transformId,
             error: err instanceof Error ? err.message : 'unknown',
           });
+        }
+      }
+
+      // Ensure discovered entities are linked to seed if no relationships were formed
+      if (entityCount > 0 && relCount === 0) {
+        for (const candidate of result.entities) {
+          const norm = normalize(candidate.type, candidate.value);
+          const targetId = entityMap.get(norm) || entityMap.get(candidate.value.trim());
+          if (targetId && targetId !== seedEntity.id) {
+            try {
+              const relType =
+                candidate.type === 'URL'
+                  ? 'LINKS_TO'
+                  : candidate.type === 'DOCUMENT'
+                    ? 'OBSERVED_ON'
+                    : 'RELATED_TO';
+              await relationshipService.create(
+                {
+                  source_entity_id: seedEntity.id,
+                  target_entity_id: targetId,
+                  relationship_type: relType,
+                  confidence: candidate.confidence || 80,
+                  reason: `Discovered during transform execution: ${transformName}`,
+                },
+                caseId,
+                userId,
+              );
+              relCount++;
+            } catch {
+              // Ignore duplicate
+            }
+          }
         }
       }
 

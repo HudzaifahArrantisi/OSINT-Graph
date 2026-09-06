@@ -784,6 +784,42 @@ export const graphService = {
       evidenceService.list(caseId, userId),
     ]);
 
+    // Auto-heal / link orphan entities to root seed if case has entities but 0 relationships
+    if (relationships.length === 0 && entities.length > 1) {
+      const seed =
+        entities.find((e) => e.type === 'SEED' || !!(e.metadata as any)?.isSeed) || entities[0];
+      if (seed) {
+        for (const ent of entities) {
+          if (ent.id === seed.id) continue;
+          const relType =
+            ent.type === 'URL'
+              ? 'LINKS_TO'
+              : ent.type === 'DOCUMENT'
+                ? 'OBSERVED_ON'
+                : ent.type === 'IP_ADDRESS'
+                  ? 'RESOLVES_TO'
+                  : 'RELATED_TO';
+
+          try {
+            const created = await relationshipService.create(
+              {
+                source_entity_id: seed.id,
+                target_entity_id: ent.id,
+                relationship_type: relType,
+                confidence: ent.confidence || 85,
+                reason: `Discovered from target ${seed.value || seed.title}`,
+              },
+              caseId,
+              userId,
+            );
+            relationships.push(created);
+          } catch {
+            // Ignore duplicate/conflict
+          }
+        }
+      }
+    }
+
     // Count evidence per entity and per relationship
     const entityEvidenceCount = new Map<string, number>();
     const entityRelCount = new Map<string, number>();

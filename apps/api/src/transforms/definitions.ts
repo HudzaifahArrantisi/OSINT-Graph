@@ -60,6 +60,16 @@ export const TRANSFORM_DEFINITIONS: TransformDefinition[] = [
     enabled: true,
   },
   {
+    id: 'domain.xnlinkfinder-js-params',
+    name: 'Frontend JS & Parameter Recon (xnLinkFinder)',
+    description: 'Crawl target to uncover hidden REST endpoints, query parameters, JS variables, and secrets embedded in frontend JavaScript bundles',
+    inputTypes: ['DOMAIN', 'URL', 'WEBSITE'],
+    outputTypes: ['URL', 'DOCUMENT', 'SUBDOMAIN'],
+    category: 'web',
+    riskLevel: 'low',
+    enabled: true,
+  },
+  {
     id: 'domain.whois-rdap',
     name: 'WHOIS / RDAP Registration Lookup',
     description: 'Query authoritative RFC 7483 RDAP records for domain registrar, creation/expiration dates, nameservers, and registrant details',

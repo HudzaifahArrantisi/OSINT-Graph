@@ -555,7 +555,6 @@ export function StartDiscoveryModal({
             <div className="flex items-center justify-between mb-1.5">
               <div>
                 <label className="text-xs font-medium text-neutral-300 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5 text-neutral-400" />
                   <span>3. Modul Penelusuran ({selectedTransformIds.length} dipilih)</span>
                 </label>
               </div>

@@ -31,7 +31,7 @@ import {
 } from 'lucide-react';
 
 const ENTITY_ICONS: Record<EntityType, React.ComponentType<{ className?: string }>> = {
-  SEED: Radio,
+  SEED: Target,
   DOMAIN: Globe2,
   IP_ADDRESS: Network,
   EMAIL: Mail,
@@ -57,6 +57,72 @@ const ENTITY_ICONS: Record<EntityType, React.ComponentType<{ className?: string 
   WEBSITE: Globe2,
 };
 
+const ENTITY_ACCENT_COLORS: Partial<Record<EntityType, string>> = {
+  URL: 'text-emerald-400',
+  DOMAIN: 'text-sky-400',
+  WEBSITE: 'text-sky-400',
+  SUBDOMAIN: 'text-sky-400',
+  IP_ADDRESS: 'text-cyan-400',
+  DOCUMENT: 'text-amber-400',
+  SEED: 'text-slate-300',
+  PERSON: 'text-indigo-400',
+  EMAIL: 'text-rose-400',
+  PHONE: 'text-teal-400',
+};
+
+function formatEntityDisplay(type: EntityType, value: string, title?: string): { mainText: string; subText: string } {
+  if (type === 'URL') {
+    try {
+      const u = new URL(value.startsWith('http') ? value : `https://${value}`);
+      const isMimeHost = ['text', 'application', 'image', 'font', 'video', 'mode', 'ace'].includes(u.hostname.toLowerCase());
+      if (isMimeHost) {
+        return {
+          mainText: value.replace(/^https?:\/\//, ''),
+          subText: 'Static Asset',
+        };
+      }
+      const pathAndQuery = (u.pathname || '') + (u.search || '');
+      const cleanPath = pathAndQuery === '/' || !pathAndQuery ? u.hostname : pathAndQuery;
+      return {
+        mainText: cleanPath,
+        subText: u.hostname,
+      };
+    } catch {
+      return { mainText: value, subText: 'URL' };
+    }
+  }
+  if (type === 'DOCUMENT') {
+    if (value.includes('#js-parameters')) {
+      return { mainText: title || 'Peta Parameter', subText: 'Frontend JS' };
+    }
+    if (value.includes('?')) {
+      try {
+        const u = new URL(value);
+        return { mainText: u.search || value, subText: 'Parameter JS' };
+      } catch {
+        return { mainText: title || value, subText: 'Parameter JS' };
+      }
+    }
+    return { mainText: title || value, subText: 'Document' };
+  }
+  if (type === 'DOMAIN' || type === 'WEBSITE') {
+    return { mainText: value, subText: 'Domain' };
+  }
+  if (type === 'IP_ADDRESS') {
+    return { mainText: value, subText: 'IP Address' };
+  }
+  if (type === 'LOCATION' && title) {
+    return {
+      mainText: title.replace(/\s*\((country-level|Mr\.Holmes|area code.*?)\)/gi, '').trim(),
+      subText: value,
+    };
+  }
+  return {
+    mainText: title || value,
+    subText: type.replace(/_/g, ' ').toLowerCase(),
+  };
+}
+
 export const EntityNode = memo(({ data, selected }: NodeProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -70,11 +136,7 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
 
   const Icon = ENTITY_ICONS[entityType] || HelpCircle;
 
-  const isLargeGraph = Boolean(nodeData.isLargeGraph);
-  const hideLabel = Boolean(nodeData.hideLabelByDefault) && !isHovered && !selected && !isSeed;
-
-  const nodeSize = isSeed ? 'w-12 h-12' : isLargeGraph ? 'w-8 h-8' : 'w-9 h-9';
-  const iconSize = isSeed ? 'w-5 h-5' : isLargeGraph ? 'w-3.5 h-3.5' : 'w-3.5 h-3.5';
+  const { mainText, subText } = formatEntityDisplay(entityType, value, title);
 
   const provenance =
     nodeData.metadata?.discoveredBy ||
@@ -113,7 +175,7 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
 
   return (
     <div
-      className={`relative flex flex-col items-center select-none group ${
+      className={`relative select-none group ${
         isHovered || selected ? 'z-[99999]' : 'z-10'
       }`}
       onMouseEnter={handleMouseEnter}
@@ -209,66 +271,82 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
         </div>
       </NodeToolbar>
 
-      {/* Main Monochrome Node Badge */}
-      <div
-        className={`rounded-full flex items-center justify-center border transition-all duration-100 cursor-pointer relative ${nodeSize} ${
-          isSeed
-            ? 'bg-[#181818] border-white text-white shadow-md'
-            : 'bg-[#0f0f0f] border-[#2c2c2c] text-neutral-300'
-        } ${
-          selected
-            ? 'ring-1 ring-white border-white scale-105 shadow-lg bg-[#1a1a1a] text-white'
-            : isHovered
-              ? 'scale-105 border-neutral-400 bg-[#161616] text-white'
-              : ''
-        }`}
-      >
-        <Handle
-          type="target"
-          position={Position.Top}
-          className="!w-1 !h-1 !bg-neutral-600 !border-0 !opacity-0 group-hover:!opacity-40"
-        />
-        <Handle
-          type="source"
-          position={Position.Bottom}
-          className="!w-1 !h-1 !bg-neutral-600 !border-0 !opacity-0 group-hover:!opacity-40"
-        />
-        <Handle
-          type="target"
-          position={Position.Left}
-          id="left"
-          className="!w-1 !h-1 !bg-neutral-600 !border-0 !opacity-0 group-hover:!opacity-40"
-        />
-        <Handle
-          type="source"
-          position={Position.Right}
-          id="right"
-          className="!w-1 !h-1 !bg-neutral-600 !border-0 !opacity-0 group-hover:!opacity-40"
-        />
+      {/* Target and Source Handles on all four edges for crisp, non-tangling connections */}
+      <Handle
+        type="target"
+        position={Position.Top}
+        className="!w-2 !h-2 !bg-[#475569] !border-0 !opacity-0 group-hover:!opacity-60"
+      />
+      <Handle
+        type="source"
+        position={Position.Bottom}
+        className="!w-2 !h-2 !bg-[#475569] !border-0 !opacity-0 group-hover:!opacity-60"
+      />
+      <Handle
+        type="target"
+        position={Position.Left}
+        id="left"
+        className="!w-2 !h-2 !bg-[#475569] !border-0 !opacity-0 group-hover:!opacity-60"
+      />
+      <Handle
+        type="source"
+        position={Position.Right}
+        id="right"
+        className="!w-2 !h-2 !bg-[#475569] !border-0 !opacity-0 group-hover:!opacity-60"
+      />
 
-        <Icon className={`${iconSize} transition-transform duration-150`} />
-
-        {/* Seed Target Indicator Badge */}
-        {isSeed && (
-          <span className="absolute -top-0.5 -right-0.5 flex h-3 w-3">
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-white text-black border border-black items-center justify-center">
-              <Target className="w-2 h-2 text-black" strokeWidth={3} />
+      {/* Seed Target Node vs Discovered Entity Badge */}
+      {isSeed ? (
+        <div
+          className={`px-3 py-2 rounded-md border transition-all duration-150 cursor-pointer flex items-center gap-2.5 min-w-[170px] max-w-[220px] select-none ${
+            selected
+              ? 'bg-[#161c28] border-white ring-1 ring-white/20 text-white shadow-lg'
+              : isHovered
+                ? 'bg-[#151922] border-slate-400 text-white shadow-md'
+                : 'bg-[#11141c] border-slate-600/80 text-slate-100'
+          }`}
+        >
+          <Target className="w-4 h-4 text-slate-300 shrink-0" />
+          <div className="flex flex-col min-w-0 leading-tight">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className="text-[8.5px] font-mono uppercase tracking-wider font-semibold text-slate-400 bg-slate-800/80 px-1 py-0.2 rounded border border-slate-700/60">
+                TARGET
+              </span>
+            </div>
+            <span
+              className="font-mono text-xs font-semibold text-white truncate max-w-[155px]"
+              title={value}
+            >
+              {value}
             </span>
-          </span>
-        )}
-      </div>
+          </div>
+        </div>
+      ) : (
+        <div
+          className={`w-[160px] h-[38px] px-2.5 rounded-md border transition-all duration-150 cursor-pointer flex items-center gap-2 select-none ${
+            selected
+              ? 'bg-[#181d28] border-slate-300 ring-1 ring-white/20 text-white shadow-lg'
+              : isHovered
+                ? 'bg-[#141822] border-slate-500 text-slate-100 shadow-md'
+                : 'bg-[#0f1218] border-[#222732] text-slate-300 hover:border-slate-500'
+          }`}
+        >
+          <Icon className={`w-3.5 h-3.5 shrink-0 ${ENTITY_ACCENT_COLORS[entityType] || 'text-slate-400'}`} />
 
-      {/* Underneath Text Label & Category */}
-      {!hideLabel && (
-        <div className="mt-1 flex flex-col items-center max-w-[120px] pointer-events-none text-center animate-in fade-in duration-75">
-          <span
-            className="font-mono text-[9px] leading-tight truncate w-full px-1.5 py-0.5 rounded text-neutral-300 bg-[#0c0c0c]/90 border border-[#222222]"
-            title={title || value}
-          >
-            {entityType === 'LOCATION' && title
-              ? title.replace(/\s*\((country-level|Mr\.Holmes|area code.*?)\)/gi, '').trim()
-              : value}
-          </span>
+          <div className="flex flex-col min-w-0 flex-1 leading-tight">
+            <span
+              className="font-mono text-[10.5px] font-medium text-slate-200 truncate w-full"
+              title={title || value}
+            >
+              {mainText}
+            </span>
+            <span
+              className="font-mono text-[8.5px] text-slate-500 truncate w-full"
+              title={subText}
+            >
+              {subText}
+            </span>
+          </div>
         </div>
       )}
     </div>

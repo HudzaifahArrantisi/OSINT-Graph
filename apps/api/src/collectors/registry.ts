@@ -24,6 +24,7 @@ import { ipGeolocationCollector } from './ip-geolocation.js';
 import { socialRapidapiCollector } from './social-rapidapi.js';
 import { shodanCollector } from './shodan.js';
 import { holeheEngineCollector } from './holehe-engine.js';
+import { xnlinkfinderCollector } from './xnlinkfinder.js';
 import { logger } from '../lib/logger.js';
 
 // Collector registry
@@ -49,6 +50,7 @@ collectors.set('ip-geolocation', ipGeolocationCollector);
 collectors.set('social-rapidapi', socialRapidapiCollector);
 collectors.set('shodan-recon', shodanCollector);
 collectors.set('holehe-engine', holeheEngineCollector);
+collectors.set('xnlinkfinder', xnlinkfinderCollector);
 
 export function getCollector(name: CollectorName): Collector | undefined {
   return collectors.get(name);

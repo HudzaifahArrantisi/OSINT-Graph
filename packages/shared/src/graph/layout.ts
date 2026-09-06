@@ -253,53 +253,42 @@ export function partitionGraphClusters<T extends Record<string, unknown>>(
 
     // Handle disconnected components that don't belong to any seed
     if (unassignedNodes.length > 0) {
-      const visited = new Set<string>();
-      for (const node of unassignedNodes) {
-        if (visited.has(node.id)) continue;
-
-        const compNodes: SimpleNode<T>[] = [];
-        const queue = [node.id];
-        visited.add(node.id);
-
-        while (queue.length > 0) {
-          const curr = queue.shift()!;
-          const nObj = nodeMap.get(curr);
-          if (nObj) compNodes.push(nObj);
-
-          const neighbors = undirectedAdj.get(curr) || [];
-          for (const neighbor of neighbors) {
-            if (!visited.has(neighbor) && !nodeToSeedDist.has(neighbor)) {
-              visited.add(neighbor);
-              queue.push(neighbor);
-            }
-          }
-        }
-
-        const compNodeSet = new Set(compNodes.map((n) => n.id));
-        const compEdges = edges.filter(
-          (e) => compNodeSet.has(e.source) && compNodeSet.has(e.target),
-        );
-
-        clusters.push({
-          id: `comp-${node.id}`,
-          nodes: compNodes,
-          edges: compEdges,
-        });
-      }
+      const uNodeSet = new Set(unassignedNodes.map((n) => n.id));
+      const uEdges = edges.filter(
+        (e) => uNodeSet.has(e.source) && uNodeSet.has(e.target),
+      );
+      clusters.push({
+        id: 'unassigned-satellites',
+        nodes: unassignedNodes,
+        edges: uEdges,
+      });
     }
 
     return clusters;
   }
 
-  // Single seed or no seeds: partition into standard connected components
+  // Single seed: all nodes discovered in this case belong to the investigation seed!
+  if (seeds.length === 1) {
+    const seed = seeds[0];
+    const clusterEdges = edges.filter(
+      (e) => nodeMap.has(e.source) && nodeMap.has(e.target),
+    );
+    return [
+      {
+        id: `seed-${seed.id}`,
+        seedNode: seed,
+        nodes: [seed, ...actualNodes.filter((n) => n.id !== seed.id)],
+        edges: clusterEdges,
+      },
+    ];
+  }
+
+  // No seeds: partition into connected components, grouping single isolated nodes
   const visited = new Set<string>();
   const clusters: GraphCluster<T>[] = [];
+  const isolatedNodes: SimpleNode<T>[] = [];
 
-  const orderedNodes = seeds.length === 1
-    ? [seeds[0], ...actualNodes.filter((n) => n.id !== seeds[0].id)]
-    : actualNodes;
-
-  for (const node of orderedNodes) {
+  for (const node of actualNodes) {
     if (visited.has(node.id)) continue;
 
     const compNodes: SimpleNode<T>[] = [];
@@ -325,13 +314,22 @@ export function partitionGraphClusters<T extends Record<string, unknown>>(
       (e) => compNodeSet.has(e.source) && compNodeSet.has(e.target),
     );
 
-    const compSeed = compNodes.find(isSeedNode);
+    if (compNodes.length === 1 && compEdges.length === 0) {
+      isolatedNodes.push(compNodes[0]);
+    } else {
+      clusters.push({
+        id: `comp-${node.id}`,
+        nodes: compNodes,
+        edges: compEdges,
+      });
+    }
+  }
 
+  if (isolatedNodes.length > 0) {
     clusters.push({
-      id: compSeed ? `seed-${compSeed.id}` : `comp-${node.id}`,
-      seedNode: compSeed,
-      nodes: compNodes,
-      edges: compEdges,
+      id: 'isolated-nodes',
+      nodes: isolatedNodes,
+      edges: [],
     });
   }
 
@@ -344,7 +342,7 @@ export function partitionGraphClusters<T extends Record<string, unknown>>(
 export function layoutStarburst<T extends Record<string, unknown>>(
   centerPos: { x: number; y: number },
   nodes: SimpleNode<T>[],
-  startRadius = 45,
+  startRadius = 120,
   _startAngle = -Math.PI / 2,
   _angleSpan = 2 * Math.PI,
 ): SimpleNode<T>[] {
@@ -362,32 +360,21 @@ export function layoutStarburst<T extends Record<string, unknown>>(
   const result: SimpleNode<T>[] = [];
   let nodeIndex = 0;
   let ringIndex = 0;
-  const RING_STEP = 42; // Compact ring spacing
+  const RING_STEP = 58; // Compact radial spacing between concentric rings
+  const MIN_ARC_PER_NODE = 120; // Compact arc distance per node badge to prevent excessive distance
 
-  // Place first node at center if ringIndex == 0 and many nodes
   while (nodeIndex < nodes.length) {
-    if (ringIndex === 0 && nodes.length > 3) {
-      // Place first 1 node right at the center of the satellite
-      result.push({
-        ...nodes[0],
-        position: { x: centerPos.x, y: centerPos.y },
-      });
-      nodeIndex = 1;
-      ringIndex = 1;
-      continue;
-    }
-
-    const currentRadius = startRadius + (ringIndex - 1) * RING_STEP;
-    // Calculate how many nodes fit nicely around full 360 degree circle at current radius
+    const currentRadius = startRadius + ringIndex * RING_STEP;
+    // Calculate how many nodes fit nicely around 360-degree circle at current radius
     const circumference = 2 * Math.PI * currentRadius;
-    const maxNodesInRing = Math.max(6, Math.floor(circumference / 44));
+    const maxNodesInRing = Math.max(5, Math.floor(circumference / MIN_ARC_PER_NODE));
 
     const remaining = nodes.length - nodeIndex;
     const countInRing = Math.min(remaining, maxNodesInRing);
     const ringNodes = nodes.slice(nodeIndex, nodeIndex + countInRing);
 
     // Stagger alternate rings for triangular close-packing
-    const ringOffsetAngle = (ringIndex % 2 === 1 ? 0 : Math.PI / countInRing) - Math.PI / 2;
+    const ringOffsetAngle = (ringIndex % 2 === 1 ? Math.PI / countInRing : 0) - Math.PI / 2;
 
     ringNodes.forEach((node, i) => {
       const angle = ringOffsetAngle + (2 * Math.PI * i) / countInRing;
@@ -408,7 +395,71 @@ export function layoutStarburst<T extends Record<string, unknown>>(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// 1. Force / Grid Layout (Cluster-Aware)
+// 2D Cluster Grid Packing Helper
+// Prevents multiple clusters or disconnected components from stretching horizontally in 1D
+// ─────────────────────────────────────────────────────────────────────────────
+export interface ClusterBox {
+  width: number;
+  height: number;
+  minX: number;
+  minY: number;
+}
+
+export interface ClusterPlacement {
+  offsetX: number;
+  offsetY: number;
+}
+
+export function computeClusterGridOffsets(
+  boxes: ClusterBox[],
+  gap = 180,
+): ClusterPlacement[] {
+  if (boxes.length === 0) return [];
+  if (boxes.length === 1) {
+    return [
+      {
+        offsetX: Math.abs(boxes[0].minX),
+        offsetY: Math.abs(boxes[0].minY),
+      },
+    ];
+  }
+
+  // Pack clusters in a balanced 2D grid (1 to 3 columns)
+  const cols = Math.max(1, Math.min(3, Math.ceil(Math.sqrt(boxes.length))));
+  const numRows = Math.ceil(boxes.length / cols);
+
+  const colWidths = new Array(cols).fill(0);
+  const rowHeights = new Array(numRows).fill(0);
+
+  boxes.forEach((box, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    if (box.width > colWidths[col]) colWidths[col] = box.width;
+    if (box.height > rowHeights[row]) rowHeights[row] = box.height;
+  });
+
+  const colStarts = [0];
+  for (let c = 1; c < cols; c++) {
+    colStarts[c] = colStarts[c - 1] + colWidths[c - 1] + gap;
+  }
+
+  const rowStarts = [0];
+  for (let r = 1; r < numRows; r++) {
+    rowStarts[r] = rowStarts[r - 1] + rowHeights[r - 1] + gap;
+  }
+
+  return boxes.map((box, i) => {
+    const col = i % cols;
+    const row = Math.floor(i / cols);
+    return {
+      offsetX: colStarts[col] + Math.abs(box.minX),
+      offsetY: rowStarts[row] + Math.abs(box.minY),
+    };
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// 1. Force / Grid Layout (Cluster-Aware 2D Organic Layout)
 // ─────────────────────────────────────────────────────────────────────────────
 export function applyForceLayout<T extends Record<string, unknown>>(
   nodes: SimpleNode<T>[],
@@ -420,13 +471,20 @@ export function applyForceLayout<T extends Record<string, unknown>>(
   const clusters = partitionGraphClusters(nodes, edges);
   if (clusters.length === 0) return nodes;
 
-  let currentOffsetX = 0;
-  const result: SimpleNode<T>[] = [];
-  const CLUSTER_GAP = 140;
+  const clusterBoxes: ClusterBox[] = [];
+  const clusterRelativePositions: Array<Map<string, { x: number; y: number }>> = [];
 
   for (const cluster of clusters) {
     const cNodes = cluster.nodes;
     const cEdges = cluster.edges;
+    const posMap = new Map<string, { x: number; y: number }>();
+
+    if (cNodes.length === 1) {
+      posMap.set(cNodes[0].id, { x: 0, y: 0 });
+      clusterRelativePositions.push(posMap);
+      clusterBoxes.push({ width: 140, height: 100, minX: -70, minY: -50 });
+      continue;
+    }
 
     const connections = new Map<string, string[]>();
     cNodes.forEach((n) => connections.set(n.id, []));
@@ -442,29 +500,136 @@ export function applyForceLayout<T extends Record<string, unknown>>(
 
     nodeDegrees.sort((a, b) => b.degree - a.degree);
 
-    const cols = Math.max(3, Math.ceil(Math.sqrt(cNodes.length * 1.5)));
-    const xSpacing = 130;
-    const ySpacing = 110;
+    const connected = nodeDegrees.filter((item) => item.degree > 0);
+    const isolated = nodeDegrees.filter((item) => item.degree === 0);
 
-    const clusterWidth = cols * xSpacing;
+    const xSpacing = 160;
+    const ySpacing = 120;
 
-    nodeDegrees.forEach((item, index) => {
-      const row = Math.floor(index / cols);
-      const col = index % cols;
-      const jitterX = ((index * 37) % 20) - 10;
-      const jitterY = ((index * 23) % 16) - 8;
+    // If all nodes are isolated or graph has very few edges:
+    // Arrange in a clean, balanced, data-dense 2D grid matrix centered around (0, 0)
+    if (connected.length <= 1) {
+      const allItems = nodeDegrees;
+      const cols = Math.max(3, Math.min(8, Math.ceil(Math.sqrt(allItems.length * 1.5))));
+      const rows = Math.ceil(allItems.length / cols);
+      const startX = -((cols - 1) * xSpacing) / 2;
+      const startY = -((rows - 1) * ySpacing) / 2;
 
+      allItems.forEach((item, index) => {
+        const r = Math.floor(index / cols);
+        const c = index % cols;
+        const jitterX = ((index * 37) % 16) - 8;
+        const jitterY = ((index * 23) % 12) - 6;
+        posMap.set(item.node.id, {
+          x: Math.round(startX + c * xSpacing + jitterX + (r % 2 === 1 ? xSpacing / 4 : 0)),
+          y: Math.round(startY + r * ySpacing + jitterY),
+        });
+      });
+    } else {
+      // Connected nodes: Seed at center (0, 0), remaining nodes arranged by degree & spring relaxation
+      const cols = Math.max(3, Math.min(7, Math.ceil(Math.sqrt(connected.length * 1.3))));
+      const rows = Math.ceil(connected.length / cols);
+      const startX = -((cols - 1) * xSpacing) / 2;
+      const startY = -((rows - 1) * ySpacing) / 2;
+
+      connected.forEach((item, index) => {
+        const r = Math.floor(index / cols);
+        const c = index % cols;
+        const jitterX = ((index * 31) % 16) - 8;
+        const jitterY = ((index * 19) % 12) - 6;
+        posMap.set(item.node.id, {
+          x: Math.round(startX + c * xSpacing + jitterX + (r % 2 === 1 ? xSpacing / 4 : 0)),
+          y: Math.round(startY + r * ySpacing + jitterY),
+        });
+      });
+
+      // Quick spring relaxation (15 iterations) to pull connected nodes toward each other
+      for (let iter = 0; iter < 15; iter++) {
+        cEdges.forEach((e) => {
+          const p1 = posMap.get(e.source);
+          const p2 = posMap.get(e.target);
+          if (!p1 || !p2) return;
+          const dx = p2.x - p1.x;
+          const dy = p2.y - p1.y;
+          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+          const targetDist = 130;
+          const force = (dist - targetDist) * 0.05;
+          const nx = (dx / dist) * force;
+          const ny = (dy / dist) * force;
+          if (!isSeedNode(nodeDegrees.find((n) => n.node.id === e.source)?.node!)) {
+            p1.x += nx;
+            p1.y += ny;
+          }
+          if (!isSeedNode(nodeDegrees.find((n) => n.node.id === e.target)?.node!)) {
+            p2.x -= nx;
+            p2.y -= ny;
+          }
+        });
+      }
+
+      // If isolated nodes exist alongside connected nodes, place them in a neat shelf below
+      if (isolated.length > 0) {
+        let maxConnectedY = 0;
+        posMap.forEach((pos) => {
+          if (pos.y > maxConnectedY) maxConnectedY = pos.y;
+        });
+
+        const isoCols = Math.max(3, Math.min(8, Math.ceil(Math.sqrt(isolated.length * 1.5))));
+        const isoStartX = -((isoCols - 1) * xSpacing) / 2;
+        const isoStartY = maxConnectedY + 140;
+
+        isolated.forEach((item, index) => {
+          const r = Math.floor(index / isoCols);
+          const c = index % isoCols;
+          const jitterX = ((index * 37) % 14) - 7;
+          const jitterY = ((index * 23) % 10) - 5;
+          posMap.set(item.node.id, {
+            x: Math.round(isoStartX + c * xSpacing + jitterX),
+            y: Math.round(isoStartY + r * ySpacing + jitterY),
+          });
+        });
+      }
+    }
+
+    // Measure bounding box of this cluster
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    posMap.forEach((pos) => {
+      if (pos.x < minX) minX = pos.x;
+      if (pos.x > maxX) maxX = pos.x;
+      if (pos.y < minY) minY = pos.y;
+      if (pos.y > maxY) maxY = pos.y;
+    });
+
+    clusterBoxes.push({
+      width: Math.max(140, maxX - minX),
+      height: Math.max(100, maxY - minY),
+      minX: minX === Infinity ? 0 : minX,
+      minY: minY === Infinity ? 0 : minY,
+    });
+    clusterRelativePositions.push(posMap);
+  }
+
+  const placements = computeClusterGridOffsets(clusterBoxes, 180);
+  const result: SimpleNode<T>[] = [];
+
+  clusters.forEach((cluster, cIdx) => {
+    const posMap = clusterRelativePositions[cIdx];
+    const placement = placements[cIdx];
+
+    cluster.nodes.forEach((n) => {
+      const p = posMap.get(n.id) || { x: 0, y: 0 };
       result.push({
-        ...item.node,
+        ...n,
         position: {
-          x: currentOffsetX + col * xSpacing + jitterX + (row % 2 === 1 ? xSpacing / 3 : 0),
-          y: row * ySpacing + jitterY,
+          x: Math.round(placement.offsetX + p.x),
+          y: Math.round(placement.offsetY + p.y),
         },
       });
     });
-
-    currentOffsetX += clusterWidth + CLUSTER_GAP;
-  }
+  });
 
   return result;
 }
@@ -480,13 +645,20 @@ export function applyHierarchicalLayout<T extends Record<string, unknown>>(
   if (nodes.length === 1) return [{ ...nodes[0], position: { x: 0, y: 0 } }];
 
   const clusters = partitionGraphClusters(nodes, edges);
-  let currentOffsetX = 0;
-  const result: SimpleNode<T>[] = [];
-  const CLUSTER_GAP = 160;
+  const clusterBoxes: ClusterBox[] = [];
+  const clusterRelativePositions: Array<Map<string, { x: number; y: number }>> = [];
 
   for (const cluster of clusters) {
     const cNodes = cluster.nodes;
     const cEdges = cluster.edges;
+    const posMap = new Map<string, { x: number; y: number }>();
+
+    if (cNodes.length === 1) {
+      posMap.set(cNodes[0].id, { x: 0, y: 0 });
+      clusterRelativePositions.push(posMap);
+      clusterBoxes.push({ width: 160, height: 100, minX: -80, minY: -50 });
+      continue;
+    }
 
     const inDegree = new Map<string, number>();
     const outDegree = new Map<string, number>();
@@ -507,6 +679,7 @@ export function applyHierarchicalLayout<T extends Record<string, unknown>>(
     const layers = new Map<string, number>();
     const queue: string[] = [];
 
+    // Root node: seed node takes top precedence, then in-degree 0 nodes
     if (cluster.seedNode) {
       layers.set(cluster.seedNode.id, 0);
       queue.push(cluster.seedNode.id);
@@ -537,6 +710,7 @@ export function applyHierarchicalLayout<T extends Record<string, unknown>>(
       });
     }
 
+    // Any unlinked nodes in this cluster belong to Layer 1 (direct discoveries under root)
     cNodes.forEach((n) => {
       if (!layers.has(n.id)) {
         layers.set(n.id, 1);
@@ -552,34 +726,116 @@ export function applyHierarchicalLayout<T extends Record<string, unknown>>(
       layerGroups.get(layer)!.push(n);
     });
 
-    const xSpacing = 130;
-    const ySpacing = 140;
-    let maxLayerWidth = 0;
+    const CARD_W = 160;
+    const CARD_GAP_X = 24;
+    const xSpacing = CARD_W + CARD_GAP_X; // 184px spacing between node columns
+    const layerYSpacing = 160; // Clean vertical drop between Seed and child layers
+    const subRowSpacing = 56; // 38px node height + 18px vertical row gap
+    const CATEGORY_BLOCK_GAP = 48; // Clear horizontal separation between distinct category clusters
 
-    layerGroups.forEach((groupNodes) => {
-      const width = groupNodes.length * xSpacing;
-      if (width > maxLayerWidth) maxLayerWidth = width;
-    });
-
-    const clusterCenterX = currentOffsetX + maxLayerWidth / 2;
-
+    // Arrange nodes per layer with sub-row wrapping to prevent infinite horizontal lines!
     layerGroups.forEach((groupNodes, layerIndex) => {
-      const totalWidth = (groupNodes.length - 1) * xSpacing;
-      const startX = clusterCenterX - totalWidth / 2;
+      const layerBaseY = layerIndex * layerYSpacing;
 
-      groupNodes.forEach((node, nodeIndex) => {
-        result.push({
-          ...node,
-          position: {
-            x: startX + nodeIndex * xSpacing,
-            y: layerIndex * ySpacing,
-          },
+      if (layerIndex === 0) {
+        // Layer 0: Root nodes centered at (0, layerBaseY)
+        const totalW = (groupNodes.length - 1) * xSpacing;
+        const startX = -totalW / 2;
+        groupNodes.forEach((n, i) => {
+          posMap.set(n.id, { x: Math.round(startX + i * xSpacing), y: layerBaseY });
         });
+        return;
+      }
+
+      // Group nodes by category on this layer
+      const catGroups = new Map<string, SimpleNode<T>[]>();
+      groupNodes.forEach((n) => {
+        const k = getSubCategoryKey(n);
+        if (!catGroups.has(k)) catGroups.set(k, []);
+        catGroups.get(k)!.push(n);
+      });
+
+      // Calculate width of each category block (each block has max 5 cols)
+      const MAX_COLS_PER_BLOCK = 5;
+      const catBlocks: Array<{
+        catKey: string;
+        nodes: SimpleNode<T>[];
+        cols: number;
+        rows: number;
+        spanWidth: number;
+      }> = [];
+
+      catGroups.forEach((catGroupNodes, catKey) => {
+        const cols = Math.min(catGroupNodes.length, MAX_COLS_PER_BLOCK);
+        const rows = Math.ceil(catGroupNodes.length / cols);
+        catBlocks.push({
+          catKey,
+          nodes: catGroupNodes,
+          cols,
+          rows,
+          spanWidth: cols * xSpacing,
+        });
+      });
+
+      const totalBlocksWidth =
+        catBlocks.reduce((acc, b) => acc + b.spanWidth, 0) +
+        Math.max(0, catBlocks.length - 1) * CATEGORY_BLOCK_GAP;
+
+      let currentBlockX = -totalBlocksWidth / 2;
+
+      catBlocks.forEach((block) => {
+        const startX = currentBlockX;
+        block.nodes.forEach((n, i) => {
+          const col = i % block.cols;
+          const row = Math.floor(i / block.cols);
+          posMap.set(n.id, {
+            x: Math.round(startX + col * xSpacing),
+            y: Math.round(layerBaseY + row * subRowSpacing),
+          });
+        });
+        currentBlockX += block.spanWidth + CATEGORY_BLOCK_GAP;
       });
     });
 
-    currentOffsetX += Math.max(maxLayerWidth, 200) + CLUSTER_GAP;
+    // Measure bounding box
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    posMap.forEach((pos) => {
+      if (pos.x < minX) minX = pos.x;
+      if (pos.x > maxX) maxX = pos.x;
+      if (pos.y < minY) minY = pos.y;
+      if (pos.y > maxY) maxY = pos.y;
+    });
+
+    clusterBoxes.push({
+      width: Math.max(160, maxX - minX),
+      height: Math.max(100, maxY - minY),
+      minX: minX === Infinity ? 0 : minX,
+      minY: minY === Infinity ? 0 : minY,
+    });
+    clusterRelativePositions.push(posMap);
   }
+
+  const placements = computeClusterGridOffsets(clusterBoxes, 200);
+  const result: SimpleNode<T>[] = [];
+
+  clusters.forEach((cluster, cIdx) => {
+    const posMap = clusterRelativePositions[cIdx];
+    const placement = placements[cIdx];
+
+    cluster.nodes.forEach((n) => {
+      const p = posMap.get(n.id) || { x: 0, y: 0 };
+      result.push({
+        ...n,
+        position: {
+          x: Math.round(placement.offsetX + p.x),
+          y: Math.round(placement.offsetY + p.y),
+        },
+      });
+    });
+  });
 
   return result;
 }
@@ -601,17 +857,18 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
   if (actualNodes.length === 0) return [];
 
   const clusters = partitionGraphClusters(actualNodes, edges);
-  let currentOffsetX = 0;
-  const result: SimpleNode<T>[] = [];
-  const CLUSTER_GAP = 280;
+  const clusterBoxes: ClusterBox[] = [];
+  const clusterRelativePositions: Array<Map<string, { x: number; y: number }>> = [];
 
   for (const cluster of clusters) {
     const cNodes = cluster.nodes;
     const cEdges = cluster.edges;
+    const posMap = new Map<string, { x: number; y: number }>();
 
     if (cNodes.length === 1) {
-      result.push({ ...cNodes[0], position: { x: currentOffsetX, y: 0 } });
-      currentOffsetX += 200 + CLUSTER_GAP;
+      posMap.set(cNodes[0].id, { x: 0, y: 0 });
+      clusterRelativePositions.push(posMap);
+      clusterBoxes.push({ width: 160, height: 100, minX: -80, minY: -50 });
       continue;
     }
 
@@ -627,7 +884,7 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
       }
     });
 
-    // Root focal node (seed target, e.g. Domain or Apex)
+    // Root focal node: Seed node first, or highest degree node
     let root: SimpleNode<T>;
     if (cluster.seedNode) {
       root = cluster.seedNode;
@@ -640,9 +897,11 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
       root = degrees[0].node;
     }
 
+    posMap.set(root.id, { x: 0, y: 0 });
+
     const nonRootNodes = cNodes.filter((n) => n.id !== root.id);
 
-    // Group EVERY non-root node strictly by its category key (subcat_ip, subcat_dns, subcat_tech, subcat_tls, subcat_subdomain, etc.)
+    // Group EVERY non-root node strictly by its category key
     const categoryGroups = new Map<string, SimpleNode<T>[]>();
     nonRootNodes.forEach((node) => {
       const catKey = getSubCategoryKey(node);
@@ -661,86 +920,126 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
 
     const numCategories = categoryKeys.length;
 
-    const positions = new Map<string, { x: number; y: number }>();
-    positions.set(root.id, { x: 0, y: 0 });
-
     if (numCategories === 0) {
-      result.push({ ...root, position: { x: currentOffsetX, y: 0 } });
-      currentOffsetX += 200 + CLUSTER_GAP;
+      clusterBoxes.push({ width: 160, height: 100, minX: -80, minY: -50 });
+      clusterRelativePositions.push(posMap);
       continue;
     }
 
-    // Determine cluster footprint radius for each category flower
-    const categoryFootprints = new Map<string, number>();
-    categoryKeys.forEach((key) => {
-      const count = categoryGroups.get(key)!.length;
-      if (count <= 1) {
-        categoryFootprints.set(key, 25);
-      } else if (count <= 6) {
-        categoryFootprints.set(key, 55);
-      } else if (count <= 18) {
-        categoryFootprints.set(key, 95);
-      } else if (count <= 40) {
-        categoryFootprints.set(key, 140);
-      } else {
-        categoryFootprints.set(key, Math.min(220, 140 + Math.sqrt(count) * 6));
-      }
-    });
+    const totalNonRoot = nonRootNodes.length;
+    const dominantCategory = categoryKeys[0];
+    const dominantCount = categoryGroups.get(dominantCategory)?.length || 0;
+    const isSingleDominant =
+      numCategories === 1 ||
+      (dominantCount / Math.max(1, totalNonRoot) >= 0.75 && dominantCount >= 10);
 
-    // Compute global orbit radius from seed to category centers
-    // Ensures adjacent satellite flowers never collide
-    let maxFootprint = 0;
-    categoryFootprints.forEach((fp) => {
-      if (fp > maxFootprint) maxFootprint = fp;
-    });
+    if (isSingleDominant) {
+      // Dominant category (e.g. all endpoints discovered from target):
+      // Bloom in balanced, non-overlapping concentric dandelion rings directly around the seed!
+      const dominantNodes = categoryGroups.get(dominantCategory)!;
+      const starNodes = layoutStarburst(
+        { x: 0, y: 0 },
+        dominantNodes,
+        125, // Compact startRadius so root seed has clean breathing space without pushing nodes too far
+      );
+      starNodes.forEach((sn) => {
+        posMap.set(sn.id, { x: sn.position.x, y: sn.position.y });
+      });
 
-    // Minimum angular separation chord length >= 2 * maxFootprint + 40px margin
-    const minChord = Math.max(160, 2 * maxFootprint * 0.85 + 50);
-    const requiredOrbitForAngle = minChord / (2 * Math.sin(Math.PI / Math.max(numCategories, 2)));
-    const globalOrbitRadius = Math.max(180, Math.min(650, requiredOrbitForAngle));
-
-    // Arrange each category satellite around the seed
-    categoryKeys.forEach((catKey, idx) => {
-      const catNodes = categoryGroups.get(catKey)!;
-      const count = catNodes.length;
-
-      // Position category center angle
-      const catAngle = -Math.PI / 2 + (2 * Math.PI * idx) / numCategories;
-      const centerX = Math.round(Math.cos(catAngle) * globalOrbitRadius);
-      const centerY = Math.round(Math.sin(catAngle) * globalOrbitRadius);
-
-      if (count === 1) {
-        positions.set(catNodes[0].id, { x: centerX, y: centerY });
-      } else if (count <= 6) {
-        // Small category: Primary category node at center (0), remaining 5 in a circle around it
-        positions.set(catNodes[0].id, { x: centerX, y: centerY });
-        const ringNodes = catNodes.slice(1);
-        const ringRadius = 46;
-        ringNodes.forEach((node, i) => {
-          const a = catAngle - Math.PI / 2 + (2 * Math.PI * i) / ringNodes.length;
-          positions.set(node.id, {
-            x: Math.round(centerX + Math.cos(a) * ringRadius),
-            y: Math.round(centerY + Math.sin(a) * ringRadius),
-          });
-        });
-      } else {
-        // Multi-node category: Primary node at (centerX, centerY), children blossoming in 360° concentric dandelion rings
-        const starNodes = layoutStarburst(
-          { x: centerX, y: centerY },
-          catNodes,
-          44, // start radius
-          catAngle,
-          2 * Math.PI,
-        );
+      // Place any remaining minor categories in clear outer satellite orbits
+      const remainingKeys = categoryKeys.slice(1);
+      if (remainingKeys.length > 0) {
+        let maxStarDist = 130;
         starNodes.forEach((sn) => {
-          positions.set(sn.id, { x: sn.position.x, y: sn.position.y });
+          const d = Math.hypot(sn.position.x, sn.position.y);
+          if (d > maxStarDist) maxStarDist = d;
+        });
+
+        const minorOrbitRadius = maxStarDist + 65;
+        remainingKeys.forEach((k, rIdx) => {
+          const minorNodes = categoryGroups.get(k)!;
+          const minorAngle = Math.PI / 2 + (Math.PI * (rIdx + 1)) / (remainingKeys.length + 1);
+          const cx = Math.round(Math.cos(minorAngle) * minorOrbitRadius);
+          const cy = Math.round(Math.sin(minorAngle) * minorOrbitRadius);
+
+          if (minorNodes.length === 1) {
+            posMap.set(minorNodes[0].id, { x: cx, y: cy });
+          } else {
+            const mStar = layoutStarburst({ x: cx, y: cy }, minorNodes, 90);
+            mStar.forEach((msn) => posMap.set(msn.id, { x: msn.position.x, y: msn.position.y }));
+          }
         });
       }
-    });
+    } else {
+      // Multiple balanced categories: Place each category flower in a spacious orbit around the seed
+      const categoryFootprints = new Map<string, number>();
+      categoryKeys.forEach((key) => {
+        const count = categoryGroups.get(key)!.length;
+        if (count <= 1) {
+          categoryFootprints.set(key, 60);
+        } else if (count <= 6) {
+          categoryFootprints.set(key, 110);
+        } else if (count <= 18) {
+          categoryFootprints.set(key, 170);
+        } else if (count <= 40) {
+          categoryFootprints.set(key, 240);
+        } else {
+          categoryFootprints.set(key, Math.min(340, 240 + Math.sqrt(count) * 10));
+        }
+      });
 
-    // Inter-node relaxation to eliminate any micro-overlaps
-    const posList = Array.from(positions.entries()).filter(([id]) => id !== root.id);
-    for (let iter = 0; iter < 12; iter++) {
+      let maxFootprint = 0;
+      categoryFootprints.forEach((fp) => {
+        if (fp > maxFootprint) maxFootprint = fp;
+      });
+
+      const minChord = Math.max(180, 2 * maxFootprint * 0.8 + 60);
+      const requiredOrbitForAngle = minChord / (2 * Math.sin(Math.PI / Math.max(numCategories, 2)));
+      const globalOrbitRadius = Math.max(200, Math.min(550, requiredOrbitForAngle));
+
+      categoryKeys.forEach((catKey, idx) => {
+        const catNodes = categoryGroups.get(catKey)!;
+        const count = catNodes.length;
+
+        // Distribute category centers around full 360 circle
+        const catAngle = -Math.PI / 2 + (2 * Math.PI * idx) / numCategories;
+        const centerX = Math.round(Math.cos(catAngle) * globalOrbitRadius);
+        const centerY = Math.round(Math.sin(catAngle) * globalOrbitRadius);
+
+        if (count === 1) {
+          posMap.set(catNodes[0].id, { x: centerX, y: centerY });
+        } else if (count <= 6) {
+          posMap.set(catNodes[0].id, { x: centerX, y: centerY });
+          const ringNodes = catNodes.slice(1);
+          const ringRadius = 80;
+          ringNodes.forEach((node, i) => {
+            const a = catAngle - Math.PI / 2 + (2 * Math.PI * i) / ringNodes.length;
+            posMap.set(node.id, {
+              x: Math.round(centerX + Math.cos(a) * ringRadius),
+              y: Math.round(centerY + Math.sin(a) * ringRadius),
+            });
+          });
+        } else {
+          const starNodes = layoutStarburst(
+            { x: centerX, y: centerY },
+            catNodes,
+            90,
+            catAngle,
+            2 * Math.PI,
+          );
+          starNodes.forEach((sn) => {
+            posMap.set(sn.id, { x: sn.position.x, y: sn.position.y });
+          });
+        }
+      });
+    }
+
+    // Elliptical inter-node relaxation to eliminate any remaining overlaps
+    const posList = Array.from(posMap.entries()).filter(([id]) => id !== root.id);
+    const NODE_BOX_W = 162; // Entity node badge width (160px) + 2px safety margin
+    const NODE_BOX_H = 44; // Entity node badge height (38px) + 6px breathing gap
+
+    for (let iter = 0; iter < 10; iter++) {
       let moved = false;
       for (let i = 0; i < posList.length; i++) {
         for (let j = i + 1; j < posList.length; j++) {
@@ -748,18 +1047,20 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
           const p2 = posList[j][1];
           const dx = p2.x - p1.x;
           const dy = p2.y - p1.y;
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const minDist = 46;
 
-          if (dist < minDist) {
-            const overlap = (minDist - dist) / 2;
-            const nx = (dx / dist) * overlap;
-            const ny = (dy / dist) * overlap;
+          // Elliptical normalized distance
+          const normDist = Math.hypot(dx / NODE_BOX_W, dy / NODE_BOX_H);
 
-            p1.x -= nx;
-            p1.y -= ny;
-            p2.x += nx;
-            p2.y += ny;
+          if (normDist < 0.92) {
+            const safeDist = normDist || 0.001;
+            const overlapRatio = (0.92 - normDist) / 2;
+            const shiftX = Math.round((dx / safeDist) * overlapRatio * 0.35 * NODE_BOX_W);
+            const shiftY = Math.round((dy / safeDist) * overlapRatio * 0.35 * NODE_BOX_H);
+
+            p1.x -= shiftX || 1;
+            p1.y -= shiftY || 1;
+            p2.x += shiftX || 1;
+            p2.y += shiftY || 1;
             moved = true;
           }
         }
@@ -768,29 +1069,44 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
     }
 
     // Measure cluster bounding box
-    let minX = 0;
-    let maxX = 0;
-    positions.forEach((pos) => {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    posMap.forEach((pos) => {
       if (pos.x < minX) minX = pos.x;
       if (pos.x > maxX) maxX = pos.x;
+      if (pos.y < minY) minY = pos.y;
+      if (pos.y > maxY) maxY = pos.y;
     });
 
-    const clusterWidth = maxX - minX;
-    const clusterCenterX = currentOffsetX + Math.abs(minX) + 60;
+    clusterBoxes.push({
+      width: Math.max(160, maxX - minX),
+      height: Math.max(120, maxY - minY),
+      minX: minX === Infinity ? 0 : minX,
+      minY: minY === Infinity ? 0 : minY,
+    });
+    clusterRelativePositions.push(posMap);
+  }
 
-    cNodes.forEach((n) => {
-      const pos = positions.get(n.id) || { x: 0, y: 0 };
+  const placements = computeClusterGridOffsets(clusterBoxes, 240);
+  const result: SimpleNode<T>[] = [];
+
+  clusters.forEach((cluster, cIdx) => {
+    const posMap = clusterRelativePositions[cIdx];
+    const placement = placements[cIdx];
+
+    cluster.nodes.forEach((n) => {
+      const p = posMap.get(n.id) || { x: 0, y: 0 };
       result.push({
         ...n,
         position: {
-          x: clusterCenterX + pos.x,
-          y: pos.y,
+          x: Math.round(placement.offsetX + p.x),
+          y: Math.round(placement.offsetY + p.y),
         },
       });
     });
-
-    currentOffsetX += clusterWidth + 120 + CLUSTER_GAP;
-  }
+  });
 
   return result;
 }

@@ -21,6 +21,7 @@ export interface DiscoveryPlanOutput {
 /** Specific transform lists per seed type for deterministic, evidence-backed planning */
 const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   URL: [
+    'domain.xnlinkfinder-js-params',
     'domain.webpage-metadata',
     'domain.resolve-dns',
     'domain.find-tls',
@@ -31,6 +32,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'mentions.search-public-web',
   ],
   DOMAIN: [
+    'domain.xnlinkfinder-js-params',
     'domain.resolve-dns',
     'domain.whois-rdap',
     'domain.find-tls',

@@ -304,7 +304,7 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
 
       {/* Direct Navigation & Action Bar for URLs / Domains / Social Profiles */}
       {selectedEntity && navUrl && (
-        <div className="p-3 bg-[#0d1627] border-b border-border-subtle flex items-center gap-2">
+        <div className="p-3 bg-[#000000] border-b border-border-subtle flex items-center gap-2">
           <button
             onClick={() => handleOpenUrl(navUrl)}
             className="flex-1 flex items-center justify-center gap-1.5 py-1.5 px-3 rounded-button bg-primary hover:bg-primary-hover text-black text-xs font-semibold shadow-md shadow-primary/20 transition-all cursor-pointer"

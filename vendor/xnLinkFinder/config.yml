@@ -1,0 +1,28 @@
+# xnLinkFinder Configuration for NexusGraph OSINT Engine
+# Reference: https://github.com/xnl-h4ck3r/xnLinkFinder
+
+# Strings in URLs to exclude from link discovery
+linkExclude: .css,.jpg,.jpeg,.png,.svg,.img,.gif,.mp4,.flv,.ogv,.webm,.webp,.pdf,.woff,.woff2,.ico,.ttf,.eot,.mp3,.m4a,.ogg,.wav,.doc,.docx,.xls,.xlsx,.ppt,.pptx
+
+# Content-Types to skip
+contentExclude: text/css,image/jpeg,image/jpg,image/png,image/x-icon,image/svg+xml,font/ttf,font/woff,font/woff2
+
+# File extensions to ignore
+fileExtExclude: .zip,.gz,.tar,.rar,.7z,.iso,.bin,.exe,.apk,.dmg,.pkg,.msi
+
+# Interesting regex files to detect endpoints
+regexFiles: php|php3|php5|phtml|asp|aspx|jsp|jspa|action|do|json|action|xml|env|config|bak|swp|yml|yaml|sql|txt
+
+# Parameter Extraction Directives (JavaScript & Frontend code focus)
+respParamLinksFound: True
+respParamPathWords: True
+respParamJSON: True
+respParamJSVars: True
+respParamXML: True
+respParamInputField: True
+respParamMetaName: True
+
+# Wordlist settings
+wordsContentTypes: text/html,text/plain,application/json,application/javascript
+stopWords: then,this,that,from,with,have,were,which,their,there,about,would,these,other,could,after,first,than,some,look,only,come,over,think,also,back,after,use,two,how,our,work,well,way,even,new,want,because,any,these,give,day,most,us
+commonTLDs: com,org,net,edu,gov,io,co,id,co.id,ac.id,go.id,me,info,biz,dev,app,ai,cloud,xyz

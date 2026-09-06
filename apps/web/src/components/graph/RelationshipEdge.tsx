@@ -3,6 +3,8 @@ import {
   BaseEdge,
   EdgeLabelRenderer,
   getStraightPath,
+  getBezierPath,
+  Position,
   EdgeProps,
 } from '@xyflow/react';
 
@@ -13,18 +15,32 @@ export const RelationshipEdge = memo(
     sourceY,
     targetX,
     targetY,
+    sourcePosition,
+    targetPosition,
     style = {},
     markerEnd,
     selected,
     data,
   }: EdgeProps) => {
     const [hovered, setHovered] = useState(false);
-    const [edgePath, labelX, labelY] = getStraightPath({
-      sourceX,
-      sourceY,
-      targetX,
-      targetY,
-    });
+
+    // If source is clearly above target (Hierarchical Tree layout), use smooth tree branching curve
+    const isVerticalTree = targetY > sourceY + 40;
+    const [edgePath, labelX, labelY] = isVerticalTree
+      ? getBezierPath({
+          sourceX,
+          sourceY,
+          sourcePosition: sourcePosition || Position.Bottom,
+          targetX,
+          targetY,
+          targetPosition: targetPosition || Position.Top,
+        })
+      : getStraightPath({
+          sourceX,
+          sourceY,
+          targetX,
+          targetY,
+        });
 
     const edgeData = (data || {}) as Record<string, any>;
     const relType = edgeData.relationshipType || 'RELATED_TO';
@@ -44,18 +60,18 @@ export const RelationshipEdge = memo(
           onMouseLeave={() => setHovered(false)}
         />
 
-        {/* Visible clean straight ray edge in monochrome */}
+        {/* Visible clean connection cable with crisp dark-slate styling */}
         <BaseEdge
           id={id}
           path={edgePath}
           markerEnd={markerEnd}
           style={{
             ...(style || {}),
-            stroke: selected ? '#ffffff' : hovered ? '#a3a3a3' : '#333333',
-            strokeWidth: selected ? 1.75 : hovered ? 1.5 : 1,
-            strokeDasharray: relType === 'CONTAINS' ? '3 3' : undefined,
-            opacity: selected ? 1 : hovered ? 0.9 : 0.6,
-            transition: 'stroke 0.1s ease, stroke-width 0.1s ease, opacity 0.1s ease',
+            stroke: selected ? '#38bdf8' : hovered ? '#cbd5e1' : '#64748b',
+            strokeWidth: selected ? 2.5 : hovered ? 2 : 1.5,
+            strokeDasharray: relType === 'CONTAINS' ? '4 4' : undefined,
+            opacity: selected ? 1 : hovered ? 1 : 0.85,
+            transition: 'stroke 0.15s ease, stroke-width 0.15s ease, opacity 0.15s ease',
           }}
         />
 

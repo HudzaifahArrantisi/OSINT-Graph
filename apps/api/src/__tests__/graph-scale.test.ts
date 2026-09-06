@@ -218,4 +218,65 @@ describe('Graph Scalability & Layout Algorithm Tests', () => {
     expect(distTls).toBeGreaterThanOrEqual(150);
     expect(distEmail).toBeGreaterThanOrEqual(150);
   });
+
+  it('should arrange 32 nodes with 0 edges in balanced 2D layouts (Force, Tree, Radial) without linear collapse', () => {
+    const seed = {
+      id: 'seed-app',
+      type: 'seed',
+      position: { x: 0, y: 0 },
+      data: { isSeed: true, entityType: 'SEED', label: 'app.dicoding.com' },
+    };
+
+    const endpoints = Array.from({ length: 30 }, (_, i) => ({
+      id: `ep-${i}`,
+      type: 'entity',
+      position: { x: 0, y: 0 },
+      data: { isSeed: false, entityType: 'URL', label: `https://app.dicoding.com/api/v${i}` },
+    }));
+
+    const jsParamDoc = {
+      id: 'doc-1',
+      type: 'entity',
+      position: { x: 0, y: 0 },
+      data: { isSeed: false, entityType: 'DOCUMENT', label: 'Frontend Parameters' },
+    };
+
+    const allNodes = [seed, ...endpoints, jsParamDoc];
+    const noEdges: any[] = [];
+
+    // 1. Force layout must NOT collapse all nodes onto a straight line (y = 0)
+    const forcePositioned = applyForceLayout(allNodes, noEdges);
+    expect(forcePositioned.length).toBe(32);
+    const forceUniqueY = new Set(forcePositioned.map((n) => Math.round(n.position.y / 20)));
+    expect(forceUniqueY.size).toBeGreaterThanOrEqual(4); // Must span multiple rows in 2D
+
+    // 2. Tree layout must group nodes into compact layers with wrapped rows
+    const treePositioned = applyHierarchicalLayout(allNodes, noEdges);
+    expect(treePositioned.length).toBe(32);
+    const treeUniqueY = new Set(treePositioned.map((n) => Math.round(n.position.y / 20)));
+    expect(treeUniqueY.size).toBeGreaterThanOrEqual(3);
+
+    // 3. Radial layout must blossom nodes in 360-degree orbits rather than a 1D horizontal line
+    const radialPositioned = applyRadialLayout(allNodes, noEdges);
+    expect(radialPositioned.length).toBe(32);
+    const radialUniqueY = new Set(radialPositioned.map((n) => Math.round(n.position.y / 20)));
+    expect(radialUniqueY.size).toBeGreaterThanOrEqual(4);
+
+    // Seed must remain central focal point
+    const radialSeed = radialPositioned.find((n) => n.id === 'seed-app')!;
+    expect(radialSeed.position.x).toBe(0);
+    expect(radialSeed.position.y).toBe(0);
+
+    // Verify that radial nodes maintain ample breathing room without severe collision
+    for (let i = 0; i < radialPositioned.length; i++) {
+      for (let j = i + 1; j < radialPositioned.length; j++) {
+        const n1 = radialPositioned[i];
+        const n2 = radialPositioned[j];
+        const dx = n2.position.x - n1.position.x;
+        const dy = n2.position.y - n1.position.y;
+        const normDist = Math.hypot(dx / 150, dy / 45);
+        expect(normDist).toBeGreaterThanOrEqual(0.7);
+      }
+    }
+  });
 });
