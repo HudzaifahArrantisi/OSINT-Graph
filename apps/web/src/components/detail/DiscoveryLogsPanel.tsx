@@ -456,7 +456,11 @@ export function DiscoveryLogsPanel({ onClose, width, onResizeStart }: DiscoveryL
                     )}
                     {t.status === 'completed' && (
                       <span className="text-neutral-300">
-                        +{t.entitiesFound || 0} entitas
+                        {(t.entitiesFound || 0) > 0
+                          ? `+${t.entitiesFound} entitas`
+                          : (t.evidenceFound || 0) > 0
+                            ? `+${t.evidenceFound} bukti`
+                            : 'Selesai'}
                       </span>
                     )}
                     {t.status === 'not_found' && (

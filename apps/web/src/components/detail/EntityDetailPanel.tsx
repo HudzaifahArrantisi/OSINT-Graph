@@ -24,6 +24,15 @@ import {
   Copy,
   Check,
   Compass,
+  Radio,
+  Server,
+  AlertTriangle,
+  AlertOctagon,
+  ShieldAlert,
+  ShieldCheck,
+  Cpu,
+  Lock,
+  CheckCircle2,
 } from 'lucide-react';
 import type { Entity, Relationship, Evidence, TimelineEvent } from '@nexusgraph/shared';
 
@@ -118,6 +127,23 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
 
   // Evidence linked to this entity
   const linkedEvidence = evidenceList.filter((ev) => ev.entity_id === selectedNodeId);
+
+  // Cross-reference evidence matching domain, host or entity value
+  const entityEvidence = evidenceList.filter(
+    (ev) =>
+      ev.entity_id === selectedNodeId ||
+      (selectedEntity &&
+        ev.source_url &&
+        (ev.source_url.includes(selectedEntity.value) ||
+          ((selectedEntity.metadata as any)?.parentDomain &&
+            ev.source_url.includes((selectedEntity.metadata as any).parentDomain))))
+  );
+
+  const takeoverEvidence = entityEvidence.find((ev) => ev.source_type === 'SUBDOMAIN_TAKEOVER');
+  const dnsSecurityEvidence = entityEvidence.find((ev) => ev.source_type === 'DNS_SECURITY_AUDIT');
+  const techEvidence = entityEvidence.find((ev) => ev.source_type === 'TECH_FINGERPRINT');
+  const sensitiveParamEvidence = entityEvidence.find((ev) => ev.source_type === 'SENSITIVE_PARAM_ANALYSIS');
+  const tlsEvidence = entityEvidence.find((ev) => ev.source_type === 'TLS_CERTIFICATE');
 
   // If edge selected instead of node
   const selectedRelationship = relationships.find((r) => r.id === selectedEdgeId);
@@ -225,7 +251,7 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
   return (
     <aside
       style={{ width: width ? `${width}px` : undefined }}
-      className="w-80 sm:w-96 h-full bg-surface border-l border-border-subtle flex flex-col z-20 shadow-2xl animate-slide-in-right relative shrink-0 select-text"
+      className="min-w-[360px] max-w-[95vw] h-full bg-surface border-l border-border-subtle flex flex-col z-20 shadow-2xl animate-slide-in-right relative shrink-0 select-text"
     >
       {/* Resizing Handle on Left Edge */}
       {onResizeStart && (
@@ -427,6 +453,494 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
                     entity={selectedEntity}
                     onCopy={handleCopyValue}
                   />
+                )}
+
+                {/* SHODAN OPEN PORTS & NETWORK SERVICES CARD */}
+                {Boolean(
+                  (Array.isArray((selectedEntity.metadata as any)?.ports) &&
+                    (selectedEntity.metadata as any)?.ports.length > 0) ||
+                    (selectedEntity.metadata as any)?.openPortCount !== undefined ||
+                    (selectedEntity.metadata as any)?.port !== undefined ||
+                    (selectedEntity.metadata as any)?.shodanUrl
+                ) && (
+                  <div className="bg-[#0a0a0a] border border-[#262626] rounded-card p-3 space-y-2.5 text-xs font-mono shadow-sm">
+                    <div className="flex items-center justify-between border-b border-[#1f1f1f] pb-2">
+                      <div className="flex items-center gap-1.5 text-neutral-200 font-semibold">
+                        <Server className="w-4 h-4 text-emerald-400" />
+                        <span>Shodan Host & Port Intel</span>
+                      </div>
+                      {(selectedEntity.metadata as any)?.shodanUrl && (
+                        <a
+                          href={(selectedEntity.metadata as any).shodanUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-[11px] text-neutral-400 hover:text-white transition-colors"
+                          title="Buka host di Shodan"
+                        >
+                          <span>Shodan Host</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+
+                    {/* Open Ports Badges */}
+                    {Array.isArray((selectedEntity.metadata as any)?.ports) && (
+                      <div>
+                        <div className="flex items-center justify-between text-[11px] text-neutral-400 mb-1.5">
+                          <span>Port Terbuka Ditemukan:</span>
+                          <span className="font-semibold text-emerald-400">
+                            {(selectedEntity.metadata as any).ports.length} port
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 max-h-36 overflow-y-auto pr-1">
+                          {((selectedEntity.metadata as any).ports as number[]).map((port) => {
+                            const portLabel =
+                              port === 80
+                                ? 'HTTP'
+                                : port === 443
+                                ? 'HTTPS'
+                                : port === 22
+                                ? 'SSH'
+                                : port === 21
+                                ? 'FTP'
+                                : port === 25
+                                ? 'SMTP'
+                                : port === 53
+                                ? 'DNS'
+                                : port === 3306
+                                ? 'MySQL'
+                                : port === 5432
+                                ? 'Postgres'
+                                : port === 8080
+                                ? 'HTTP-Proxy'
+                                : port === 8443
+                                ? 'HTTPS-Alt'
+                                : null;
+
+                            return (
+                              <span
+                                key={port}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-[#141414] hover:bg-[#1e1e1e] border border-[#2a2a2a] text-neutral-200 transition-colors"
+                                title={`Port ${port}${portLabel ? ` (${portLabel})` : ''}`}
+                              >
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
+                                <span className="font-bold">{port}</span>
+                                {portLabel && <span className="text-[10px] text-neutral-500">/{portLabel}</span>}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Single Port detail for Technology entity */}
+                    {(selectedEntity.metadata as any)?.port !== undefined &&
+                      !Array.isArray((selectedEntity.metadata as any)?.ports) && (
+                        <div className="flex items-center justify-between py-1 bg-[#121212] px-2.5 rounded border border-[#222222]">
+                          <span className="text-neutral-400">Service Port:</span>
+                          <span className="font-bold text-emerald-400">
+                            {(selectedEntity.metadata as any).port}
+                            {(selectedEntity.metadata as any).transport
+                              ? `/${(selectedEntity.metadata as any).transport.toUpperCase()}`
+                              : ''}
+                          </span>
+                        </div>
+                      )}
+
+                    {/* Infrastructure info */}
+                    {((selectedEntity.metadata as any)?.asn || (selectedEntity.metadata as any)?.org) && (
+                      <div className="pt-1 border-t border-[#1a1a1a] text-[11px] text-neutral-400 space-y-1">
+                        {(selectedEntity.metadata as any)?.org && (
+                          <div className="flex justify-between">
+                            <span className="text-neutral-500">Org/ISP:</span>
+                            <span className="text-neutral-300 truncate max-w-[200px]">
+                              {(selectedEntity.metadata as any).org}
+                            </span>
+                          </div>
+                        )}
+                        {(selectedEntity.metadata as any)?.asn && (
+                          <div className="flex justify-between">
+                            <span className="text-neutral-500">ASN:</span>
+                            <span className="text-neutral-300">{(selectedEntity.metadata as any).asn}</span>
+                          </div>
+                        )}
+                        {(selectedEntity.metadata as any)?.os && (
+                          <div className="flex justify-between">
+                            <span className="text-neutral-500">OS:</span>
+                            <span className="text-neutral-300">{(selectedEntity.metadata as any).os}</span>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* 1. SUBDOMAIN TAKEOVER ALERT CARD */}
+                {Boolean(
+                  (selectedEntity.metadata as any)?.isVulnerableTakeover ||
+                    (takeoverEvidence && (takeoverEvidence.metadata as any)?.severity === 'CRITICAL') ||
+                    (takeoverEvidence && (takeoverEvidence.metadata as any)?.isDangling)
+                ) && (
+                  <div className="bg-rose-950/30 border border-rose-500/60 rounded-card p-3 space-y-2 text-xs font-mono shadow-sm">
+                    <div className="flex items-center justify-between border-b border-rose-500/30 pb-2">
+                      <div className="flex items-center gap-1.5 text-rose-300 font-bold">
+                        <AlertOctagon className="w-4 h-4 text-rose-400 animate-pulse" />
+                        <span>Subdomain Takeover Alert</span>
+                      </div>
+                      <span className="px-2 py-0.5 rounded text-[10px] bg-rose-900/60 text-rose-200 border border-rose-500/50 font-bold uppercase">
+                        Critical Risk
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 text-neutral-300 text-[11px]">
+                      <div className="flex justify-between">
+                        <span className="text-neutral-500">Penyedia Layanan:</span>
+                        <span className="font-semibold text-rose-300">
+                          {(selectedEntity.metadata as any)?.providerName || (takeoverEvidence?.metadata as any)?.service || 'Cloud Host'}
+                        </span>
+                      </div>
+                      {Boolean((selectedEntity.metadata as any)?.cnameTarget || (takeoverEvidence?.metadata as any)?.cname) && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-500">Dangling CNAME:</span>
+                          <span className="text-neutral-200 truncate max-w-[180px]">
+                            {(selectedEntity.metadata as any)?.cnameTarget || (takeoverEvidence?.metadata as any)?.cname}
+                          </span>
+                        </div>
+                      )}
+                      {Boolean((selectedEntity.metadata as any)?.matchedSignature || (takeoverEvidence?.metadata as any)?.signature) && (
+                        <div className="p-1.5 rounded bg-black/40 border border-rose-900/40 text-[10px] text-rose-200">
+                          Signature: "{(selectedEntity.metadata as any)?.matchedSignature || (takeoverEvidence?.metadata as any)?.signature}"
+                        </div>
+                      )}
+                      <p className="text-[10px] text-neutral-400 pt-1 border-t border-rose-950">
+                        Rekomendasi: Hapus record CNAME DNS atau klaim ulang resource sebelum dieksploitasi pihak penyerang.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. DEEP DNS & EMAIL SPOOFING AUDIT CARD */}
+                {Boolean(
+                  dnsSecurityEvidence ||
+                    (selectedEntity.metadata as any)?.emailSecurityGrade ||
+                    (selectedEntity.metadata as any)?.spf
+                ) && (
+                  <div className="bg-[#0a0a0a] border border-[#262626] rounded-card p-3 space-y-2.5 text-xs font-mono shadow-sm">
+                    <div className="flex items-center justify-between border-b border-[#1f1f1f] pb-2">
+                      <div className="flex items-center gap-1.5 text-neutral-200 font-semibold">
+                        <ShieldCheck className="w-4 h-4 text-cyan-400" />
+                        <span>DNS & Email Security Audit</span>
+                      </div>
+                      {Boolean((dnsSecurityEvidence?.metadata as any)?.emailSecurityGrade || (selectedEntity.metadata as any)?.emailSecurityGrade) && (
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            ['EXCELLENT', 'GOOD'].includes(
+                              String((dnsSecurityEvidence?.metadata as any)?.emailSecurityGrade || (selectedEntity.metadata as any)?.emailSecurityGrade)
+                            )
+                              ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/40'
+                              : 'bg-amber-950/60 text-amber-300 border border-amber-500/40'
+                          }`}
+                        >
+                          Grade {(dnsSecurityEvidence?.metadata as any)?.emailSecurityGrade || (selectedEntity.metadata as any)?.emailSecurityGrade}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-2 text-[11px]">
+                      {/* SPF Row */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-neutral-500">SPF Mechanism:</span>
+                        <span
+                          className={`font-semibold ${
+                            (dnsSecurityEvidence?.metadata as any)?.spf?.status === 'HARD_FAIL'
+                              ? 'text-emerald-400'
+                              : (dnsSecurityEvidence?.metadata as any)?.spf?.status === 'SOFT_FAIL'
+                              ? 'text-amber-400'
+                              : 'text-rose-400'
+                          }`}
+                        >
+                          {(dnsSecurityEvidence?.metadata as any)?.spf?.status || 'NOT DETECTED'}
+                        </span>
+                      </div>
+
+                      {/* DMARC Row */}
+                      <div className="flex items-center justify-between">
+                        <span className="text-neutral-500">DMARC Policy:</span>
+                        <span
+                          className={`font-semibold ${
+                            (dnsSecurityEvidence?.metadata as any)?.dmarc?.policy === 'REJECT'
+                              ? 'text-emerald-400'
+                              : (dnsSecurityEvidence?.metadata as any)?.dmarc?.policy === 'QUARANTINE'
+                              ? 'text-amber-400'
+                              : 'text-rose-400'
+                          }`}
+                        >
+                          {(dnsSecurityEvidence?.metadata as any)?.dmarc?.policy
+                            ? `p=${(dnsSecurityEvidence?.metadata as any)?.dmarc?.policy}`
+                            : 'MISSING'}
+                        </span>
+                      </div>
+
+                      {/* DKIM Selectors */}
+                      {Array.isArray((dnsSecurityEvidence?.metadata as any)?.dkim?.activeSelectors) &&
+                        (dnsSecurityEvidence?.metadata as any).dkim.activeSelectors.length > 0 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-neutral-500">DKIM Selectors:</span>
+                            <span className="text-cyan-400">
+                              {(dnsSecurityEvidence?.metadata as any).dkim.activeSelectors.join(', ')}
+                            </span>
+                          </div>
+                        )}
+
+                      {/* CAA Authorized CAs */}
+                      {Array.isArray((dnsSecurityEvidence?.metadata as any)?.caa?.authorizedCAs) &&
+                        (dnsSecurityEvidence?.metadata as any).caa.authorizedCAs.length > 0 && (
+                          <div className="flex items-center justify-between">
+                            <span className="text-neutral-500">CAA Permitted:</span>
+                            <span className="text-neutral-300">
+                              {(dnsSecurityEvidence?.metadata as any).caa.authorizedCAs.join(', ')}
+                            </span>
+                          </div>
+                        )}
+
+                      {/* Verified SaaS Cloud Services */}
+                      {Array.isArray((dnsSecurityEvidence?.metadata as any)?.verifiedSaas) &&
+                        (dnsSecurityEvidence?.metadata as any).verifiedSaas.length > 0 && (
+                          <div className="pt-2 border-t border-[#1a1a1a]">
+                            <div className="text-[10px] text-neutral-500 mb-1.5 uppercase">Layanan Cloud Terverifikasi (TXT):</div>
+                            <div className="flex flex-wrap gap-1">
+                              {((dnsSecurityEvidence?.metadata as any).verifiedSaas as Array<{ name: string }>).map((s, idx) => (
+                                <span
+                                  key={idx}
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-[#161616] border border-[#2a2a2a] text-neutral-200"
+                                >
+                                  <CheckCircle2 className="w-2.5 h-2.5 text-emerald-400" />
+                                  <span>{s.name}</span>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. SENSITIVE PARAMETER & ROUTE CLASSIFIER CARD */}
+                {Boolean(
+                  sensitiveParamEvidence ||
+                    (selectedEntity.metadata as any)?.riskCategory ||
+                    (selectedEntity.metadata as any)?.paramName
+                ) && (
+                  <div className="bg-[#0e0a05] border border-amber-500/30 rounded-card p-3 space-y-2 text-xs font-mono shadow-sm">
+                    <div className="flex items-center justify-between border-b border-amber-500/20 pb-2">
+                      <div className="flex items-center gap-1.5 text-amber-300 font-semibold">
+                        <ShieldAlert className="w-4 h-4 text-amber-400" />
+                        <span>Sensitive Param & Route Intel</span>
+                      </div>
+                      {Boolean((selectedEntity.metadata as any)?.severity) && (
+                        <span className="px-2 py-0.5 rounded text-[10px] bg-amber-950/60 text-amber-300 border border-amber-500/40 font-bold uppercase">
+                          {(selectedEntity.metadata as any).severity}
+                        </span>
+                      )}
+                    </div>
+
+                    {(selectedEntity.metadata as any)?.paramName && (
+                      <div className="space-y-1 text-[11px]">
+                        <div className="flex justify-between">
+                          <span className="text-neutral-500">Parameter:</span>
+                          <span className="text-amber-300 font-bold">?{(selectedEntity.metadata as any).paramName}=</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-neutral-500">Kategori:</span>
+                          <span className="text-neutral-300">{(selectedEntity.metadata as any).riskCategory}</span>
+                        </div>
+                        {(selectedEntity.metadata as any)?.label && (
+                          <div className="text-[10px] text-neutral-400">{(selectedEntity.metadata as any).label}</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Aggregate Findings List */}
+                    {Array.isArray((sensitiveParamEvidence?.metadata as any)?.findings) &&
+                      (sensitiveParamEvidence?.metadata as any).findings.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          <div className="text-[10px] text-neutral-500 uppercase">
+                            Parameter & Rute Berisiko Tinggi ({(sensitiveParamEvidence?.metadata as any).findings.length}):
+                          </div>
+                          <div className="max-h-36 overflow-y-auto space-y-1 pr-1">
+                            {((sensitiveParamEvidence?.metadata as any).findings as Array<any>).slice(0, 8).map((f, i) => (
+                              <div
+                                key={i}
+                                className="flex items-center justify-between p-1 rounded bg-black/40 border border-[#222222] text-[10px]"
+                              >
+                                <span className="text-neutral-200 truncate max-w-[170px]">{f.label}</span>
+                                <span
+                                  className={`px-1 rounded text-[9px] font-bold ${
+                                    f.severity === 'CRITICAL'
+                                      ? 'text-rose-400'
+                                      : f.severity === 'HIGH'
+                                      ? 'text-amber-400'
+                                      : 'text-neutral-400'
+                                  }`}
+                                >
+                                  {f.severity}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                  </div>
+                )}
+
+                {/* 4. WEB TECHNOLOGY STACK FINGERPRINT CARD */}
+                {Boolean(
+                  selectedEntity.type === 'TECHNOLOGY' ||
+                    techEvidence ||
+                    (selectedEntity.metadata as any)?.techName ||
+                    (selectedEntity.metadata as any)?.category
+                ) && (
+                  <div className="bg-[#0a0a0a] border border-[#262626] rounded-card p-3 space-y-2 text-xs font-mono shadow-sm">
+                    <div className="flex items-center justify-between border-b border-[#1f1f1f] pb-2">
+                      <div className="flex items-center gap-1.5 text-neutral-200 font-semibold">
+                        <Cpu className="w-4 h-4 text-cyan-400" />
+                        <span>Technology Stack Intel</span>
+                      </div>
+                      {(selectedEntity.metadata as any)?.category && (
+                        <span className="px-2 py-0.5 rounded text-[10px] bg-cyan-950/60 text-cyan-300 border border-cyan-500/40 font-bold uppercase">
+                          {(selectedEntity.metadata as any).category}
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Single Tech Detail */}
+                    {(selectedEntity.metadata as any)?.techName && (
+                      <div className="space-y-1 text-[11px]">
+                        <div className="flex justify-between">
+                          <span className="text-neutral-500">Komponen:</span>
+                          <span className="text-neutral-200 font-bold">{(selectedEntity.metadata as any).techName}</span>
+                        </div>
+                        {(selectedEntity.metadata as any)?.version && (
+                          <div className="flex justify-between">
+                            <span className="text-neutral-500">Versi:</span>
+                            <span className="text-cyan-400 font-bold">{(selectedEntity.metadata as any).version}</span>
+                          </div>
+                        )}
+                        {(selectedEntity.metadata as any)?.evidence && (
+                          <div className="text-[10px] text-neutral-400 pt-1 border-t border-[#1a1a1a]">
+                            {(selectedEntity.metadata as any).evidence}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Aggregate Tech List */}
+                    {Array.isArray((techEvidence?.metadata as any)?.technologies) &&
+                      (techEvidence?.metadata as any).technologies.length > 0 && (
+                        <div className="space-y-1.5 pt-1">
+                          <div className="text-[10px] text-neutral-500 uppercase">
+                            Stack Terdeteksi ({(techEvidence?.metadata as any).technologies.length}):
+                          </div>
+                          <div className="flex flex-wrap gap-1 max-h-32 overflow-y-auto pr-1">
+                            {((techEvidence?.metadata as any).technologies as Array<any>).map((t, i) => (
+                              <span
+                                key={i}
+                                className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-[#141414] border border-[#2a2a2a] text-neutral-200"
+                              >
+                                <span className="font-semibold">{t.name}</span>
+                                {t.version && <span className="text-cyan-400 text-[9px]">{t.version}</span>}
+                              </span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                  </div>
+                )}
+
+                {/* 5. SSL/TLS HEALTH & SAN CLUSTER CARD */}
+                {Boolean(
+                  tlsEvidence ||
+                    selectedEntity.type === 'CERTIFICATE' ||
+                    (selectedEntity.metadata as any)?.expiryStatus ||
+                    (selectedEntity.metadata as any)?.sanClusterType
+                ) && (
+                  <div className="bg-[#0a0a0a] border border-[#262626] rounded-card p-3 space-y-2 text-xs font-mono shadow-sm">
+                    <div className="flex items-center justify-between border-b border-[#1f1f1f] pb-2">
+                      <div className="flex items-center gap-1.5 text-neutral-200 font-semibold">
+                        <Lock className="w-4 h-4 text-emerald-400" />
+                        <span>SSL/TLS & SAN Cluster Intel</span>
+                      </div>
+                      {Boolean((selectedEntity.metadata as any)?.expiryStatus || (tlsEvidence?.metadata as any)?.primaryHealth?.expiryStatus) && (
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            String((selectedEntity.metadata as any)?.expiryStatus || (tlsEvidence?.metadata as any)?.primaryHealth?.expiryStatus) === 'VALID'
+                              ? 'bg-emerald-950/60 text-emerald-300 border border-emerald-500/40'
+                              : 'bg-rose-950/60 text-rose-300 border border-rose-500/40'
+                          }`}
+                        >
+                          {(selectedEntity.metadata as any)?.expiryStatus || (tlsEvidence?.metadata as any)?.primaryHealth?.expiryStatus}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1 text-[11px]">
+                      {((selectedEntity.metadata as any)?.daysRemaining !== undefined ||
+                        (tlsEvidence?.metadata as any)?.primaryHealth?.daysRemaining !== undefined) && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-500">Masa Aktif Sertifikat:</span>
+                          <span className="text-neutral-200 font-bold">
+                            {(selectedEntity.metadata as any)?.daysRemaining ?? (tlsEvidence?.metadata as any)?.primaryHealth?.daysRemaining} hari tersisa
+                          </span>
+                        </div>
+                      )}
+
+                      {Boolean((selectedEntity.metadata as any)?.issuer || (tlsEvidence?.metadata as any)?.primaryHealth?.issuer) && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-500">Issuer CA:</span>
+                          <span className="text-neutral-300 truncate max-w-[180px]">
+                            {(selectedEntity.metadata as any)?.issuer || (tlsEvidence?.metadata as any)?.primaryHealth?.issuer}
+                          </span>
+                        </div>
+                      )}
+
+                      {(selectedEntity.metadata as any)?.sanClusterType && (
+                        <div className="flex justify-between">
+                          <span className="text-neutral-500">Klaster SAN:</span>
+                          <span
+                            className={`font-semibold ${
+                              (selectedEntity.metadata as any).sanClusterType === 'SIBLING_DOMAIN'
+                                ? 'text-cyan-400'
+                                : 'text-neutral-300'
+                            }`}
+                          >
+                            {(selectedEntity.metadata as any).sanClusterType === 'SIBLING_DOMAIN'
+                              ? 'Corporate Sibling Domain'
+                              : 'Subdomain'}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Sibling SAN domains list */}
+                      {Array.isArray((tlsEvidence?.metadata as any)?.siblingDomains) &&
+                        (tlsEvidence?.metadata as any).siblingDomains.length > 0 && (
+                          <div className="pt-1.5 border-t border-[#1a1a1a]">
+                            <div className="text-[10px] text-neutral-500 mb-1 uppercase">
+                              Domain Saudara (Shared TLS SAN):
+                            </div>
+                            <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto pr-1">
+                              {((tlsEvidence?.metadata as any).siblingDomains as string[]).slice(0, 10).map((sd, i) => (
+                                <span
+                                  key={i}
+                                  className="px-1.5 py-0.5 rounded text-[10px] bg-[#161616] border border-[#2a2a2a] text-cyan-300"
+                                >
+                                  {sd}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                    </div>
+                  </div>
                 )}
 
                 <div className="bg-surface-2 rounded-card p-3 border border-border-subtle space-y-2 text-xs">

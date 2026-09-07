@@ -249,18 +249,55 @@ export const xnlinkfinderCollector: Collector = {
       const primarySourceType: EntityType = 'DOMAIN';
 
       for (const ep of topEndpoints) {
-        // Defensive check: Skip any MIME types that might have leaked
-        if (ep.url.includes('text/x-') || ep.url.includes('/application/') || ep.raw.startsWith('text/')) {
+        // Defensive check: Skip any MIME types or assets that might have leaked
+        const rawLower = ep.raw.toLowerCase();
+        if (
+          ep.url.includes('text/x-') ||
+          ep.url.includes('/application/') ||
+          rawLower.startsWith('text/') ||
+          rawLower.startsWith('image/') ||
+          rawLower.startsWith('application/') ||
+          rawLower.startsWith('audio/') ||
+          rawLower.startsWith('video/') ||
+          rawLower.startsWith('font/') ||
+          rawLower.startsWith('mode/') ||
+          rawLower.startsWith('ace/') ||
+          rawLower.startsWith('webpack/') ||
+          rawLower.startsWith('babel/')
+        ) {
           continue;
         }
+
+        let parsedUrl: URL;
+        try {
+          parsedUrl = new URL(ep.url);
+        } catch {
+          continue;
+        }
+
+        const hostLower = parsedUrl.hostname.toLowerCase();
+        if (
+          !parsedUrl.hostname ||
+          !parsedUrl.hostname.includes('.') ||
+          ['text', 'application', 'image', 'video', 'audio', 'font', 'mode', 'ace'].includes(hostLower)
+        ) {
+          continue;
+        }
+
+        const pathAndQuery = (parsedUrl.pathname === '/' && !parsedUrl.search ? '' : parsedUrl.pathname) + parsedUrl.search;
+        const displayLabel = `${parsedUrl.hostname}${pathAndQuery}`;
 
         entities.push({
           type: 'URL',
           value: ep.url,
-          title: ep.raw.startsWith('/') ? ep.raw : `/${ep.raw}`,
+          title: displayLabel,
           confidence: 85,
           metadata: {
             endpointType: 'JS_DISCOVERED_ENDPOINT',
+            fullUrl: ep.url,
+            hostname: parsedUrl.hostname,
+            pathname: parsedUrl.pathname,
+            search: parsedUrl.search,
             rawPath: ep.raw,
             inScope: ep.in_scope,
             sourceScript: ep.source_script || targetUrl,
@@ -320,7 +357,7 @@ export const xnlinkfinderCollector: Collector = {
           source_type: primarySourceType,
           target_value: extDomain,
           target_type: 'DOMAIN',
-          relationship_type: 'USES_EXTERNAL_SERVICE',
+          relationship_type: 'RELATED_TO',
           confidence: 85,
           reason: `Domain layanan pihak ketiga dipanggil oleh bundel JavaScript frontend`,
         });

@@ -96,15 +96,17 @@ describe('Data Integrity & No-Contamination Verification Suite', () => {
       expect(transformIds).not.toContain('developer.gitlab-profile');
     });
 
-    it('should deterministically extract domain gmail.com from email', () => {
-      const parsed = parseSeed('EMAIL', emailSeed);
+    it('should exclude public webmail domain (gmail.com) and extract custom email domains', () => {
+      const publicParsed = parseSeed('EMAIL', emailSeed);
+      expect(publicParsed.seedEntity.type).toBe('SEED');
+      expect(publicParsed.seedEntity.value).toBe(emailSeed);
+      expect(publicParsed.derivedEntities.length).toBe(0); // Excluded to prevent false cross-contamination
 
-      expect(parsed.seedEntity.type).toBe('SEED');
-      expect(parsed.seedEntity.value).toBe(emailSeed);
-      expect(parsed.derivedEntities.length).toBe(1);
-      expect(parsed.derivedEntities[0].type).toBe('DOMAIN');
-      expect(parsed.derivedEntities[0].value).toBe('gmail.com');
-      expect(parsed.derivedEntities[0].relationshipType).toBe('OBSERVED_ON');
+      const customParsed = parseSeed('EMAIL', 'investigator@targetcorp.com');
+      expect(customParsed.derivedEntities.length).toBe(1);
+      expect(customParsed.derivedEntities[0].type).toBe('DOMAIN');
+      expect(customParsed.derivedEntities[0].value).toBe('targetcorp.com');
+      expect(customParsed.derivedEntities[0].relationshipType).toBe('OBSERVED_ON');
     });
 
     it('github collector must search exact email and NEVER fallback to username handle', async () => {

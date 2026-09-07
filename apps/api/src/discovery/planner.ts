@@ -22,6 +22,15 @@ export interface DiscoveryPlanOutput {
 const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   URL: [
     'domain.xnlinkfinder-js-params',
+    'domain.sensitive-url-classifier',
+    'domain.web-tech-fingerprint',
+    'domain.historical-urls',
+    'domain.web-exposure',
+    'domain.favicon-hash',
+    'domain.reverse-ip',
+    'infrastructure.shodan-recon',
+    'domain.subdomain-takeover',
+    'domain.dns-security-audit',
     'domain.webpage-metadata',
     'domain.resolve-dns',
     'domain.find-tls',
@@ -33,6 +42,15 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   ],
   DOMAIN: [
     'domain.xnlinkfinder-js-params',
+    'domain.sensitive-url-classifier',
+    'domain.web-tech-fingerprint',
+    'domain.historical-urls',
+    'domain.web-exposure',
+    'domain.favicon-hash',
+    'domain.reverse-ip',
+    'infrastructure.shodan-recon',
+    'domain.subdomain-takeover',
+    'domain.dns-security-audit',
     'domain.resolve-dns',
     'domain.whois-rdap',
     'domain.find-tls',
@@ -48,6 +66,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'contact.email-breach-lookup',
     'developer.github-profile',
     'domain.resolve-dns',
+    'domain.dns-security-audit',
   ],
   USERNAME: [
     'social.rapidapi-social-lookup',
@@ -83,6 +102,8 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'developer.gitlab-profile',
   ],
   IP_ADDRESS: [
+    'infrastructure.shodan-recon',
+    'domain.reverse-ip',
     'domain.resolve-dns',
     'infrastructure.ip-geolocation',
     'mentions.search-public-web',

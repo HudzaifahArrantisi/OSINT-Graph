@@ -62,6 +62,7 @@ export interface DiscoveryOutput {
     status: string;
     entitiesFound: number;
     relationshipsFound: number;
+    evidenceFound?: number;
     error?: string;
   }>;
 }
@@ -222,6 +223,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
     status: 'pending',
     entitiesFound: 0,
     relationshipsFound: 0,
+    evidenceFound: 0,
     error: null,
   }));
 
@@ -590,10 +592,17 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
           pipelineItem.status = 'completed';
           pipelineItem.entitiesFound = entityCount;
           pipelineItem.relationshipsFound = relCount;
+          pipelineItem.evidenceFound = evCount;
         }
+        const completionMsg = entityCount > 0
+          ? `[${transformName}] Selesai - ${entityCount} entitas, ${relCount} relasi ditemukan`
+          : evCount > 0
+            ? `[${transformName}] Selesai - ${evCount} bukti audit keamanan tercatat`
+            : `[${transformName}] Selesai`;
+
         emitProgress(
           'success',
-          `[${transformName}] Completed - ${entityCount} entities, ${relCount} relationships found`,
+          completionMsg,
           {
             type: 'transform_complete',
             transformId,
@@ -608,10 +617,11 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
           pipelineItem.status = 'not_found';
           pipelineItem.entitiesFound = 0;
           pipelineItem.relationshipsFound = 0;
+          pipelineItem.evidenceFound = 0;
         }
         emitProgress(
           'info',
-          `[${transformName}] Completed - 0 results found on this vector`,
+          `[${transformName}] Selesai - 0 hasil ditemukan pada vektor ini`,
           {
             type: 'transform_complete',
             transformId,
@@ -628,7 +638,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
         }
         emitProgress(
           'warn',
-          `[${transformName}] Completed with warning: ${result.error || 'Vector unavailable'}`,
+          `[${transformName}] Selesai dengan catatan: ${result.error || 'Vector unavailable'}`,
           {
             type: 'transform_failed',
             transformId,
@@ -647,6 +657,7 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
         status: finalStatus,
         entitiesFound: entityCount,
         relationshipsFound: relCount,
+        evidenceFound: evCount,
         error: result.error,
       });
 

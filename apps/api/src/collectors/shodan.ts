@@ -20,10 +20,12 @@ import type {
   EvidenceCandidate,
   SeedType,
 } from '@nexusgraph/shared';
+import { lookup } from 'node:dns/promises';
 import { normalizeDomain, normalizeIpAddress } from '@nexusgraph/shared';
 import { logger } from '../lib/logger.js';
 
 const SHODAN_BASE_URL = 'https://api.shodan.io';
+const SHODAN_INTERNETDB_URL = 'https://internetdb.shodan.io';
 const REQUEST_TIMEOUT_MS = 15_000;
 
 interface ShodanLocation {
@@ -108,6 +110,11 @@ function extractTarget(input: string): { target: string; isIp: boolean } {
     } catch {
       // fallback
     }
+  } else if (trimmed.includes('/')) {
+    trimmed = trimmed.split('/')[0];
+  }
+  if (trimmed.includes(':') && !trimmed.includes('::') && /:\d+$/.test(trimmed)) {
+    trimmed = trimmed.replace(/:\d+$/, '');
   }
   return {
     target: trimmed,
@@ -115,23 +122,49 @@ function extractTarget(input: string): { target: string; isIp: boolean } {
   };
 }
 
-/**
- * Resolve domain to IP using Shodan DNS API or Cloudflare DoH fallback
- */
-async function resolveDomainToIp(domain: string, apiKey: string, signal: AbortSignal): Promise<string | null> {
+interface ShodanInternetDbResponse {
+  ip: string;
+  ports?: number[];
+  cpes?: string[];
+  hostnames?: string[];
+  tags?: string[];
+  vulns?: string[];
+  detail?: string;
+}
+
+async function queryShodanInternetDb(ip: string, signal: AbortSignal): Promise<ShodanInternetDbResponse | null> {
   try {
-    const url = `${SHODAN_BASE_URL}/dns/resolve?hostnames=${encodeURIComponent(domain)}&key=${apiKey}`;
-    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } });
+    const res = await fetch(`${SHODAN_INTERNETDB_URL}/${encodeURIComponent(ip)}`, {
+      signal,
+      headers: { Accept: 'application/json' },
+    });
+    if (res.status === 404) {
+      return { ip, ports: [], cpes: [], hostnames: [], tags: [], vulns: [], detail: 'No information available' };
+    }
     if (res.ok) {
-      const data = (await res.json()) as ShodanDnsResolveResponse;
-      const ip = data[domain];
-      if (ip && isIpAddress(ip)) return ip;
+      return (await res.json()) as ShodanInternetDbResponse;
     }
   } catch (err) {
-    logger.debug('Shodan DNS resolve failed, trying DoH fallback', { domain, error: err });
+    logger.debug('Shodan InternetDB lookup failed', { ip, error: err });
+  }
+  return null;
+}
+
+/**
+ * Resolve domain to IP using native DNS, Cloudflare DoH, or Shodan DNS API
+ */
+async function resolveDomainToIp(domain: string, apiKey: string, signal: AbortSignal): Promise<string | null> {
+  // 1. Native Node.js DNS lookup (fastest & most reliable)
+  try {
+    const res = await lookup(domain, { family: 4 });
+    if (res.address && isIpAddress(res.address)) {
+      return res.address;
+    }
+  } catch {
+    // fallback to external resolvers
   }
 
-  // Cloudflare DoH fallback
+  // 2. Cloudflare DoH fallback
   try {
     const dohUrl = `https://cloudflare-dns.com/dns-query?name=${encodeURIComponent(domain)}&type=A`;
     const res = await fetch(dohUrl, {
@@ -146,7 +179,20 @@ async function resolveDomainToIp(domain: string, apiKey: string, signal: AbortSi
       }
     }
   } catch (err) {
-    logger.warn('Domain to IP resolution failed for Shodan recon', { domain, error: err });
+    logger.debug('DoH DNS resolve failed for Shodan', { domain, error: err });
+  }
+
+  // 3. Shodan DNS API fallback
+  try {
+    const url = `${SHODAN_BASE_URL}/dns/resolve?hostnames=${encodeURIComponent(domain)}&key=${apiKey}`;
+    const res = await fetch(url, { signal, headers: { Accept: 'application/json' } });
+    if (res.ok) {
+      const data = (await res.json()) as ShodanDnsResolveResponse;
+      const ip = data[domain];
+      if (ip && isIpAddress(ip)) return ip;
+    }
+  } catch (err) {
+    logger.debug('Shodan DNS resolve failed', { domain, error: err });
   }
 
   return null;
@@ -185,9 +231,11 @@ export const shodanCollector: Collector = {
       }
     }
 
-    logger.info('Querying Shodan Host API', { target, queryIp, requestId: ctx.requestId });
+    logger.info('Querying Shodan Host / InternetDB API', { target, queryIp, requestId: ctx.requestId });
 
-    let hostData: ShodanHostResponse;
+    let hostData: ShodanHostResponse | null = null;
+
+    // 1. Attempt Shodan Host API (for paid keys with query credits)
     try {
       const hostUrl = `${SHODAN_BASE_URL}/shodan/host/${encodeURIComponent(queryIp)}?key=${apiKey}&minify=false`;
       const controller = new AbortController();
@@ -204,33 +252,66 @@ export const shodanCollector: Collector = {
       clearTimeout(timeoutId);
       ctx.signal.removeEventListener('abort', abortHandler);
 
-      if (response.status === 404) {
-        logger.info('Host not found in Shodan database', { queryIp });
-        evidence.push({
-          source_url: `https://www.shodan.io/host/${queryIp}`,
-          source_type: 'SHODAN_HOST',
-          title: `Shodan Host Query: ${queryIp}`,
-          extracted_value: 'No open ports or public services indexed in Shodan for this IP',
-          confidence: 60,
-          metadata: { negativeResult: true, ip: queryIp, target },
-        });
-        return { source: 'shodan-recon', collectedAt, entities, relationships, evidence, warnings };
+      if (response.ok) {
+        const json = (await response.json()) as ShodanHostResponse;
+        if (!json.error) {
+          hostData = json;
+        }
       }
+    } catch {
+      // Graceful fallback to InternetDB
+    }
 
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => '');
-        warnings.push(`Shodan API request failed (${response.status}): ${errorText.slice(0, 200)}`);
-        return { source: 'shodan-recon', collectedAt, entities, relationships, evidence, warnings };
-      }
+    // 2. Fallback to official Shodan InternetDB (open, fast, reliable across all tier keys)
+    if (!hostData) {
+      const internetDbData = await queryShodanInternetDb(queryIp, ctx.signal);
+      if (internetDbData) {
+        const idbPorts = internetDbData.ports || [];
+        const idbCpes = internetDbData.cpes || [];
+        const idbVulns: Record<string, { cvss?: number; summary?: string; references?: string[] }> = {};
+        for (const v of internetDbData.vulns || []) {
+          idbVulns[v] = { summary: `Known vulnerability indexed by Shodan: ${v}` };
+        }
 
-      hostData = (await response.json()) as ShodanHostResponse;
-      if (hostData.error) {
-        warnings.push(`Shodan API returned error: ${hostData.error}`);
-        return { source: 'shodan-recon', collectedAt, entities, relationships, evidence, warnings };
+        hostData = {
+          ip_str: internetDbData.ip || queryIp,
+          ports: idbPorts,
+          hostnames: internetDbData.hostnames || [],
+          domains: [],
+          vulns: internetDbData.vulns || [],
+          tags: internetDbData.tags || [],
+          data: idbPorts.map((p, idx) => {
+            const cpeStr = idbCpes[idx] || idbCpes[0];
+            const product = cpeStr ? cpeStr.split(':')[2] || 'service' : 'service';
+            return {
+              port: p,
+              transport: 'tcp',
+              product,
+              cpe: idbCpes,
+              _shodan: { module: `tcp/${p}` },
+              vulns: idbVulns,
+            };
+          }),
+        };
       }
-    } catch (err: any) {
-      if (err.name === 'AbortError') throw err;
-      warnings.push(`Shodan host lookup failed: ${err.message || 'unknown error'}`);
+    }
+
+    // 3. Clean audit if host is not in Shodan index or has 0 open ports
+    if (!hostData || ((hostData.ports || []).length === 0 && (hostData.vulns || []).length === 0)) {
+      logger.info('Host has no open ports or services indexed in Shodan database', { queryIp });
+      evidence.push({
+        source_url: `https://internetdb.shodan.io/${queryIp}`,
+        source_type: 'SHODAN_HOST',
+        title: `Audit Shodan Host & Port: ${queryIp}`,
+        extracted_value: 'Tidak ditemukan port terbuka, CVE berisiko, atau layanan publik terindeks pada database Shodan untuk host ini.',
+        confidence: 75,
+        metadata: {
+          negativeResult: true,
+          ip: queryIp,
+          target,
+          status: 'CLEAN_NO_OPEN_PORTS',
+        },
+      });
       return { source: 'shodan-recon', collectedAt, entities, relationships, evidence, warnings };
     }
 

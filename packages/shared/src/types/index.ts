@@ -356,6 +356,7 @@ export interface DiscoveryTransformProgressItem {
   status: 'pending' | 'running' | 'completed' | 'failed' | 'not_found';
   entitiesFound?: number;
   relationshipsFound?: number;
+  evidenceFound?: number;
   error?: string | null;
 }
 

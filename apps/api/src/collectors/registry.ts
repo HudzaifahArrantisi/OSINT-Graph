@@ -25,6 +25,14 @@ import { socialRapidapiCollector } from './social-rapidapi.js';
 import { shodanCollector } from './shodan.js';
 import { holeheEngineCollector } from './holehe-engine.js';
 import { xnlinkfinderCollector } from './xnlinkfinder.js';
+import { historicalUrlsCollector } from './historical-urls.js';
+import { webExposureCollector } from './web-exposure.js';
+import { reverseIpCollector } from './reverse-ip.js';
+import { faviconHashCollector } from './favicon-hash.js';
+import { subdomainTakeoverCollector } from './subdomain-takeover.js';
+import { dnsSecurityAuditCollector } from './dns-security-audit.js';
+import { sensitiveUrlClassifierCollector } from './sensitive-url-classifier.js';
+import { webTechFingerprintCollector } from './web-tech-fingerprint.js';
 import { logger } from '../lib/logger.js';
 
 // Collector registry
@@ -51,6 +59,14 @@ collectors.set('social-rapidapi', socialRapidapiCollector);
 collectors.set('shodan-recon', shodanCollector);
 collectors.set('holehe-engine', holeheEngineCollector);
 collectors.set('xnlinkfinder', xnlinkfinderCollector);
+collectors.set('historical-urls', historicalUrlsCollector);
+collectors.set('web-exposure', webExposureCollector);
+collectors.set('reverse-ip', reverseIpCollector);
+collectors.set('favicon-hash', faviconHashCollector);
+collectors.set('subdomain-takeover', subdomainTakeoverCollector);
+collectors.set('dns-security-audit', dnsSecurityAuditCollector);
+collectors.set('sensitive-url-classifier', sensitiveUrlClassifierCollector);
+collectors.set('web-tech-fingerprint', webTechFingerprintCollector);
 
 export function getCollector(name: CollectorName): Collector | undefined {
   return collectors.get(name);

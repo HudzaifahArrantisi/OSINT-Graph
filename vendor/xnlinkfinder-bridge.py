@@ -234,70 +234,157 @@ def extract_parameters_from_text(content, script_origin="inline"):
     return found_details
 
 
-def extract_endpoints_from_text(content, base_url, scope_domain=None):
+# ─────────────────────────────────────────────────────────────────────────────
+# Endpoint & Asset Filter Rules
+# ─────────────────────────────────────────────────────────────────────────────
+
+MIME_PREFIXES = (
+    "text/", "application/", "image/", "audio/", "video/", "font/",
+    "multipart/", "model/", "message/",
+)
+
+CODE_AND_FRAMEWORK_PREFIXES = (
+    "mode/", "ace/", "monaco/", "codemirror/", "prism/", "highlight/", "clike/",
+    "addon/", "theme/", "themes/", "webpack/", "babel/", "react/", "react-dom/",
+    "node_modules/", "core-js/", "lodash/", "jquery/", "@babel/", "@webpack/",
+    "static/chunks/", "chunks/", "static/media/", "static/css/",
+)
+
+STATIC_EXTENSIONS = (
+    ".css", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".ico", ".woff", ".woff2",
+    ".ttf", ".eot", ".otf", ".map", ".webp", ".avif", ".mp4", ".mp3", ".ogg",
+    ".wav", ".webm", ".flac", ".aac", ".pdf", ".zip", ".tar", ".gz",
+)
+
+IGNORED_TOKENS = {
+    "sw_iframe", "measurement", "frontend", "backend", "submit", "button",
+    "window", "document", "true", "false", "null", "undefined", "about:blank",
+    "object", "function", "string", "number", "boolean",
+}
+
+
+def is_valid_endpoint(raw_val, resolved_url):
+    if not raw_val or len(raw_val) < 2 or len(raw_val) > 350:
+        return False
+
+    raw_clean = raw_val.strip().strip("'\"`")
+    if not raw_clean:
+        return False
+
+    # Skip schemas that aren't web endpoints
+    if raw_clean.startswith(("//www.w3.org", "http://www.w3.org", "https://www.w3.org", "data:", "blob:", "javascript:", "mailto:", "tel:", "about:", "chrome:", "moz-extension:")):
+        return False
+
+    # Protocol-relative '//' verification
+    if raw_clean.startswith("//"):
+        proto_host = raw_clean[2:].split("/")[0].split("?")[0].split("#")[0].strip()
+        if "." not in proto_host:
+            return False
+        if any(proto_host.lower().startswith(p.rstrip("/")) for p in MIME_PREFIXES):
+            return False
+
+    # Path content without leading slashes or dots
+    path_check = raw_clean.lstrip("/. ").split("?")[0].split("#")[0].strip().lower()
+    if not path_check and "?" not in raw_clean and "#" not in raw_clean:
+        return False
+
+    # Filter MIME types
+    if any(path_check.startswith(p) for p in MIME_PREFIXES):
+        return False
+    if re.search(r"text/x-[a-z0-9_\-]+", path_check):
+        return False
+    if re.search(r"application/x-[a-z0-9_\-]+", path_check):
+        return False
+
+    # Filter code editor / bundler internal names
+    if any(path_check.startswith(p) for p in CODE_AND_FRAMEWORK_PREFIXES):
+        return False
+
+    # Filter static media/style assets
+    if any(path_check.endswith(ext) for ext in STATIC_EXTENSIONS):
+        return False
+
+    # Filter isolated keyword tokens
+    if path_check in IGNORED_TOKENS:
+        return False
+
+    # Validate resolved URL
+    try:
+        parsed = urllib.parse.urlparse(resolved_url)
+    except Exception:
+        return False
+
+    if parsed.scheme not in ("http", "https"):
+        return False
+
+    if not parsed.netloc or "." not in parsed.netloc:
+        return False
+
+    netloc_lower = parsed.netloc.lower()
+    if any(netloc_lower.startswith(p.rstrip("/")) for p in MIME_PREFIXES):
+        return False
+
+    path_lower = parsed.path.lower()
+    if any(path_lower.startswith("/" + p) for p in MIME_PREFIXES):
+        return False
+    if any(path_lower.startswith("/" + p) for p in CODE_AND_FRAMEWORK_PREFIXES):
+        return False
+    if any(path_lower.endswith(ext) for ext in STATIC_EXTENSIONS):
+        return False
+
+    return True
+
+
+def extract_endpoints_from_text(content, target_base_url, script_url=None, scope_domain=None):
     """
     Extracts potential API endpoints, routes, and paths using LinkFinder regex.
+    All relative routes are resolved to target_base_url to guarantee complete full URLs.
     """
     endpoints = []
     seen = set()
 
     for match in LINK_REGEX.finditer(content):
         val = match.group(1).strip()
-        if not val or len(val) < 3 or len(val) > 300:
+        if not val or len(val) < 2 or len(val) > 300:
             continue
 
-        # Skip common false positives
-        if val.startswith(("//www.w3.org", "http://www.w3.org", "data:", "blob:", "javascript:", "mailto:", "tel:", "about:")):
-            continue
-        # Skip MIME types / Content-Type headers (e.g. application/json, text/x-kotlin, text/javascript, text/x-c)
-        if re.match(r"^(?:text|application|image|audio|video|font|multipart|model)/", val, re.IGNORECASE):
-            continue
-        if re.search(r"text/x-[a-z0-9_\-]+", val, re.IGNORECASE):
-            continue
-        if val.lower().startswith(("mode/", "ace/", "monaco/", "webpack/", "babel/")):
-            continue
-        # Skip static media / style assets
-        if re.search(r"\.(?:css|png|jpg|jpeg|gif|svg|woff|woff2|ttf|eot|ico|map|webp|avif|mp4|mp3|ogg|wav)$", val, re.IGNORECASE):
-            continue
-
-        # Handle protocol-relative URLs
-        if val.startswith("//"):
-            resolved = "https:" + val
-        # Normalize relative path
-        elif val.startswith(("/", "./", "../")):
-            resolved = urllib.parse.urljoin(base_url, val)
-        elif val.startswith(("http://", "https://")):
+        # Resolve full URL against target domain base URL
+        if val.startswith(("http://", "https://")):
             resolved = val
-        elif "/" in val or val.startswith("?"):
-            resolved = urllib.parse.urljoin(base_url, "/" + val)
+        elif val.startswith("//"):
+            proto_host = val[2:].split("/")[0].split("?")[0].split("#")[0].strip()
+            if "." not in proto_host:
+                continue
+            resolved = "https:" + val
+        elif val.startswith(("/", "./", "../")):
+            resolved = urllib.parse.urljoin(target_base_url, val)
+        elif val.startswith("?"):
+            resolved = urllib.parse.urljoin(target_base_url, "/" + val)
         else:
-            resolved = urllib.parse.urljoin(base_url, "/" + val)
+            resolved = urllib.parse.urljoin(target_base_url, "/" + val)
+
+        if not is_valid_endpoint(val, resolved):
+            continue
 
         if resolved in seen:
             continue
 
-        # Skip if resolved URL is still invalid or just a mime type
         parsed = urllib.parse.urlparse(resolved)
-        if not parsed.netloc or not parsed.scheme:
-            continue
-        path_lower = parsed.path.lower()
-        if any(path_lower.startswith(prefix) for prefix in ("/text/", "/application/", "/image/", "/video/")):
-            continue
-        if re.search(r"text/x-[a-z0-9_\-]+", path_lower):
-            continue
-
-        # Scope check: if scope provided, prioritize in-scope endpoints
         in_scope = True
         if scope_domain:
-            parsed = urllib.parse.urlparse(resolved)
-            if parsed.netloc and scope_domain.lower() not in parsed.netloc.lower():
+            host = (parsed.netloc or "").lower().split(":")[0]
+            scope = scope_domain.lower().split(":")[0]
+            if host != scope and not host.endswith("." + scope):
                 in_scope = False
 
         seen.add(resolved)
         endpoints.append({
             "raw": val,
             "url": resolved,
+            "path": parsed.path,
+            "query": parsed.query,
             "in_scope": in_scope,
+            "source_script": script_url or target_base_url,
         })
 
     return endpoints
@@ -359,7 +446,7 @@ def run_discovery(target, scope=None, depth=1, timeout=10, max_scripts=25):
                 seen_params.add(p["name"])
                 all_parameters.append(p)
 
-        html_endpoints = extract_endpoints_from_text(html_content, target_url, scope_domain)
+        html_endpoints = extract_endpoints_from_text(html_content, target_url, script_url="index.html", scope_domain=scope_domain)
         for ep in html_endpoints:
             if ep["url"] not in seen_endpoints:
                 seen_endpoints.add(ep["url"])
@@ -379,12 +466,11 @@ def run_discovery(target, scope=None, depth=1, timeout=10, max_scripts=25):
             if not js_code:
                 continue
 
-            # Extract endpoints from JS code
-            js_endpoints = extract_endpoints_from_text(js_code, script_url, scope_domain)
+            # Extract endpoints from JS code, resolving relative routes against target_url
+            js_endpoints = extract_endpoints_from_text(js_code, target_url, script_url=script_url, scope_domain=scope_domain)
             for ep in js_endpoints:
                 if ep["url"] not in seen_endpoints:
                     seen_endpoints.add(ep["url"])
-                    ep["source_script"] = script_url
                     all_endpoints.append(ep)
 
             # Extract parameters from JS code
@@ -407,7 +493,7 @@ def run_discovery(target, scope=None, depth=1, timeout=10, max_scripts=25):
                     seen_params.add(p["name"])
                     all_parameters.append(p)
 
-            inline_endpoints = extract_endpoints_from_text(inline_code, target_url, scope_domain)
+            inline_endpoints = extract_endpoints_from_text(inline_code, target_url, script_url=origin, scope_domain=scope_domain)
             for ep in inline_endpoints:
                 if ep["url"] not in seen_endpoints:
                     seen_endpoints.add(ep["url"])

@@ -503,8 +503,8 @@ export function applyForceLayout<T extends Record<string, unknown>>(
     const connected = nodeDegrees.filter((item) => item.degree > 0);
     const isolated = nodeDegrees.filter((item) => item.degree === 0);
 
-    const xSpacing = 160;
-    const ySpacing = 120;
+    const xSpacing = 205;
+    const ySpacing = 125;
 
     // If all nodes are isolated or graph has very few edges:
     // Arrange in a clean, balanced, data-dense 2D grid matrix centered around (0, 0)
@@ -552,7 +552,7 @@ export function applyForceLayout<T extends Record<string, unknown>>(
           const dx = p2.x - p1.x;
           const dy = p2.y - p1.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const targetDist = 130;
+          const targetDist = 160;
           const force = (dist - targetDist) * 0.05;
           const nx = (dx / dist) * force;
           const ny = (dy / dist) * force;

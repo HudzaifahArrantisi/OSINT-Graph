@@ -110,6 +110,44 @@ const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
     },
     collectors: [{ name: 'xnlinkfinder' }],
   },
+  'domain.historical-urls': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;
+      if (analysis.isDomain) return v.trim();
+      if (analysis.isEmail && analysis.extractedDomain) return analysis.extractedDomain;
+      const d = extractDomain(v);
+      return d && d.includes('.') ? d : null;
+    },
+    collectors: [{ name: 'historical-urls' }],
+  },
+  'domain.web-exposure': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;
+      if (analysis.isDomain) return v.trim();
+      const d = extractDomain(v);
+      return d && d.includes('.') ? d : null;
+    },
+    collectors: [{ name: 'web-exposure' }],
+  },
+  'domain.reverse-ip': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isIpAddress) return v.trim();
+      if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;
+      if (analysis.isDomain) return v.trim();
+      const d = extractDomain(v);
+      return d && d.includes('.') ? d : null;
+    },
+    collectors: [{ name: 'reverse-ip' }],
+  },
+  'domain.favicon-hash': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl) return v.trim();
+      if (analysis.isDomain) return `https://${v.trim()}`;
+      const d = extractDomain(v);
+      return d && d.includes('.') ? `https://${d}` : null;
+    },
+    collectors: [{ name: 'favicon-hash' }],
+  },
   'domain.whois-rdap': {
     deriveInput: (v, _st, analysis) => {
       if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;
@@ -260,6 +298,43 @@ const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
       return null;
     },
     collectors: [{ name: 'shodan-recon' }],
+  },
+  'domain.subdomain-takeover': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;
+      if (analysis.isDomain) return v.trim();
+      const d = extractDomain(v);
+      return d && d.includes('.') ? d : null;
+    },
+    collectors: [{ name: 'subdomain-takeover' }],
+  },
+  'domain.dns-security-audit': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;
+      if (analysis.isDomain) return v.trim();
+      if (analysis.isEmail && analysis.extractedDomain) return analysis.extractedDomain;
+      const d = extractDomain(v);
+      return d && d.includes('.') ? d : null;
+    },
+    collectors: [{ name: 'dns-security-audit' }],
+  },
+  'domain.sensitive-url-classifier': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl) return v.trim();
+      if (analysis.isDomain) return `https://${v.trim()}`;
+      const d = extractDomain(v);
+      return d && d.includes('.') ? `https://${d}` : null;
+    },
+    collectors: [{ name: 'sensitive-url-classifier' }],
+  },
+  'domain.web-tech-fingerprint': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl) return v.trim();
+      if (analysis.isDomain) return `https://${v.trim()}`;
+      const d = extractDomain(v);
+      return d && d.includes('.') ? `https://${d}` : null;
+    },
+    collectors: [{ name: 'web-tech-fingerprint' }],
   },
   'mentions.search-public-web': {
     deriveInput: (v, st, analysis) => {
@@ -429,11 +504,26 @@ export async function executeTransform(
   // Filter out seed echoes
   const filtered = filterSeedEchoes(allEntities, seedValue);
 
-  const status = filtered.length > 0
-    ? 'COMPLETED'
-    : allWarnings.some((w) => w.includes('error') || w.includes('Error') || w.includes('failed'))
-      ? 'FAILED'
-      : 'NOT_FOUND';
+  // Determine transform status
+  // 1. If new entities, evidence, or relationships were discovered/audited -> COMPLETED
+  // 2. Else if unhandled fatal/critical errors occurred -> FAILED
+  // 3. Otherwise -> NOT_FOUND (vector scanned cleanly with 0 positive hits)
+  const hasFindings = filtered.length > 0 || allEvidence.length > 0 || allRelationships.length > 0;
+  let status: 'COMPLETED' | 'FAILED' | 'NOT_FOUND' = 'NOT_FOUND';
+
+  if (hasFindings) {
+    status = 'COMPLETED';
+  } else if (
+    handler.collectors.length > 0 &&
+    allWarnings.some((w) => {
+      const lower = w.toLowerCase();
+      return lower.includes('fatal') || lower.includes('critical') || lower.includes('unauthorized') || lower.includes('econnrefused');
+    })
+  ) {
+    status = 'FAILED';
+  } else {
+    status = 'NOT_FOUND';
+  }
 
   return {
     transformId,

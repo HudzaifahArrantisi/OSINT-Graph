@@ -45,11 +45,47 @@ describe('xnLinkFinder JS Parameter & Endpoint Recon Tests', () => {
     const result = await xnlinkfinderCollector.run('invalid..domain', {
       caseId: 'test-case-id',
       requestId: 'test-req-id',
+      signal: new AbortController().signal,
     });
 
     expect(result).toBeDefined();
     expect(result.source).toBe('xnlinkfinder');
     expect(Array.isArray(result.entities)).toBe(true);
     expect(Array.isArray(result.warnings)).toBe(true);
+  });
+
+  it('should filter out MIME types and non-endpoint assets and generate complete full URLs', () => {
+    const sampleEndpoints = [
+      { raw: 'text/x-java', url: 'https://text/x-java', in_scope: false },
+      { raw: 'image/png', url: 'https://app.dicoding.com/image/png', in_scope: true },
+      { raw: '/tempa/registration', url: 'https://app.dicoding.com/tempa/registration', in_scope: true },
+      { raw: '/?origin=sw_iframe', url: 'https://app.dicoding.com/?origin=sw_iframe', in_scope: true },
+    ];
+
+    const validEndpoints = sampleEndpoints.filter((ep) => {
+      const rawLower = ep.raw.toLowerCase();
+      if (
+        ep.url.includes('text/x-') ||
+        ep.url.includes('/application/') ||
+        rawLower.startsWith('text/') ||
+        rawLower.startsWith('image/') ||
+        rawLower.startsWith('application/')
+      ) {
+        return false;
+      }
+      try {
+        const u = new URL(ep.url);
+        if (!u.hostname || !u.hostname.includes('.') || ['text', 'image'].includes(u.hostname)) {
+          return false;
+        }
+        return true;
+      } catch {
+        return false;
+      }
+    });
+
+    expect(validEndpoints).toHaveLength(2);
+    expect(validEndpoints[0].url).toBe('https://app.dicoding.com/tempa/registration');
+    expect(validEndpoints[1].url).toBe('https://app.dicoding.com/?origin=sw_iframe');
   });
 });

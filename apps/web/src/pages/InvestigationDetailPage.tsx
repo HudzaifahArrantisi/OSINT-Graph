@@ -164,6 +164,33 @@ export function InvestigationDetailPage() {
     window.addEventListener('mouseup', onMouseUp);
   };
 
+  const handleRightResizeStart = (e: React.MouseEvent) => {
+    e.preventDefault();
+    const startX = e.clientX;
+    const startWidth = rightSidebarWidth;
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+
+    const onMouseMove = (moveEvent: MouseEvent) => {
+      const newWidth = Math.max(380, Math.min(950, startWidth - (moveEvent.clientX - startX)));
+      setRightSidebarWidth(newWidth);
+    };
+
+    const onMouseUp = (upEvent: MouseEvent) => {
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      window.removeEventListener('mousemove', onMouseMove);
+      window.removeEventListener('mouseup', onMouseUp);
+      const finalWidth = Math.max(380, Math.min(950, startWidth - (upEvent.clientX - startX)));
+      try {
+        localStorage.setItem('nexusgraph_right_sidebar_width', finalWidth.toString());
+      } catch { }
+    };
+
+    window.addEventListener('mousemove', onMouseMove);
+    window.addEventListener('mouseup', onMouseUp);
+  };
+
   // Close more-actions dropdown on outside click
   useEffect(() => {
     const handleClickOutside = (e: MouseEvent) => {
@@ -888,6 +915,7 @@ export function InvestigationDetailPage() {
                   setSelectedEdgeId(null);
                 }}
                 width={rightSidebarWidth}
+                onResizeStart={handleRightResizeStart}
               />
             )}
 

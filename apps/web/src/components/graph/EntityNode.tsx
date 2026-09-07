@@ -70,25 +70,27 @@ const ENTITY_ACCENT_COLORS: Partial<Record<EntityType, string>> = {
   PHONE: 'text-teal-400',
 };
 
-function formatEntityDisplay(type: EntityType, value: string, title?: string): { mainText: string; subText: string } {
+function formatEntityDisplay(type: EntityType, value: string, title?: string): { mainText: string; subText: string; queryParams?: string } {
   if (type === 'URL') {
     try {
       const u = new URL(value.startsWith('http') ? value : `https://${value}`);
-      const isMimeHost = ['text', 'application', 'image', 'font', 'video', 'mode', 'ace'].includes(u.hostname.toLowerCase());
-      if (isMimeHost) {
-        return {
-          mainText: value.replace(/^https?:\/\//, ''),
-          subText: 'Static Asset',
-        };
-      }
-      const pathAndQuery = (u.pathname || '') + (u.search || '');
-      const cleanPath = pathAndQuery === '/' || !pathAndQuery ? u.hostname : pathAndQuery;
+      const fullPath = (u.pathname === '/' && !u.search ? '' : u.pathname) + u.search;
+      const fullDisplay = `${u.hostname}${fullPath}`;
+
+      const queryParams = u.search ? u.search : undefined;
+      const sub = u.search
+        ? `Param: ${u.search}`
+        : u.pathname !== '/'
+          ? `Path: ${u.pathname}`
+          : u.hostname;
+
       return {
-        mainText: cleanPath,
-        subText: u.hostname,
+        mainText: fullDisplay,
+        subText: sub,
+        queryParams,
       };
     } catch {
-      return { mainText: value, subText: 'URL' };
+      return { mainText: title || value, subText: 'URL' };
     }
   }
   if (type === 'DOCUMENT') {
@@ -98,7 +100,11 @@ function formatEntityDisplay(type: EntityType, value: string, title?: string): {
     if (value.includes('?')) {
       try {
         const u = new URL(value);
-        return { mainText: u.search || value, subText: 'Parameter JS' };
+        return {
+          mainText: `${u.hostname}${u.pathname}${u.search}`,
+          subText: `Param: ${u.search}`,
+          queryParams: u.search,
+        };
       } catch {
         return { mainText: title || value, subText: 'Parameter JS' };
       }
@@ -136,7 +142,7 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
 
   const Icon = ENTITY_ICONS[entityType] || HelpCircle;
 
-  const { mainText, subText } = formatEntityDisplay(entityType, value, title);
+  const { mainText, subText, queryParams } = formatEntityDisplay(entityType, value, title);
 
   const provenance =
     nodeData.metadata?.discoveredBy ||
@@ -224,8 +230,15 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
             </button>
           </div>
 
+          {/* Query Parameters Badge if present */}
+          {queryParams && (
+            <div className="mt-1.5 text-[9.5px] font-mono text-emerald-300 bg-emerald-950/40 border border-emerald-800/40 px-2 py-0.5 rounded break-all">
+              <span className="text-emerald-400 font-semibold">Param:</span> {queryParams}
+            </div>
+          )}
+
           {/* Additional Title / Label if different */}
-          {title && title !== value && (
+          {title && title !== value && !queryParams && (
             <div className="text-[10.5px] text-neutral-400 mt-1 line-clamp-2 leading-tight">
               {title}
             </div>
@@ -323,7 +336,7 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
         </div>
       ) : (
         <div
-          className={`w-[160px] h-[38px] px-2.5 rounded-md border transition-all duration-150 cursor-pointer flex items-center gap-2 select-none ${
+          className={`w-[190px] min-h-[42px] py-1.5 px-2.5 rounded-md border transition-all duration-150 cursor-pointer flex items-center gap-2 select-none ${
             selected
               ? 'bg-[#181d28] border-slate-300 ring-1 ring-white/20 text-white shadow-lg'
               : isHovered
@@ -336,7 +349,7 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
           <div className="flex flex-col min-w-0 flex-1 leading-tight">
             <span
               className="font-mono text-[10.5px] font-medium text-slate-200 truncate w-full"
-              title={title || value}
+              title={value}
             >
               {mainText}
             </span>

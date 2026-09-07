@@ -176,6 +176,15 @@ export const EVIDENCE_SOURCE_TYPES = [
   'SUBDOMAIN_ENUM',
   'SHODAN_HOST',
   'JS_ENDPOINT_ANALYSIS',
+  'WAYBACK_ARCHIVE',
+  'SECURITY_TXT',
+  'SITEMAP_XML',
+  'REVERSE_IP_LOOKUP',
+  'FAVICON_HASH',
+  'SUBDOMAIN_TAKEOVER',
+  'DNS_SECURITY_AUDIT',
+  'TECH_FINGERPRINT',
+  'SENSITIVE_PARAM_ANALYSIS',
 ] as const;
 
 export type EvidenceSourceType = (typeof EVIDENCE_SOURCE_TYPES)[number];
@@ -203,6 +212,14 @@ export const COLLECTOR_NAMES = [
   'shodan-recon',
   'holehe-engine',
   'xnlinkfinder',
+  'historical-urls',
+  'web-exposure',
+  'reverse-ip',
+  'favicon-hash',
+  'subdomain-takeover',
+  'dns-security-audit',
+  'web-tech-fingerprint',
+  'sensitive-url-classifier',
 ] as const;
 
 export type CollectorName = (typeof COLLECTOR_NAMES)[number];
