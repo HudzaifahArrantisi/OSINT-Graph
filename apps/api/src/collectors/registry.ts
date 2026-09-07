@@ -33,6 +33,9 @@ import { subdomainTakeoverCollector } from './subdomain-takeover.js';
 import { dnsSecurityAuditCollector } from './dns-security-audit.js';
 import { sensitiveUrlClassifierCollector } from './sensitive-url-classifier.js';
 import { webTechFingerprintCollector } from './web-tech-fingerprint.js';
+import { trackingIdCollector } from './tracking-id-extractor.js';
+import { siteCrawlerCollector } from './site-crawler.js';
+import { httpSecurityAuditCollector } from './http-security-audit.js';
 import { logger } from '../lib/logger.js';
 
 // Collector registry
@@ -67,6 +70,9 @@ collectors.set('subdomain-takeover', subdomainTakeoverCollector);
 collectors.set('dns-security-audit', dnsSecurityAuditCollector);
 collectors.set('sensitive-url-classifier', sensitiveUrlClassifierCollector);
 collectors.set('web-tech-fingerprint', webTechFingerprintCollector);
+collectors.set('tracking-id-extractor', trackingIdCollector);
+collectors.set('site-crawler', siteCrawlerCollector);
+collectors.set('http-security-audit', httpSecurityAuditCollector);
 
 export function getCollector(name: CollectorName): Collector | undefined {
   return collectors.get(name);

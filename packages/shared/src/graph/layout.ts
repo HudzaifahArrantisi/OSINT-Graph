@@ -33,63 +33,538 @@ function isSeedNode<T extends Record<string, unknown>>(node: SimpleNode<T>): boo
   );
 }
 
+export type EngineModuleId =
+  | 'engine_seed'
+  | 'engine_wayback'
+  | 'engine_xnlinkfinder'
+  | 'engine_sensitive_route'
+  | 'engine_shodan'
+  | 'engine_tech_stack'
+  | 'engine_subdomain_takeover'
+  | 'engine_dns_sec'
+  | 'engine_subdomain_crt'
+  | 'engine_tls'
+  | 'engine_reverse_ip'
+  | 'engine_favicon'
+  | 'engine_dns_records'
+  | 'engine_whois'
+  | 'engine_mrholmes'
+  | 'engine_contact'
+  | 'engine_tracking_id'
+  | 'engine_site_crawler'
+  | 'engine_http_headers'
+  | 'engine_general';
+
+export interface EngineModuleMeta {
+  id: EngineModuleId;
+  name: string;
+  shortName: string;
+  category: 'endpoints' | 'infrastructure' | 'security' | 'intelligence' | 'identity' | 'target';
+  description: string;
+  color: string;
+  textColor: string;
+  badgeBg: string;
+  borderAccent: string;
+  iconName: string;
+}
+
+export const ENGINE_MODULE_DEFINITIONS: Record<EngineModuleId, EngineModuleMeta> = {
+  engine_seed: {
+    id: 'engine_seed',
+    name: 'Investigation Seed Target',
+    shortName: 'Target Seed',
+    category: 'target',
+    description: 'Target utama investigasi (Domain, URL, IP, atau Host)',
+    color: '#f8fafc',
+    textColor: 'text-slate-100',
+    badgeBg: 'bg-slate-700/60 border-slate-600',
+    borderAccent: 'border-l-slate-400',
+    iconName: 'Target',
+  },
+  engine_wayback: {
+    id: 'engine_wayback',
+    name: 'Historical Endpoints (Wayback CDX)',
+    shortName: 'Wayback CDX',
+    category: 'endpoints',
+    description: 'Arsip rute & URL historis dari Internet Archive Wayback Machine CDX API',
+    color: '#f59e0b',
+    textColor: 'text-amber-400',
+    badgeBg: 'bg-amber-500/10 border-amber-500/30',
+    borderAccent: 'border-l-amber-500',
+    iconName: 'Archive',
+  },
+  engine_xnlinkfinder: {
+    id: 'engine_xnlinkfinder',
+    name: 'xnLinkFinder (JS Endpoints & Parameters)',
+    shortName: 'xnLinkFinder',
+    category: 'endpoints',
+    description: 'Ekstraksi endpoint dan parameter URL tersembunyi dari source code JavaScript',
+    color: '#10b981',
+    textColor: 'text-emerald-400',
+    badgeBg: 'bg-emerald-500/10 border-emerald-500/30',
+    borderAccent: 'border-l-emerald-500',
+    iconName: 'Code2',
+  },
+  engine_sensitive_route: {
+    id: 'engine_sensitive_route',
+    name: 'Sensitive Route & Web Exposure',
+    shortName: 'Sensitive Route',
+    category: 'security',
+    description: 'Deteksi endpoint berisiko tinggi (admin panel, config, auth, backup files)',
+    color: '#f43f5e',
+    textColor: 'text-rose-400',
+    badgeBg: 'bg-rose-500/10 border-rose-500/30',
+    borderAccent: 'border-l-rose-500',
+    iconName: 'ShieldAlert',
+  },
+  engine_shodan: {
+    id: 'engine_shodan',
+    name: 'Shodan Recon & Vulnerabilities',
+    shortName: 'Shodan Recon',
+    category: 'infrastructure',
+    description: 'Pemeriksaan port terbuka, running services, banner & CVE dari Shodan / InternetDB',
+    color: '#ef4444',
+    textColor: 'text-red-400',
+    badgeBg: 'bg-red-500/10 border-red-500/30',
+    borderAccent: 'border-l-red-500',
+    iconName: 'Radar',
+  },
+  engine_tech_stack: {
+    id: 'engine_tech_stack',
+    name: 'Web Tech Fingerprinter',
+    shortName: 'Tech Stack',
+    category: 'infrastructure',
+    description: 'Identifikasi server, framework, CMS, library JS, dan CDN yang aktif',
+    color: '#0ea5e9',
+    textColor: 'text-sky-400',
+    badgeBg: 'bg-sky-500/10 border-sky-500/30',
+    borderAccent: 'border-l-sky-500',
+    iconName: 'Cpu',
+  },
+  engine_subdomain_takeover: {
+    id: 'engine_subdomain_takeover',
+    name: 'Subdomain Takeover Audit',
+    shortName: 'Takeover Audit',
+    category: 'security',
+    description: 'Audit kerentanan takeover dan dangling CNAME (AWS, GitHub Pages, Heroku, dll.)',
+    color: '#eab308',
+    textColor: 'text-yellow-400',
+    badgeBg: 'bg-yellow-500/10 border-yellow-500/30',
+    borderAccent: 'border-l-yellow-500',
+    iconName: 'AlertTriangle',
+  },
+  engine_dns_sec: {
+    id: 'engine_dns_sec',
+    name: 'DNS Security & Email Auth (SPF/DMARC)',
+    shortName: 'DNS Security',
+    category: 'security',
+    description: 'Audit keamanan konfigurasi SPF, DMARC, DKIM, DNSSEC & zone transfer',
+    color: '#8b5cf6',
+    textColor: 'text-violet-400',
+    badgeBg: 'bg-violet-500/10 border-violet-500/30',
+    borderAccent: 'border-l-violet-500',
+    iconName: 'ShieldCheck',
+  },
+  engine_subdomain_crt: {
+    id: 'engine_subdomain_crt',
+    name: 'Subdomain Enumeration (crt.sh)',
+    shortName: 'Subdomain CRT',
+    category: 'infrastructure',
+    description: 'Pencarian subdomain melalui log Certificate Transparency publik (crt.sh)',
+    color: '#6366f1',
+    textColor: 'text-indigo-400',
+    badgeBg: 'bg-indigo-500/10 border-indigo-500/30',
+    borderAccent: 'border-l-indigo-500',
+    iconName: 'Globe2',
+  },
+  engine_tls: {
+    id: 'engine_tls',
+    name: 'TLS Certificate & SANs',
+    shortName: 'TLS / SAN',
+    category: 'infrastructure',
+    description: 'Inspeksi sertifikat SSL/TLS, Subject Alternative Names (SAN), dan validitas',
+    color: '#14b8a6',
+    textColor: 'text-teal-400',
+    badgeBg: 'bg-teal-500/10 border-teal-500/30',
+    borderAccent: 'border-l-teal-500',
+    iconName: 'Key',
+  },
+  engine_reverse_ip: {
+    id: 'engine_reverse_ip',
+    name: 'Reverse IP & Shared Hosting',
+    shortName: 'Reverse IP',
+    category: 'infrastructure',
+    description: 'Pencarian domain lain yang berada di alamat IP server yang sama',
+    color: '#d946ef',
+    textColor: 'text-fuchsia-400',
+    badgeBg: 'bg-fuchsia-500/10 border-fuchsia-500/30',
+    borderAccent: 'border-l-fuchsia-500',
+    iconName: 'Radio',
+  },
+  engine_favicon: {
+    id: 'engine_favicon',
+    name: 'Favicon MurmurHash3 Recon',
+    shortName: 'Favicon Hash',
+    category: 'intelligence',
+    description: 'Fingerprint ikon web untuk mendeteksi framework (Spring Boot, Shiro, dll.)',
+    color: '#f97316',
+    textColor: 'text-orange-400',
+    badgeBg: 'bg-orange-500/10 border-orange-500/30',
+    borderAccent: 'border-l-orange-500',
+    iconName: 'Sparkles',
+  },
+  engine_dns_records: {
+    id: 'engine_dns_records',
+    name: 'DNS Resolution & Infrastructure Records',
+    shortName: 'DNS Records',
+    category: 'infrastructure',
+    description: 'Resolusi alamat IP host dan record A, AAAA, MX, NS, dan TXT',
+    color: '#06b6d4',
+    textColor: 'text-cyan-400',
+    badgeBg: 'bg-cyan-500/10 border-cyan-500/30',
+    borderAccent: 'border-l-cyan-500',
+    iconName: 'Server',
+  },
+  engine_whois: {
+    id: 'engine_whois',
+    name: 'WHOIS & RDAP Registry',
+    shortName: 'WHOIS / RDAP',
+    category: 'identity',
+    description: 'Informasi registrar, tanggal kedaluwarsa domain, dan data kepemilikan',
+    color: '#94a3b8',
+    textColor: 'text-slate-300',
+    badgeBg: 'bg-slate-500/10 border-slate-500/30',
+    borderAccent: 'border-l-slate-400',
+    iconName: 'Building',
+  },
+  engine_mrholmes: {
+    id: 'engine_mrholmes',
+    name: 'Mr.Holmes Recon & Google Dorks',
+    shortName: 'Mr.Holmes Dork',
+    category: 'intelligence',
+    description: 'Dorking Google tingkat lanjut untuk menemukan file bocor & login tersembunyi',
+    color: '#84cc16',
+    textColor: 'text-lime-400',
+    badgeBg: 'bg-lime-500/10 border-lime-500/30',
+    borderAccent: 'border-l-lime-500',
+    iconName: 'Search',
+  },
+  engine_contact: {
+    id: 'engine_contact',
+    name: 'Official Contact & Staff Intel',
+    shortName: 'Contact Info',
+    category: 'identity',
+    description: 'Email resmi, nomor telepon, dan staf yang terkait dengan target',
+    color: '#ec4899',
+    textColor: 'text-pink-400',
+    badgeBg: 'bg-pink-500/10 border-pink-500/30',
+    borderAccent: 'border-l-pink-500',
+    iconName: 'Mail',
+  },
+  engine_tracking_id: {
+    id: 'engine_tracking_id',
+    name: 'Tracking ID & Analytics Pivoting',
+    shortName: 'Trackers & Ads',
+    category: 'identity',
+    description: 'Ekstraksi Google Analytics (GA4/UA), GTM, AdSense, Meta Pixel untuk pivot kepemilikan situs',
+    color: '#a855f7',
+    textColor: 'text-purple-400',
+    badgeBg: 'bg-purple-500/10 border-purple-500/30',
+    borderAccent: 'border-l-purple-500',
+    iconName: 'Sparkles',
+  },
+  engine_site_crawler: {
+    id: 'engine_site_crawler',
+    name: 'Site Architecture & Crawler (robots / sitemap / security)',
+    shortName: 'Site Crawler',
+    category: 'endpoints',
+    description: 'Inspeksi mendalam robots.txt disallow routes, sitemap.xml, dan security.txt RFC 9116',
+    color: '#06b6d4',
+    textColor: 'text-cyan-400',
+    badgeBg: 'bg-cyan-500/10 border-cyan-500/30',
+    borderAccent: 'border-l-cyan-500',
+    iconName: 'FileText',
+  },
+  engine_http_headers: {
+    id: 'engine_http_headers',
+    name: 'HTTP Security Headers & WAF Health Audit',
+    shortName: 'Security Headers',
+    category: 'security',
+    description: 'Inspeksi postur keamanan header (HSTS, CSP, X-Frame-Options, CORS) dan deteksi WAF/CDN',
+    color: '#14b8a6',
+    textColor: 'text-teal-400',
+    badgeBg: 'bg-teal-500/10 border-teal-500/30',
+    borderAccent: 'border-l-teal-500',
+    iconName: 'ShieldCheck',
+  },
+  engine_general: {
+    id: 'engine_general',
+    name: 'General OSINT Intelligence',
+    shortName: 'Intelligence',
+    category: 'intelligence',
+    description: 'Entitas OSINT terhubung umum dari hasil investigasi',
+    color: '#64748b',
+    textColor: 'text-slate-400',
+    badgeBg: 'bg-slate-500/10 border-slate-500/30',
+    borderAccent: 'border-l-slate-500',
+    iconName: 'Layers',
+  },
+};
+
+/**
+ * Determines the precise Engine Module for any node based on metadata provenance and entity properties
+ */
+export function getNodeEngineModule(data: Record<string, any> = {}): EngineModuleMeta {
+  const isSeed =
+    data.isSeed === true ||
+    data.entityType === 'SEED' ||
+    String(data.entityType || '').toUpperCase() === 'SEED' ||
+    data.type === 'seed';
+  if (isSeed) return ENGINE_MODULE_DEFINITIONS.engine_seed;
+
+  const metadata = data.metadata || {};
+  const discoveredBy = String(
+    data.discoveredBy ||
+      metadata.discoveredBy ||
+      metadata.source?.transform ||
+      metadata.source?.collector ||
+      metadata.collector ||
+      '',
+  ).toLowerCase();
+
+  const entityType = String(data.entityType || data.type || '').toUpperCase();
+  const val = String(data.value || data.label || '').toLowerCase();
+  const title = String(data.title || '').toLowerCase();
+
+  // 1. Direct match on collector/transform provenance
+  if (
+    discoveredBy.includes('historical') ||
+    discoveredBy.includes('wayback') ||
+    discoveredBy.includes('cdx')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_wayback;
+  }
+  if (
+    discoveredBy.includes('xnlinkfinder') ||
+    discoveredBy.includes('js-param') ||
+    val.includes('#js-parameters')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_xnlinkfinder;
+  }
+  if (
+    discoveredBy.includes('sensitive') ||
+    discoveredBy.includes('web-exposure')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_sensitive_route;
+  }
+  if (
+    discoveredBy.includes('shodan') ||
+    discoveredBy.includes('internetdb')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_shodan;
+  }
+  if (
+    discoveredBy.includes('subdomain-takeover') ||
+    discoveredBy.includes('takeover')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_subdomain_takeover;
+  }
+  if (
+    discoveredBy.includes('dns-security') ||
+    discoveredBy.includes('dns-security-audit') ||
+    discoveredBy.includes('spf') ||
+    discoveredBy.includes('dmarc')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_dns_sec;
+  }
+  if (
+    discoveredBy.includes('crt') ||
+    discoveredBy.includes('find-subdomains-crt')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_subdomain_crt;
+  }
+  if (
+    discoveredBy.includes('find-tls') ||
+    discoveredBy.includes('tls') ||
+    discoveredBy.includes('cert')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_tls;
+  }
+  if (
+    discoveredBy.includes('reverse-ip')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_reverse_ip;
+  }
+  if (
+    discoveredBy.includes('favicon')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_favicon;
+  }
+  if (
+    discoveredBy.includes('whois') ||
+    discoveredBy.includes('rdap')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_whois;
+  }
+  if (
+    discoveredBy.includes('mrholmes') ||
+    discoveredBy.includes('website-recon') ||
+    discoveredBy.includes('generate-dorks') ||
+    discoveredBy.includes('dork')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_mrholmes;
+  }
+  if (
+    discoveredBy.includes('contact') ||
+    discoveredBy.includes('holehe') ||
+    discoveredBy.includes('email-crawl') ||
+    discoveredBy.includes('breach') ||
+    discoveredBy.includes('email-lookup')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_contact;
+  }
+  if (
+    discoveredBy.includes('web-tech') ||
+    discoveredBy.includes('fingerprint') ||
+    discoveredBy.includes('wappalyzer')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_tech_stack;
+  }
+  if (
+    discoveredBy.includes('resolve-dns') ||
+    discoveredBy.includes('dns-resolver')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_dns_records;
+  }
+  if (
+    discoveredBy.includes('tracking') ||
+    discoveredBy.includes('analytics') ||
+    metadata.category === 'TRACKER' ||
+    metadata.trackerType ||
+    val.startsWith('ga:') ||
+    val.startsWith('gtm:') ||
+    title.includes('google analytics') ||
+    title.includes('adsense') ||
+    title.includes('tag manager') ||
+    title.includes('meta pixel')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_tracking_id;
+  }
+  if (
+    discoveredBy.includes('site-crawler') ||
+    discoveredBy.includes('crawler') ||
+    metadata.docKind === 'ROBOTS_TXT' ||
+    metadata.docKind === 'SECURITY_TXT' ||
+    metadata.docKind === 'SITEMAP_XML' ||
+    val.includes('robots.txt') ||
+    val.includes('sitemap.xml') ||
+    val.includes('security.txt')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_site_crawler;
+  }
+  if (
+    discoveredBy.includes('http-security') ||
+    discoveredBy.includes('security-audit') ||
+    discoveredBy.includes('security-headers') ||
+    metadata.kind === 'SECURITY_HEADERS_AUDIT' ||
+    metadata.kind === 'WAF_DETECTION' ||
+    title.includes('security grade') ||
+    title.includes('waf / cdn') ||
+    title.includes('http security')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_http_headers;
+  }
+
+  // 2. Semantic inference from value & title
+  if (
+    val.startsWith('inurl:') ||
+    val.includes('site:') ||
+    val.includes('filetype:') ||
+    val.includes('intitle:')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_mrholmes;
+  }
+  if (val.includes('favicon') || title.includes('favicon')) {
+    return ENGINE_MODULE_DEFINITIONS.engine_favicon;
+  }
+  if (
+    val.includes('#js-parameters') ||
+    title.includes('frontend js') ||
+    title.includes('parameter js')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_xnlinkfinder;
+  }
+  if (
+    title.includes('port ') ||
+    val.includes('[tcp]') ||
+    val.includes('[udp]') ||
+    title.includes('cve-')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_shodan;
+  }
+  if (
+    title.includes('spf') ||
+    title.includes('dmarc') ||
+    title.includes('dkim') ||
+    title.includes('dns security')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_dns_sec;
+  }
+  if (title.includes('takeover') || title.includes('dangling')) {
+    return ENGINE_MODULE_DEFINITIONS.engine_subdomain_takeover;
+  }
+
+  // 3. Fallback inference on entityType
+  if (entityType === 'TECHNOLOGY') {
+    return ENGINE_MODULE_DEFINITIONS.engine_tech_stack;
+  }
+  if (entityType === 'SUBDOMAIN') {
+    return ENGINE_MODULE_DEFINITIONS.engine_subdomain_crt;
+  }
+  if (entityType === 'CERTIFICATE' || entityType === 'TLS_CERTIFICATE') {
+    return ENGINE_MODULE_DEFINITIONS.engine_tls;
+  }
+  if (
+    entityType === 'MX_RECORD' ||
+    entityType === 'NS_RECORD' ||
+    entityType === 'DNS_RECORD'
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_dns_records;
+  }
+  if (
+    entityType === 'EMAIL' ||
+    entityType === 'PHONE' ||
+    (entityType === 'PERSON' && !val.includes(' '))
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_contact;
+  }
+  if (entityType === 'URL') {
+    if (val.includes('?') || val.includes('&')) {
+      return ENGINE_MODULE_DEFINITIONS.engine_xnlinkfinder;
+    }
+    return ENGINE_MODULE_DEFINITIONS.engine_wayback;
+  }
+  if (entityType === 'DOCUMENT') {
+    return ENGINE_MODULE_DEFINITIONS.engine_xnlinkfinder;
+  }
+  if (entityType === 'IP_ADDRESS' || entityType === 'IP') {
+    return ENGINE_MODULE_DEFINITIONS.engine_dns_records;
+  }
+  if (entityType === 'ORGANIZATION') {
+    return ENGINE_MODULE_DEFINITIONS.engine_whois;
+  }
+
+  return ENGINE_MODULE_DEFINITIONS.engine_general;
+}
+
 /**
  * Determines the sub-category / transform key for a discovered node.
- * Groups entities into discrete functional modules (DNS, TLS, Webpage Metadata, Contacts, Social, etc.)
+ * Groups entities strictly into discrete engine modules (Wayback, xnLinkFinder, Shodan, etc.)
  */
 export function getSubCategoryKey<T extends Record<string, unknown>>(node: SimpleNode<T>): string {
   const d = (node.data || {}) as Record<string, any>;
-  const entityType = String(d.entityType || node.type || '').toUpperCase();
-  const label = String(d.label || d.value || '').toLowerCase();
-  const metadata = d.metadata || {};
-
-  // Check specific dork types / search types
-  if (label.startsWith('inurl:') || label.includes('site:') || label.includes('filetype:') || label.includes('intitle:')) {
-    if (label.startsWith('inurl:')) return 'subcat_dork_inurl';
-    if (label.startsWith('site:')) return 'subcat_dork_site';
-    if (label.startsWith('filetype:')) return 'subcat_dork_filetype';
-    if (label.startsWith('intitle:')) return 'subcat_dork_intitle';
-    return 'subcat_dorks';
-  }
-
-  // Exact type mappings
-  if (entityType === 'IP_ADDRESS' || entityType === 'IP') return 'subcat_ip';
-  if (entityType === 'SUBDOMAIN') return 'subcat_subdomain';
-  if (entityType === 'DOMAIN' || entityType === 'WEBSITE') return 'subcat_domain';
-  if (entityType === 'URL') return 'subcat_url';
-  if (entityType === 'DOCUMENT') return 'subcat_document';
-  if (entityType === 'LOCATION' || entityType === 'ADDRESS') return 'subcat_location';
-  if (entityType === 'NS_RECORD' || entityType === 'MX_RECORD' || entityType === 'DNS_RECORD') return 'subcat_dns';
-  if (entityType === 'CERTIFICATE' || entityType === 'TLS_CERTIFICATE') return 'subcat_tls';
-  if (entityType === 'TECHNOLOGY') return 'subcat_tech';
-  if (entityType === 'EMAIL' || entityType === 'PERSON' || entityType === 'ORGANIZATION') return 'subcat_contact';
-  if (entityType === 'PHONE') return 'subcat_phone';
-  if (['SOCIAL_PROFILE', 'GITHUB_PROFILE', 'GITLAB_PROFILE', 'YOUTUBE_CHANNEL', 'USERNAME'].includes(entityType)) return 'subcat_social';
-  if (entityType === 'PUBLIC_MENTION') return 'subcat_mentions';
-
-  const discoveredBy =
-    metadata.discoveredBy ||
-    metadata.source?.transform ||
-    metadata.source?.collector;
-
-  if (discoveredBy) {
-    const s = String(discoveredBy).toLowerCase();
-    if (s.includes('subdomain') || s.includes('crt')) return 'subcat_subdomain';
-    if (s.includes('dns') || s.includes('resolve-dns')) return 'subcat_dns';
-    if (s.includes('tls') || s.includes('cert') || s.includes('find-tls')) return 'subcat_tls';
-    if (s.includes('webpage') || s.includes('metadata')) return 'subcat_webpage';
-    if (s.includes('recon') || s.includes('website-recon')) return 'subcat_recon';
-    if (s.includes('contact') || s.includes('breach') || s.includes('email-lookup')) return 'subcat_contact';
-    if (s.includes('phone') || s.includes('geo')) return 'subcat_phone';
-    if (s.includes('social') || s.includes('username') || s.includes('mrholmes') || s.includes('holehe') || s.includes('email-crawl')) return 'subcat_social';
-    if (s.includes('github') || s.includes('gitlab') || s.includes('developer')) return 'subcat_dev';
-    if (s.includes('shodan') || s.includes('port') || s.includes('service')) return 'subcat_tech';
-    if (s.includes('dork') || s.includes('generate-dorks')) return 'subcat_dorks';
-    if (s.includes('mention')) return 'subcat_mentions';
-    return `subcat_${discoveredBy}`;
-  }
-
-  return `subcat_${entityType || 'other'}`;
+  const engine = getNodeEngineModule(d);
+  return engine.id;
 }
 
 function matchesSeedProvenance(seedVal: string, derivedFrom: string): boolean {
@@ -526,25 +1001,91 @@ export function applyForceLayout<T extends Record<string, unknown>>(
         });
       });
     } else {
-      // Connected nodes: Seed at center (0, 0), remaining nodes arranged by degree & spring relaxation
-      const cols = Math.max(3, Math.min(7, Math.ceil(Math.sqrt(connected.length * 1.3))));
-      const rows = Math.ceil(connected.length / cols);
-      const startX = -((cols - 1) * xSpacing) / 2;
-      const startY = -((rows - 1) * ySpacing) / 2;
+      // Connected nodes: Seed at center (0, 0), remaining nodes partitioned into Engine Module islands
+      const seedItem = nodeDegrees.find((item) => isSeedNode(item.node));
+      const nonSeedConnected = nodeDegrees.filter((item) => !isSeedNode(item.node) && item.degree > 0);
 
-      connected.forEach((item, index) => {
-        const r = Math.floor(index / cols);
-        const c = index % cols;
-        const jitterX = ((index * 31) % 16) - 8;
-        const jitterY = ((index * 19) % 12) - 6;
-        posMap.set(item.node.id, {
-          x: Math.round(startX + c * xSpacing + jitterX + (r % 2 === 1 ? xSpacing / 4 : 0)),
-          y: Math.round(startY + r * ySpacing + jitterY),
-        });
+      if (seedItem) {
+        posMap.set(seedItem.node.id, { x: 0, y: 0 });
+      }
+
+      // Partition connected non-seed nodes by their Engine Module
+      const engineGroups = new Map<string, typeof nonSeedConnected>();
+      nonSeedConnected.forEach((item) => {
+        const engKey = getSubCategoryKey(item.node);
+        if (!engineGroups.has(engKey)) {
+          engineGroups.set(engKey, []);
+        }
+        engineGroups.get(engKey)!.push(item);
       });
 
-      // Quick spring relaxation (15 iterations) to pull connected nodes toward each other
-      for (let iter = 0; iter < 15; iter++) {
+      // Sort engine groups by size (largest first)
+      const engineKeys = Array.from(engineGroups.keys()).sort((a, b) => {
+        return engineGroups.get(b)!.length - engineGroups.get(a)!.length;
+      });
+      const numEngines = engineKeys.length;
+
+      const NODE_X_STEP = 210; // Node width (190px) + 20px gap
+      const NODE_Y_STEP = 64; // Node height (44px) + 20px gap
+
+      if (numEngines === 1) {
+        // Single engine module: arrange in balanced radial flower around seed
+        const singleGroup = engineGroups.get(engineKeys[0])!;
+        const starNodes = layoutStarburst({ x: 0, y: 0 }, singleGroup.map((item) => item.node), 130);
+        starNodes.forEach((sn) => {
+          posMap.set(sn.id, { x: sn.position.x, y: sn.position.y });
+        });
+      } else {
+        // Multiple engine modules: Assign each Engine Module its own distinct orbital sector / island!
+        const totalNodes = nonSeedConnected.length;
+        const orbitRadius = Math.max(320, Math.min(850, 220 + Math.sqrt(totalNodes) * 48));
+
+        engineKeys.forEach((engKey, idx) => {
+          const group = engineGroups.get(engKey)!;
+          const count = group.length;
+
+          // Distribute island centers evenly around 360 degrees
+          const angle = -Math.PI / 2 + (2 * Math.PI * idx) / numEngines;
+          const islandCenterX = Math.round(Math.cos(angle) * orbitRadius);
+          const islandCenterY = Math.round(Math.sin(angle) * orbitRadius);
+
+          if (count === 1) {
+            posMap.set(group[0].node.id, { x: islandCenterX, y: islandCenterY });
+          } else if (count <= 4) {
+            // Small cluster: compact column or mini starburst
+            group.forEach((item, i) => {
+              const offsetY = (i - (count - 1) / 2) * NODE_Y_STEP;
+              posMap.set(item.node.id, {
+                x: islandCenterX,
+                y: Math.round(islandCenterY + offsetY),
+              });
+            });
+          } else {
+            // Structured compact subgrid for this engine
+            const cols = Math.max(2, Math.min(4, Math.ceil(Math.sqrt(count * 1.1))));
+            const rows = Math.ceil(count / cols);
+            const gridW = (cols - 1) * NODE_X_STEP;
+            const gridH = (rows - 1) * NODE_Y_STEP;
+            const startX = islandCenterX - gridW / 2;
+            const startY = islandCenterY - gridH / 2;
+
+            group.forEach((item, i) => {
+              const col = i % cols;
+              const row = Math.floor(i / cols);
+              const jitterX = ((i * 17) % 10) - 5;
+              const jitterY = ((i * 13) % 8) - 4;
+              posMap.set(item.node.id, {
+                x: Math.round(startX + col * NODE_X_STEP + jitterX),
+                y: Math.round(startY + row * NODE_Y_STEP + jitterY),
+              });
+            });
+          }
+        });
+      }
+
+      // Cluster-preserving spring relaxation (8 iterations)
+      // Maintains cohesive engine islands while easing local edge tensions
+      for (let iter = 0; iter < 8; iter++) {
         cEdges.forEach((e) => {
           const p1 = posMap.get(e.source);
           const p2 = posMap.get(e.target);
@@ -552,15 +1093,19 @@ export function applyForceLayout<T extends Record<string, unknown>>(
           const dx = p2.x - p1.x;
           const dy = p2.y - p1.y;
           const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const targetDist = 160;
-          const force = (dist - targetDist) * 0.05;
+          const targetDist = 180;
+          const force = (dist - targetDist) * 0.02;
           const nx = (dx / dist) * force;
           const ny = (dy / dist) * force;
-          if (!isSeedNode(nodeDegrees.find((n) => n.node.id === e.source)?.node!)) {
+
+          const n1 = nodeDegrees.find((n) => n.node.id === e.source)?.node;
+          const n2 = nodeDegrees.find((n) => n.node.id === e.target)?.node;
+
+          if (n1 && !isSeedNode(n1)) {
             p1.x += nx;
             p1.y += ny;
           }
-          if (!isSeedNode(nodeDegrees.find((n) => n.node.id === e.target)?.node!)) {
+          if (n2 && !isSeedNode(n2)) {
             p2.x -= nx;
             p2.y -= ny;
           }

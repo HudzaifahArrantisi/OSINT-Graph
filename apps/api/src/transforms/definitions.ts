@@ -331,6 +331,37 @@ export const TRANSFORM_DEFINITIONS: TransformDefinition[] = [
     enabled: true,
   },
 
+  {
+    id: 'domain.tracking-ids',
+    name: 'Tracking ID & Analytics Pivoting',
+    description: 'Extract Google Analytics (GA4/UA), GTM, AdSense, Meta Pixel, and marketing tags for OSINT identity and infrastructure pivoting',
+    inputTypes: ['DOMAIN', 'URL', 'WEBSITE'],
+    outputTypes: ['TECHNOLOGY'],
+    category: 'web',
+    riskLevel: 'low',
+    enabled: true,
+  },
+  {
+    id: 'domain.site-crawler',
+    name: 'Deep Site Architecture & Security Crawler',
+    description: 'Deep crawl robots.txt disallowed sensitive paths, sitemap.xml architecture, and RFC 9116 security.txt disclosure contacts',
+    inputTypes: ['DOMAIN', 'URL', 'WEBSITE'],
+    outputTypes: ['URL', 'DOCUMENT', 'EMAIL'],
+    category: 'web',
+    riskLevel: 'low',
+    enabled: true,
+  },
+  {
+    id: 'domain.http-security-audit',
+    name: 'HTTP Security Headers & WAF Health Audit',
+    description: 'Inspect live response headers for WAF/CDN perimeter protection (Cloudflare, CloudFront, Akamai) and evaluate security headers compliance (HSTS, CSP, CORS)',
+    inputTypes: ['DOMAIN', 'URL', 'WEBSITE'],
+    outputTypes: ['TECHNOLOGY'],
+    category: 'infrastructure',
+    riskLevel: 'low',
+    enabled: true,
+  },
+
   // ─── Intelligence Transforms ────────────────────────────────────────
   {
     id: 'mentions.search-public-web',

@@ -14,9 +14,45 @@ import {
   Layers,
   Maximize2,
   Minimize2,
+  Archive,
+  Code2,
+  ShieldAlert,
+  Radar,
+  AlertTriangle,
+  ShieldCheck,
+  Radio,
+  Sparkles,
+  Server,
+  Building,
+  Target,
 } from 'lucide-react';
+import {
+  ENGINE_MODULE_DEFINITIONS,
+  EngineModuleId,
+} from '@nexusgraph/shared';
 
-const HUB_META: Record<
+const ENGINE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  Archive,
+  Code2,
+  ShieldAlert,
+  Radar,
+  Cpu,
+  AlertTriangle,
+  ShieldCheck,
+  Globe2,
+  Key,
+  Radio,
+  Sparkles,
+  Server,
+  Building,
+  Search,
+  Mail,
+  Target,
+  Layers,
+  Network,
+};
+
+const LEGACY_HUB_META: Record<
   string,
   {
     title: string;
@@ -42,18 +78,20 @@ const HUB_META: Record<
 
 export const ClusterHubNode = memo(({ data, selected }: NodeProps) => {
   const nodeData = (data || {}) as Record<string, any>;
-  const catKey = String(nodeData.categoryKey || nodeData.entityType || 'subcat_webpage');
+  const catKey = String(nodeData.categoryKey || nodeData.entityType || 'engine_general');
   const count = Number(nodeData.count || nodeData.nodeCount || 0);
   const label = String(nodeData.label || nodeData.title || 'Discovery Module');
   const isCollapsed = Boolean(nodeData.isCollapsed);
 
-  const meta = HUB_META[catKey] || {
-    title: label,
-    icon: Layers,
-  };
+  // Check engine module definition first
+  const engineMeta = (ENGINE_MODULE_DEFINITIONS as Record<string, any>)[catKey];
+  const legacyMeta = LEGACY_HUB_META[catKey];
 
-  const Icon = meta.icon;
-  const title = meta.title || label;
+  const title = engineMeta?.shortName || engineMeta?.name || legacyMeta?.title || label;
+  const iconName = engineMeta?.iconName;
+  const Icon = (iconName && ENGINE_ICONS[iconName]) || legacyMeta?.icon || Layers;
+  const textColor = engineMeta?.textColor || 'text-neutral-200';
+  const badgeBorder = engineMeta?.color ? `border-[${engineMeta.color}]/40` : 'border-[#262626]';
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -90,23 +128,40 @@ export const ClusterHubNode = memo(({ data, selected }: NodeProps) => {
       {/* Hub Pill Badge at the Center of the Satellite */}
       <div
         onClick={handleToggle}
-        className={`px-2.5 py-1 rounded-md border flex items-center gap-2 bg-[#0d0d0d] border-[#262626] hover:border-neutral-400 transition-all duration-100 cursor-pointer shadow-sm ${
-          selected ? 'ring-1 ring-white border-white' : ''
+        className={`px-2.5 py-1 rounded-md border flex items-center gap-2 bg-[#0c1017]/95 backdrop-blur-sm transition-all duration-100 cursor-pointer shadow-md ${
+          selected ? 'ring-2 ring-white border-white' : 'hover:border-neutral-300'
         }`}
+        style={{
+          borderColor: selected ? '#ffffff' : engineMeta?.color ? `${engineMeta.color}80` : '#262626',
+          boxShadow: engineMeta?.color ? `0 2px 10px ${engineMeta.color}20` : undefined,
+        }}
         title={`Click to ${isCollapsed ? 'expand' : 'collapse'} ${title} (${count} entities)`}
       >
-        <div className="p-0.5 rounded text-neutral-300">
+        <div
+          className="p-1 rounded shrink-0 flex items-center justify-center"
+          style={{
+            backgroundColor: engineMeta?.color ? `${engineMeta.color}25` : '#171717',
+            color: engineMeta?.color || '#ffffff',
+          }}
+        >
           <Icon className="w-3.5 h-3.5" />
         </div>
 
         <div className="flex flex-col text-left">
-          <span className="text-[10.5px] font-sans font-medium text-neutral-200 leading-tight">
+          <span className={`text-[10.5px] font-sans font-semibold leading-tight ${textColor}`}>
             {title}
           </span>
         </div>
 
         {count > 0 && (
-          <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded border bg-[#171717] border-[#2e2e2e] text-neutral-300 font-medium">
+          <span
+            className="text-[9.5px] font-mono px-1.5 py-0.5 rounded border font-medium"
+            style={{
+              backgroundColor: engineMeta?.color ? `${engineMeta.color}15` : '#171717',
+              borderColor: engineMeta?.color ? `${engineMeta.color}40` : '#2e2e2e',
+              color: engineMeta?.color || '#e2e8f0',
+            }}
+          >
             {count}
           </span>
         )}

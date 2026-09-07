@@ -1,6 +1,10 @@
 import { memo, useState } from 'react';
 import { Handle, Position, NodeProps, NodeToolbar } from '@xyflow/react';
-import { EntityType } from '@nexusgraph/shared';
+import {
+  EntityType,
+  getNodeEngineModule,
+  EngineModuleMeta,
+} from '@nexusgraph/shared';
 import { ConfidenceBadge } from '../ui/ConfidenceBadge';
 import { getNavigableUrl } from '../detail/EntityDetailPanel';
 import {
@@ -28,7 +32,35 @@ import {
   Copy,
   Check,
   Target,
+  Archive,
+  Code2,
+  ShieldAlert,
+  Radar,
+  AlertTriangle,
+  ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
+
+const ENGINE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
+  Archive,
+  Code2,
+  ShieldAlert,
+  Radar,
+  Cpu,
+  AlertTriangle,
+  ShieldCheck,
+  Globe2,
+  Key,
+  Radio,
+  Sparkles,
+  Server,
+  Building,
+  Search: LinkIcon,
+  Mail,
+  Target,
+  Layers,
+  Network,
+};
 
 const ENTITY_ICONS: Record<EntityType, React.ComponentType<{ className?: string }>> = {
   SEED: Target,
@@ -129,7 +161,7 @@ function formatEntityDisplay(type: EntityType, value: string, title?: string): {
   };
 }
 
-export const EntityNode = memo(({ data, selected }: NodeProps) => {
+export const EntityNode = memo(({ id, data, selected }: NodeProps) => {
   const [isHovered, setIsHovered] = useState(false);
   const [copied, setCopied] = useState(false);
 
@@ -141,6 +173,8 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
   const isSeed = nodeData.isSeed || entityType === 'SEED';
 
   const Icon = ENTITY_ICONS[entityType] || HelpCircle;
+  const engineMeta = getNodeEngineModule(nodeData);
+  const EngineIcon = (engineMeta.iconName && ENGINE_ICONS[engineMeta.iconName]) || HelpCircle;
 
   const { mainText, subText, queryParams } = formatEntityDisplay(entityType, value, title);
 
@@ -195,9 +229,29 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
         className="!z-[99999] pointer-events-auto"
       >
         <div
-          className="w-64 sm:w-72 bg-[#0c0c0c]/98 backdrop-blur-md border border-[#2a2a2a] rounded-lg shadow-[0_12px_32px_rgba(0,0,0,0.95)] p-3 text-left animate-in fade-in zoom-in-95 duration-100 relative"
+          className="w-68 sm:w-76 bg-[#0c0c0c]/98 backdrop-blur-md border border-[#2a2a2a] rounded-lg shadow-[0_12px_32px_rgba(0,0,0,0.95)] p-3 text-left animate-in fade-in zoom-in-95 duration-100 relative"
           onClick={(e) => e.stopPropagation()}
         >
+          {/* Top Engine Module Banner */}
+          {!isSeed && (
+            <div
+              className="flex items-center justify-between px-2 py-1 rounded border mb-2"
+              style={{
+                backgroundColor: `${engineMeta.color}18`,
+                borderColor: `${engineMeta.color}45`,
+                color: engineMeta.color,
+              }}
+            >
+              <div className="flex items-center gap-1.5 font-mono text-[10px] font-semibold min-w-0 truncate">
+                <EngineIcon className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{engineMeta.name}</span>
+              </div>
+              <span className="text-[8px] font-mono uppercase px-1 py-0.2 rounded bg-black/50 text-slate-300 shrink-0 border border-white/10">
+                {engineMeta.category}
+              </span>
+            </div>
+          )}
+
           {/* Top Category Badge & Confidence Indicator */}
           <div className="flex items-center justify-between gap-2 mb-2 pb-2 border-b border-[#1f1f1f]">
             <div className="flex items-center gap-1.5 min-w-0">
@@ -258,6 +312,23 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
             </a>
           )}
 
+          {/* Target Seed Dossier Action */}
+          {isSeed && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                if (typeof (nodeData as any)?.onOpenDossier === 'function') {
+                  (nodeData as any).onOpenDossier(id);
+                }
+              }}
+              className="mt-2 w-full flex items-center justify-between gap-1.5 text-[10.5px] font-mono text-sky-300 bg-sky-950/50 hover:bg-sky-900/70 border border-sky-500/40 px-2.5 py-1 rounded transition-all cursor-pointer shadow-sm"
+              title="Buka Target Seed Deep Dossier Modal"
+            >
+              <span>Inspect Seed Dossier</span>
+              <Target className="w-3.5 h-3.5 text-sky-400" />
+            </button>
+          )}
+
           {/* Provenance Trail */}
           {provenance && (
             <div className="flex items-center gap-1.5 mt-2 text-[9.5px] font-mono text-neutral-400 bg-[#121212] px-2 py-0.5 rounded border border-[#1f1f1f]">
@@ -311,6 +382,12 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
       {/* Seed Target Node vs Discovered Entity Badge */}
       {isSeed ? (
         <div
+          onDoubleClick={(e) => {
+            e.stopPropagation();
+            if (typeof (nodeData as any)?.onOpenDossier === 'function') {
+              (nodeData as any).onOpenDossier(id);
+            }
+          }}
           className={`px-3 py-2 rounded-md border transition-all duration-150 cursor-pointer flex items-center gap-2.5 min-w-[170px] max-w-[220px] select-none ${
             selected
               ? 'bg-[#161c28] border-white ring-1 ring-white/20 text-white shadow-lg'
@@ -318,13 +395,15 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
                 ? 'bg-[#151922] border-slate-400 text-white shadow-md'
                 : 'bg-[#11141c] border-slate-600/80 text-slate-100'
           }`}
+          title="Klik ganda untuk membuka Target Seed Deep Dossier"
         >
-          <Target className="w-4 h-4 text-slate-300 shrink-0" />
+          <Target className="w-4 h-4 text-sky-400 shrink-0" />
           <div className="flex flex-col min-w-0 leading-tight">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <span className="text-[8.5px] font-mono uppercase tracking-wider font-semibold text-slate-400 bg-slate-800/80 px-1 py-0.2 rounded border border-slate-700/60">
+            <div className="flex items-center justify-between gap-1.5 mb-0.5">
+              <span className="text-[8.5px] font-mono uppercase tracking-wider font-semibold text-sky-300 bg-sky-950/60 px-1 py-0.2 rounded border border-sky-500/40">
                 TARGET
               </span>
+              <span className="text-[8px] font-mono text-slate-500">2x Click</span>
             </div>
             <span
               className="font-mono text-xs font-semibold text-white truncate max-w-[155px]"
@@ -336,30 +415,63 @@ export const EntityNode = memo(({ data, selected }: NodeProps) => {
         </div>
       ) : (
         <div
-          className={`w-[190px] min-h-[42px] py-1.5 px-2.5 rounded-md border transition-all duration-150 cursor-pointer flex items-center gap-2 select-none ${
+          className={`w-[195px] min-h-[48px] py-1.5 px-2 rounded-md border border-l-[3.5px] transition-all duration-150 cursor-pointer flex flex-col justify-center select-none shadow-sm ${
             selected
-              ? 'bg-[#181d28] border-slate-300 ring-1 ring-white/20 text-white shadow-lg'
+              ? 'bg-[#181d28] ring-2 ring-white text-white shadow-xl'
               : isHovered
-                ? 'bg-[#141822] border-slate-500 text-slate-100 shadow-md'
-                : 'bg-[#0f1218] border-[#222732] text-slate-300 hover:border-slate-500'
+                ? 'bg-[#141822] text-slate-100 shadow-md'
+                : 'bg-[#0c0f16]/95 text-slate-300'
           }`}
+          style={{
+            borderLeftColor: engineMeta.color,
+            borderColor: selected ? '#ffffff' : isHovered ? `${engineMeta.color}80` : '#1e2430',
+            boxShadow: selected
+              ? `0 0 16px ${engineMeta.color}40, 0 4px 12px rgba(0,0,0,0.8)`
+              : isHovered
+                ? `0 0 10px ${engineMeta.color}25`
+                : undefined,
+          }}
         >
-          <Icon className={`w-3.5 h-3.5 shrink-0 ${ENTITY_ACCENT_COLORS[entityType] || 'text-slate-400'}`} />
+          {/* Top Engine Pill Badge & Type Tag */}
+          <div className="flex items-center justify-between gap-1 mb-1">
+            <div
+              className="flex items-center gap-1 px-1.5 py-0.2 rounded text-[8.5px] font-mono font-semibold truncate max-w-[130px] border"
+              style={{
+                backgroundColor: `${engineMeta.color}15`,
+                borderColor: `${engineMeta.color}35`,
+                color: engineMeta.color,
+              }}
+              title={`Output dari: ${engineMeta.name}`}
+            >
+              <EngineIcon className="w-2.5 h-2.5 shrink-0" />
+              <span className="truncate">{engineMeta.shortName}</span>
+            </div>
 
-          <div className="flex flex-col min-w-0 flex-1 leading-tight">
+            <span className="text-[7.5px] font-mono text-slate-500 uppercase tracking-tight shrink-0">
+              {entityType === 'URL' ? 'URL' : entityType === 'TECHNOLOGY' ? 'TECH' : entityType.replace('_', ' ').slice(0, 5)}
+            </span>
+          </div>
+
+          {/* Main Entity Value & Type Icon */}
+          <div className="flex items-center gap-1.5 min-w-0">
+            <Icon className={`w-3 h-3 shrink-0 ${ENTITY_ACCENT_COLORS[entityType] || 'text-slate-400'}`} />
             <span
-              className="font-mono text-[10.5px] font-medium text-slate-200 truncate w-full"
+              className="font-mono text-[10.5px] font-medium text-slate-100 truncate w-full"
               title={value}
             >
               {mainText}
             </span>
+          </div>
+
+          {/* Subtext / Path / Parameter if present */}
+          {subText && subText.toLowerCase() !== entityType.toLowerCase() && (
             <span
-              className="font-mono text-[8.5px] text-slate-500 truncate w-full"
+              className="font-mono text-[8px] text-slate-400/80 truncate w-full pl-4.5 mt-0.5"
               title={subText}
             >
               {subText}
             </span>
-          </div>
+          )}
         </div>
       )}
     </div>

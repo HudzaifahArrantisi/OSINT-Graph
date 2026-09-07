@@ -19,6 +19,7 @@ import { ClusterHubNode } from './ClusterHubNode';
 import { RelationshipEdge } from './RelationshipEdge';
 import { GraphToolbar } from './GraphToolbar';
 import { GraphFilterBar } from './GraphFilterBar';
+import { EngineModuleFilterBar } from './EngineModuleFilterBar';
 import { useAppStore } from '../../stores/appStore';
 import {
   applyForceLayout,
@@ -28,7 +29,9 @@ import {
 import { Radio, Layers, Route, X } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import { PathFinderModal } from './PathFinderModal';
+import { TargetSeedDossierModal } from '../modals/TargetSeedDossierModal';
 import type { GraphPayload } from '@nexusgraph/shared';
+import { getNodeEngineModule, EngineModuleId } from '@nexusgraph/shared';
 
 const nodeTypes = {
   entity: EntityNode,
@@ -90,6 +93,7 @@ function GraphViewInner({ graphData }: GraphViewProps) {
   const [pathFinderOpen, setPathFinderOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedSeedFilter, setSelectedSeedFilter] = useState<string | null>(null);
+  const [selectedEngineFilter, setSelectedEngineFilter] = useState<EngineModuleId | null>(null);
 
   // Performance & Level-of-Detail states
   const rawNodeCount = (graphData.nodes || []).length;
@@ -101,6 +105,7 @@ function GraphViewInner({ graphData }: GraphViewProps) {
     return rawNodeCount > 60 ? new Set(['subcat_subdomain', 'subcat_url']) : new Set();
   });
   const [labelMode, setLabelMode] = useState<'auto' | 'always' | 'hover'>('auto');
+  const [dossierSeedId, setDossierSeedId] = useState<string | null>(null);
 
   const handleToggleCollapse = useCallback((catKey: string) => {
     setCollapsedCategories((prev) => {
@@ -511,43 +516,99 @@ function GraphViewInner({ graphData }: GraphViewProps) {
   }, [edges, visibleNodeIds]);
 
   const displayNodes = useMemo(() => {
-    if (!highlightedPath) return filteredNodes;
     return filteredNodes.map((node) => {
-      const isPathNode = highlightedPath.nodeIds.includes(node.id);
-      return {
+      const data = (node.data || {}) as Record<string, any>;
+      const isSeed = Boolean(data.isSeed || data.entityType === 'SEED' || node.type === 'seed');
+      const isHub = Boolean(node.type === 'cluster_hub' || data.isHub);
+
+      const enhancedNode = {
         ...node,
-        style: {
-          ...(node.style || {}),
-          opacity: isPathNode ? 1 : 0.18,
-          transition: 'opacity 0.2s ease',
+        data: {
+          ...data,
+          onOpenDossier: (nodeId: string) => setDossierSeedId(nodeId),
         },
       };
+
+      // Path highlight takes precedence if active
+      if (highlightedPath) {
+        const isPathNode = highlightedPath.nodeIds.includes(node.id);
+        return {
+          ...enhancedNode,
+          style: {
+            ...(node.style || {}),
+            opacity: isPathNode ? 1 : 0.18,
+            transition: 'opacity 0.2s ease',
+          },
+        };
+      }
+
+      // Engine Module Filter Spotlight
+      if (selectedEngineFilter) {
+        const engineMeta = getNodeEngineModule(data);
+        const matchesEngine = isSeed || isHub || engineMeta.id === selectedEngineFilter;
+        return {
+          ...enhancedNode,
+          style: {
+            ...(node.style || {}),
+            opacity: matchesEngine ? 1 : 0.18,
+            transition: 'opacity 0.2s ease',
+          },
+        };
+      }
+
+      return enhancedNode;
     });
-  }, [filteredNodes, highlightedPath]);
+  }, [filteredNodes, highlightedPath, selectedEngineFilter]);
 
   const displayEdges = useMemo(() => {
-    if (!highlightedPath) return filteredEdges;
-    return filteredEdges.map((edge) => {
-      const isPathEdge =
-        highlightedPath.edgeIds.includes(edge.id) ||
-        (highlightedPath.nodeIds.includes(edge.source) &&
-          highlightedPath.nodeIds.includes(edge.target));
+    if (highlightedPath) {
+      return filteredEdges.map((edge) => {
+        const isPathEdge =
+          highlightedPath.edgeIds.includes(edge.id) ||
+          (highlightedPath.nodeIds.includes(edge.source) &&
+            highlightedPath.nodeIds.includes(edge.target));
 
-      return {
-        ...edge,
-        style: {
-          ...(edge.style || {}),
-          stroke: isPathEdge ? '#38bdf8' : 'rgba(100, 116, 139, 0.2)',
-          strokeWidth: isPathEdge ? 2.5 : 1,
-          opacity: isPathEdge ? 1 : 0.1,
-        },
-        data: {
-          ...(edge.data || {}),
-          isHighlighted: isPathEdge,
-        },
-      };
-    });
-  }, [filteredEdges, highlightedPath]);
+        return {
+          ...edge,
+          style: {
+            ...(edge.style || {}),
+            stroke: isPathEdge ? '#38bdf8' : 'rgba(100, 116, 139, 0.2)',
+            strokeWidth: isPathEdge ? 2.5 : 1,
+            opacity: isPathEdge ? 1 : 0.1,
+          },
+          data: {
+            ...(edge.data || {}),
+            isHighlighted: isPathEdge,
+          },
+        };
+      });
+    }
+
+    if (selectedEngineFilter) {
+      const nodeMap = new Map(filteredNodes.map((n) => [n.id, n]));
+      return filteredEdges.map((edge) => {
+        const srcNode = nodeMap.get(edge.source);
+        const tgtNode = nodeMap.get(edge.target);
+        const srcEngine = srcNode ? getNodeEngineModule(srcNode.data) : null;
+        const tgtEngine = tgtNode ? getNodeEngineModule(tgtNode.data) : null;
+        const matches =
+          (srcEngine && srcEngine.id === selectedEngineFilter) ||
+          (tgtEngine && tgtEngine.id === selectedEngineFilter);
+
+        return {
+          ...edge,
+          style: {
+            ...(edge.style || {}),
+            opacity: matches ? 1 : 0.12,
+            strokeWidth: matches ? 1.8 : 1,
+            stroke: matches ? undefined : 'rgba(100, 116, 139, 0.2)',
+          },
+        };
+      });
+    }
+
+    return filteredEdges;
+  }, [filteredEdges, highlightedPath, selectedEngineFilter, filteredNodes]);
 
   const onNodeClick = useCallback(
     (_: React.MouseEvent, node: Node) => {
@@ -614,6 +675,15 @@ function GraphViewInner({ graphData }: GraphViewProps) {
 
       {filterOpen && <GraphFilterBar onClose={() => setFilterOpen(false)} />}
 
+      {/* Floating Engine Module Filter Workstation Dock (Bottom Center) */}
+      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+        <EngineModuleFilterBar
+          nodes={nodes}
+          selectedEngine={selectedEngineFilter}
+          onSelectEngine={(engineId) => setSelectedEngineFilter(engineId)}
+        />
+      </div>
+
       {/* Floating Active Path Highlight Banner */}
       {highlightedPath && (
         <div className="absolute top-16 left-4 z-20 flex items-center gap-3 px-3.5 py-2 bg-[#0c1017]/95 backdrop-blur-md border border-sky-500/50 rounded-lg shadow-2xl animate-in fade-in slide-in-from-top-2 text-xs">
@@ -658,6 +728,15 @@ function GraphViewInner({ graphData }: GraphViewProps) {
         />
       )}
 
+      {/* Target Seed Deep Dossier Modal */}
+      <TargetSeedDossierModal
+        isOpen={Boolean(dossierSeedId)}
+        onClose={() => setDossierSeedId(null)}
+        seedNode={nodes.find((n) => n.id === dossierSeedId) || null}
+        allNodes={nodes}
+        allEdges={edges}
+      />
+
       <ReactFlow
         nodes={displayNodes}
         edges={displayEdges}
@@ -667,9 +746,17 @@ function GraphViewInner({ graphData }: GraphViewProps) {
         onEdgesChange={onEdgesChange}
         onNodeDragStop={onNodeDragStop}
         onNodeClick={onNodeClick}
+        onNodeDoubleClick={(_e, node) => {
+          const d = (node.data || {}) as Record<string, any>;
+          const isSeed = Boolean(d.isSeed || d.entityType === 'SEED' || node.type === 'seed');
+          if (isSeed) {
+            setDossierSeedId(node.id);
+          }
+        }}
         onEdgeClick={onEdgeClick}
         onPaneClick={onPaneClick}
         fitView
+        fitViewOptions={{ padding: 0.22, duration: 400 }}
         onlyRenderVisibleElements={true}
         elevateNodesOnSelect={true}
         minZoom={0.04}

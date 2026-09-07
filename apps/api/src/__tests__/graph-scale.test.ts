@@ -4,6 +4,8 @@ import {
   applyHierarchicalLayout,
   applyRadialLayout,
   partitionGraphClusters,
+  getNodeEngineModule,
+  ENGINE_MODULE_DEFINITIONS,
 } from '@nexusgraph/shared';
 
 describe('Graph Scalability & Layout Algorithm Tests', () => {
@@ -279,5 +281,163 @@ describe('Graph Scalability & Layout Algorithm Tests', () => {
         expect(normDist).toBeGreaterThanOrEqual(0.7);
       }
     }
+  });
+
+  describe('Engine Module Classification & Spatial Island Partitioning', () => {
+    it('should accurately classify nodes into discrete engine modules with valid styling', () => {
+      // Validate registry
+      expect(ENGINE_MODULE_DEFINITIONS.engine_wayback.id).toBe('engine_wayback');
+      expect(ENGINE_MODULE_DEFINITIONS.engine_xnlinkfinder.id).toBe('engine_xnlinkfinder');
+
+      // 1. Wayback CDX
+      const waybackNode = {
+        label: 'https://example.com/old-page',
+        entityType: 'URL',
+        metadata: { discoveredBy: 'domain.historical-urls' },
+      };
+      const waybackEngine = getNodeEngineModule(waybackNode);
+      expect(waybackEngine.id).toBe('engine_wayback');
+      expect(waybackEngine.shortName).toBe('Wayback CDX');
+      expect(waybackEngine.color).toBe('#f59e0b');
+
+      // 2. xnLinkFinder
+      const xnNode = {
+        label: 'https://example.com/api/v1?token=xyz',
+        entityType: 'URL',
+        metadata: { discoveredBy: 'domain.xnlinkfinder-js-params' },
+      };
+      const xnEngine = getNodeEngineModule(xnNode);
+      expect(xnEngine.id).toBe('engine_xnlinkfinder');
+      expect(xnEngine.shortName).toBe('xnLinkFinder');
+      expect(xnEngine.color).toBe('#10b981');
+
+      // 3. Shodan Recon
+      const shodanNode = {
+        label: 'Port 8080 [TCP]: nginx 1.18.0',
+        entityType: 'TECHNOLOGY',
+        metadata: { discoveredBy: 'infrastructure.shodan-recon' },
+      };
+      const shodanEngine = getNodeEngineModule(shodanNode);
+      expect(shodanEngine.id).toBe('engine_shodan');
+      expect(shodanEngine.shortName).toBe('Shodan Recon');
+      expect(shodanEngine.color).toBe('#ef4444');
+
+      // 4. Web Tech Fingerprinter
+      const techNode = {
+        label: 'WordPress 6.4 (CMS)',
+        entityType: 'TECHNOLOGY',
+        metadata: { discoveredBy: 'domain.web-tech-fingerprint' },
+      };
+      const techEngine = getNodeEngineModule(techNode);
+      expect(techEngine.id).toBe('engine_tech_stack');
+      expect(techEngine.shortName).toBe('Tech Stack');
+      expect(techEngine.color).toBe('#0ea5e9');
+
+      // 5. DNS Security Audit
+      const dnsSecNode = {
+        label: 'SPF: v=spf1 include:_spf.google.com ~all',
+        entityType: 'DNS_RECORD',
+        metadata: { discoveredBy: 'domain.dns-security-audit' },
+      };
+      const dnsSecEngine = getNodeEngineModule(dnsSecNode);
+      expect(dnsSecEngine.id).toBe('engine_dns_sec');
+      expect(dnsSecEngine.shortName).toBe('DNS Security');
+
+      // 6. Subdomain CRT
+      const crtNode = {
+        label: 'admin.corp.com',
+        entityType: 'SUBDOMAIN',
+        metadata: { discoveredBy: 'domain.find-subdomains-crt' },
+      };
+      const crtEngine = getNodeEngineModule(crtNode);
+      expect(crtEngine.id).toBe('engine_subdomain_crt');
+      expect(crtEngine.shortName).toBe('Subdomain CRT');
+
+      // 7. Seed Target
+      const seedNode = {
+        label: 'target.com',
+        isSeed: true,
+      };
+      const seedEngine = getNodeEngineModule(seedNode);
+      expect(seedEngine.id).toBe('engine_seed');
+      expect(seedEngine.shortName).toBe('Target Seed');
+    });
+
+    it('should partition nodes into distinct separated spatial islands in Force Layout', () => {
+      const seed = {
+        id: 'seed-domain',
+        type: 'seed',
+        position: { x: 0, y: 0 },
+        data: { isSeed: true, label: 'target.com' },
+      };
+
+      // 10 Wayback URLs
+      const waybackNodes = Array.from({ length: 10 }, (_, i) => ({
+        id: `wb-${i}`,
+        type: 'entity',
+        position: { x: 0, y: 0 },
+        data: {
+          label: `https://target.com/archive/${i}`,
+          entityType: 'URL',
+          metadata: { discoveredBy: 'domain.historical-urls' },
+        },
+      }));
+
+      // 10 xnLinkFinder Parameters
+      const xnNodes = Array.from({ length: 10 }, (_, i) => ({
+        id: `xn-${i}`,
+        type: 'entity',
+        position: { x: 0, y: 0 },
+        data: {
+          label: `https://target.com/app.js?p=${i}`,
+          entityType: 'URL',
+          metadata: { discoveredBy: 'domain.xnlinkfinder-js-params' },
+        },
+      }));
+
+      // 5 Shodan technologies
+      const shodanNodes = Array.from({ length: 5 }, (_, i) => ({
+        id: `shodan-${i}`,
+        type: 'entity',
+        position: { x: 0, y: 0 },
+        data: {
+          label: `Port ${8000 + i} [TCP]`,
+          entityType: 'TECHNOLOGY',
+          metadata: { discoveredBy: 'infrastructure.shodan-recon' },
+        },
+      }));
+
+      const allNodes: any[] = [seed, ...waybackNodes, ...xnNodes, ...shodanNodes];
+
+      // Connect all nodes to seed
+      const edges = allNodes.slice(1).map((n, i) => ({
+        id: `edge-seed-${i}`,
+        source: 'seed-domain',
+        target: n.id,
+      }));
+
+      const positioned = applyForceLayout(allNodes, edges);
+      expect(positioned.length).toBe(26);
+
+      // Seed node remains placed with valid coordinates
+      const positionedSeed = positioned.find((n) => n.id === 'seed-domain')!;
+      expect(positionedSeed).toBeDefined();
+      expect(typeof positionedSeed.position.x).toBe('number');
+      expect(typeof positionedSeed.position.y).toBe('number');
+
+      // Compute centroid of Wayback cluster vs xnLinkFinder cluster
+      const wbPositions = positioned.filter((n) => n.id.startsWith('wb-'));
+      const xnPositions = positioned.filter((n) => n.id.startsWith('xn-'));
+
+      const wbCentroidX = wbPositions.reduce((acc, n) => acc + n.position.x, 0) / wbPositions.length;
+      const wbCentroidY = wbPositions.reduce((acc, n) => acc + n.position.y, 0) / wbPositions.length;
+
+      const xnCentroidX = xnPositions.reduce((acc, n) => acc + n.position.x, 0) / xnPositions.length;
+      const xnCentroidY = xnPositions.reduce((acc, n) => acc + n.position.y, 0) / xnPositions.length;
+
+      // Distance between Wayback island centroid and xnLinkFinder centroid must be substantial (>= 200px)
+      const islandDist = Math.hypot(xnCentroidX - wbCentroidX, xnCentroidY - wbCentroidY);
+      expect(islandDist).toBeGreaterThanOrEqual(200);
+    });
   });
 });

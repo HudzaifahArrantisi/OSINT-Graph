@@ -336,6 +336,33 @@ const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
     },
     collectors: [{ name: 'web-tech-fingerprint' }],
   },
+  'domain.tracking-ids': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl) return v.trim();
+      if (analysis.isDomain) return `https://${v.trim()}`;
+      const d = extractDomain(v);
+      return d && d.includes('.') ? `https://${d}` : null;
+    },
+    collectors: [{ name: 'tracking-id-extractor' }],
+  },
+  'domain.site-crawler': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;
+      if (analysis.isDomain) return v.trim();
+      const d = extractDomain(v);
+      return d && d.includes('.') ? d : null;
+    },
+    collectors: [{ name: 'site-crawler' }],
+  },
+  'domain.http-security-audit': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl) return v.trim();
+      if (analysis.isDomain) return `https://${v.trim()}`;
+      const d = extractDomain(v);
+      return d && d.includes('.') ? `https://${d}` : null;
+    },
+    collectors: [{ name: 'http-security-audit' }],
+  },
   'mentions.search-public-web': {
     deriveInput: (v, st, analysis) => {
       // Only allowed for DOMAIN, IP_ADDRESS, URL, ORGANIZATION

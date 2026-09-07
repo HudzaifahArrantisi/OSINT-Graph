@@ -220,6 +220,9 @@ export const COLLECTOR_NAMES = [
   'dns-security-audit',
   'web-tech-fingerprint',
   'sensitive-url-classifier',
+  'tracking-id-extractor',
+  'site-crawler',
+  'http-security-audit',
 ] as const;
 
 export type CollectorName = (typeof COLLECTOR_NAMES)[number];
