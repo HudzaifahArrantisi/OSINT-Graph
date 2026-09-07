@@ -489,15 +489,36 @@ export function InvestigationDetailPage() {
             <span className="hidden md:inline">Export Dossier</span>
           </Button>
 
-          <Button
-            variant="primary"
-            size="sm"
-            icon={<Compass className="w-3.5 h-3.5" />}
-            onClick={() => setDiscoveryModalOpen(true)}
-            className="font-medium"
-          >
-            <span>Start Discovery</span>
-          </Button>
+          {isDiscovering ? (
+            <button
+              onClick={() => {
+                setLiveLogsOpen(true);
+                addToast(
+                  `Mesin penelusuran sedang aktif memproses modul (${discoveryProgress ? `${discoveryProgress.completedTransforms}/${discoveryProgress.totalTransforms}` : 'berjalan'}). Harap tunggu hingga selesai di Execution Console.`,
+                  'warning',
+                );
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono font-semibold rounded-button bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/40 text-amber-300 transition-all shadow-sm cursor-pointer"
+              title="Mesin sedang aktif memproses modul di Execution Console. Klik untuk melihat log."
+            >
+              <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400 shrink-0" />
+              <span>
+                {discoveryProgress && typeof discoveryProgress.completedTransforms === 'number'
+                  ? `Memproses Modul (${discoveryProgress.completedTransforms}/${discoveryProgress.totalTransforms})...`
+                  : 'Memproses Modul...'}
+              </span>
+            </button>
+          ) : (
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Compass className="w-3.5 h-3.5" />}
+              onClick={() => setDiscoveryModalOpen(true)}
+              className="font-medium"
+            >
+              <span>Start Discovery</span>
+            </Button>
+          )}
         </div>
       </div>
 
@@ -616,11 +637,23 @@ export function InvestigationDetailPage() {
                     <span>Seed Targets ({seedTargets.length})</span>
                   </span>
                   <button
-                    onClick={() => setDiscoveryModalOpen(true)}
-                    className="text-[10px] text-primary hover:underline flex items-center gap-0.5 font-medium"
+                    onClick={() => {
+                      if (isDiscovering) {
+                        setLiveLogsOpen(true);
+                        addToast('Mesin penelusuran sedang aktif berjalan. Harap tunggu hingga modul selesai di Execution Console.', 'warning');
+                        return;
+                      }
+                      setDiscoveryModalOpen(true);
+                    }}
+                    className={`text-[10px] flex items-center gap-0.5 font-medium cursor-pointer ${
+                      isDiscovering
+                        ? 'text-amber-400 hover:text-amber-300'
+                        : 'text-primary hover:underline'
+                    }`}
+                    title={isDiscovering ? 'Mesin sedang memproses modul di Console' : 'Tambah target seed baru'}
                   >
-                    <Plus className="w-2.5 h-2.5" />
-                    <span>Add</span>
+                    {isDiscovering ? <Loader2 className="w-2.5 h-2.5 animate-spin" /> : <Plus className="w-2.5 h-2.5" />}
+                    <span>{isDiscovering ? 'Memproses' : 'Add'}</span>
                   </button>
                 </div>
 
@@ -628,10 +661,18 @@ export function InvestigationDetailPage() {
                   <div className="bg-surface-2 p-2.5 rounded-card border border-border-subtle text-center text-[11px] text-text-muted">
                     <p>No seed targets active</p>
                     <button
-                      onClick={() => setDiscoveryModalOpen(true)}
-                      className="mt-1.5 text-xs text-primary font-medium hover:underline inline-flex items-center gap-1"
+                      onClick={() => {
+                        if (isDiscovering) {
+                          setLiveLogsOpen(true);
+                          addToast('Mesin penelusuran sedang aktif berjalan di Execution Console.', 'warning');
+                          return;
+                        }
+                        setDiscoveryModalOpen(true);
+                      }}
+                      className="mt-1.5 text-xs text-primary font-medium hover:underline inline-flex items-center gap-1 cursor-pointer"
                     >
-                      <span>Start Discovery</span>
+                      {isDiscovering && <Loader2 className="w-3 h-3 animate-spin text-amber-400" />}
+                      <span>{isDiscovering ? 'Lihat Progress di Console' : 'Start Discovery'}</span>
                     </button>
                   </div>
                 ) : (

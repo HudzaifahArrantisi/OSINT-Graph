@@ -363,6 +363,24 @@ const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
     },
     collectors: [{ name: 'http-security-audit' }],
   },
+  'domain.dirsearch-path-bruteforce': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl) return v.trim();
+      if (analysis.isDomain) return `https://${v.trim()}`;
+      const d = extractDomain(v);
+      return d && d.includes('.') ? `https://${d}` : null;
+    },
+    collectors: [{ name: 'dirsearch' }],
+  },
+  'domain.company-geo-location': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl) return v.trim();
+      if (analysis.isDomain) return v.trim();
+      const d = extractDomain(v);
+      return d && d.includes('.') ? d : v.trim();
+    },
+    collectors: [{ name: 'company-geo' }],
+  },
   'mentions.search-public-web': {
     deriveInput: (v, st, analysis) => {
       // Only allowed for DOMAIN, IP_ADDRESS, URL, ORGANIZATION

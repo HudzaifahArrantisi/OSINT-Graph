@@ -124,6 +124,8 @@ export function StartDiscoveryModal({
     addLiveLog,
     clearLiveLogs,
     setLiveLogsOpen,
+    isDiscovering,
+    discoveryProgress,
     setIsDiscovering,
     setDiscoveryProgress,
     setDiscoverySummary,
@@ -204,6 +206,12 @@ export function StartDiscoveryModal({
 
   const handleStartDiscovery = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isDiscovering) {
+      setError('Mesin penelusuran sedang aktif berjalan di Execution Console. Harap tunggu hingga seluruh modul selesai.');
+      addToast('Mesin penelusuran sedang aktif memproses modul. Harap tunggu hingga selesai.', 'warning');
+      return;
+    }
+
     if (!seedValue.trim()) {
       setError('Masukkan nilai target / seed investigasi terlebih dahulu');
       return;
@@ -331,6 +339,39 @@ export function StartDiscoveryModal({
       description="Pilih kategori target dan modul investigasi untuk memetakan jejak digital ke dalam graph"
       maxWidth="lg"
     >
+      {/* Active Discovery In-Progress Warning Banner */}
+      {isDiscovering && (
+        <div className="p-3 mb-3.5 rounded-xl bg-amber-500/15 border border-amber-500/40 text-amber-300 text-xs font-mono flex items-start justify-between gap-3 animate-in fade-in duration-150">
+          <div className="flex items-start gap-2.5">
+            <Loader2 className="w-4 h-4 shrink-0 text-amber-400 mt-0.5 animate-spin" />
+            <div>
+              <div className="font-bold flex items-center gap-2 text-white">
+                <span>Mesin Penelusuran Sedang Berjalan</span>
+                {discoveryProgress && typeof discoveryProgress.completedTransforms === 'number' && (
+                  <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/30 text-amber-200 border border-amber-500/40">
+                    {discoveryProgress.completedTransforms}/{discoveryProgress.totalTransforms} modul selesai
+                  </span>
+                )}
+              </div>
+              <div className="text-[11px] text-amber-400/90 mt-0.5 leading-relaxed">
+                Sistem saat ini sedang memproses modul di Execution Console. Harap tunggu hingga modul saat ini selesai sebelum memulai penelusuran baru.
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              onClose();
+              setLiveLogsOpen(true);
+            }}
+            className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-[10.5px] font-semibold shrink-0 cursor-pointer transition-colors"
+          >
+            Lihat Console ↗
+          </button>
+        </div>
+      )}
+
       {discoveryState === 'complete' && discoveryResult ? (
         /* DISCOVERY SUMMARY VIEW */
         <div className="space-y-4">
@@ -659,19 +700,23 @@ export function StartDiscoveryModal({
                 variant="primary"
                 type="submit"
                 disabled={
+                  isDiscovering ||
+                  discoveryState === 'running' ||
                   selectedTransformIds.length === 0 ||
                   (isSocialIdentity &&
                     selectedPlatforms.length === 0 &&
                     selectedTransformIds.includes('social.rapidapi-social-lookup'))
                 }
                 loading={discoveryState === 'running'}
-                icon={<Sparkles className="w-3.5 h-3.5" />}
+                icon={isDiscovering ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" /> : <Sparkles className="w-3.5 h-3.5" />}
               >
-                {discoveryState === 'running'
-                  ? 'Menjalankan...'
-                  : selectedTransformIds.length === 0
-                    ? 'Pilih minimal 1 modul'
-                    : `Mulai Penelusuran (${selectedTransformIds.length})`}
+                {isDiscovering
+                  ? 'Menunggu Modul Selesai di Console...'
+                  : discoveryState === 'running'
+                    ? 'Menjalankan...'
+                    : selectedTransformIds.length === 0
+                      ? 'Pilih minimal 1 modul'
+                      : `Mulai Penelusuran (${selectedTransformIds.length})`}
               </Button>
             </div>
           </div>

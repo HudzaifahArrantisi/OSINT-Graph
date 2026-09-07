@@ -675,8 +675,8 @@ function GraphViewInner({ graphData }: GraphViewProps) {
 
       {filterOpen && <GraphFilterBar onClose={() => setFilterOpen(false)} />}
 
-      {/* Floating Engine Module Filter Workstation Dock (Bottom Center) */}
-      <div className="absolute bottom-5 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+      {/* Unobtrusive Engine Module Filter Bar (Bottom Center) */}
+      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
         <EngineModuleFilterBar
           nodes={nodes}
           selectedEngine={selectedEngineFilter}

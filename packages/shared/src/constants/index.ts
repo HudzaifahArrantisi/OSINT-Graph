@@ -185,6 +185,8 @@ export const EVIDENCE_SOURCE_TYPES = [
   'DNS_SECURITY_AUDIT',
   'TECH_FINGERPRINT',
   'SENSITIVE_PARAM_ANALYSIS',
+  'DIRSEARCH_SCAN',
+  'COMPANY_GEO_RECON',
 ] as const;
 
 export type EvidenceSourceType = (typeof EVIDENCE_SOURCE_TYPES)[number];
@@ -223,6 +225,8 @@ export const COLLECTOR_NAMES = [
   'tracking-id-extractor',
   'site-crawler',
   'http-security-audit',
+  'dirsearch',
+  'company-geo',
 ] as const;
 
 export type CollectorName = (typeof COLLECTOR_NAMES)[number];

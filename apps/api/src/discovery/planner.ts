@@ -21,6 +21,7 @@ export interface DiscoveryPlanOutput {
 /** Specific transform lists per seed type for deterministic, evidence-backed planning */
 const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   URL: [
+    'domain.company-geo-location',
     'domain.xnlinkfinder-js-params',
     'domain.sensitive-url-classifier',
     'domain.web-tech-fingerprint',
@@ -28,6 +29,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'domain.tracking-ids',
     'domain.site-crawler',
     'domain.http-security-audit',
+    'domain.dirsearch-path-bruteforce',
     'domain.web-exposure',
     'domain.favicon-hash',
     'domain.reverse-ip',
@@ -44,6 +46,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'mentions.search-public-web',
   ],
   DOMAIN: [
+    'domain.company-geo-location',
     'domain.xnlinkfinder-js-params',
     'domain.sensitive-url-classifier',
     'domain.web-tech-fingerprint',
@@ -51,6 +54,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'domain.tracking-ids',
     'domain.site-crawler',
     'domain.http-security-audit',
+    'domain.dirsearch-path-bruteforce',
     'domain.web-exposure',
     'domain.favicon-hash',
     'domain.reverse-ip',
@@ -84,6 +88,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
     'social.youtube-channel',
   ],
   ORGANIZATION: [
+    'domain.company-geo-location',
     'web.discover-official-site',
     'developer.github-profile',
     'developer.gitlab-profile',

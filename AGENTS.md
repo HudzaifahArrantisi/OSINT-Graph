@@ -106,23 +106,143 @@ pnpm format
 
 ---
 
-## 5. Checklist Sebelum Commit / Selesai Modifikasi
+## 6. Frontend & UI/UX Standards (Anti-Slop & Monochrome Theme)
+
+Frontend NexusGraph mengadopsi standar **Anti-Slop Security Workstation** dengan estetika **Hitam-Putih / Monochrome**:
+1. **Palet Warna Netral (Monochrome)**:
+   - Base Backgrounds: `#080808` / `#0a0a0a` (canvas/docks), `#111111` (header/cards).
+   - Subtle Borders: `#222222` (default border), `#2e2e2e` (hover/subtle highlight).
+   - Dilarang menggunakan warna neon glow, saturated halos (`shadow-[0_0_24px_...]`), maupun gradien pelangi.
+2. **Status Aktif & Kontras**:
+   - Status tombol aktif menggunakan kontras tinggi monokrom (`bg-white text-black font-semibold border-white`).
+   - Status non-aktif menggunakan dark neutral (`bg-[#121212] text-neutral-300 hover:text-white hover:bg-[#1a1a1a] border-[#222222]`).
+3. **Typography & Icons**:
+   - Hindari emoji/ikon AI-cliché (`Sparkles` ✨, 🚀, dll.). Selalu gunakan Lucide SVG icons semantik (`Layers`, `Filter`, `Target`, `Shield`, `Search`).
+   - Angka metrik, IP, domain, hash, dan total entitas wajib menggunakan `font-mono`.
+4. **Docking & Canvas Non-Intrusive**:
+   - Kontrol graf melayang (floating docks) wajib memiliki lebar kompak dan terkontrol (tidak membentang memenuhi layar hingga bertabrakan dengan Console/Minimap).
+   - Menyediakan fitur minimize 1-klik agar kanvas investigasi dapat dieksplorasi tanpa hambatan visual.
+
+---
+
+## 7. Status Terkini Proyek & Milestone Arsitektur (Current Project State)
+
+Dokumentasi ini mencatat sejauh mana kapabilitas platform NexusGraph telah dibangun dan siap digunakan, agar setiap AI assistant memahami kondisi codebase saat ini secara utuh:
+
+### 7.1 Kolektor & Mesin Investigasi Aktif (Active OSINT Engines)
+Platform saat ini memiliki 17 kolektor aktif yang terdaftar di `apps/api/src/collectors/registry.ts` dan discovery planner:
+
+1. **`dirsearch` (Web Path Brute-Force Discovery Engine)**:
+   - **Engine Vendored**: Mengintegrasikan mesin asli `maurosoria/dirsearch` di `vendor/dirsearch/`.
+   - **Bridge Python**: `vendor/dirsearch-bridge.py` mengeksekusi fuzzer secara non-interaktif, menerima input target, ekstensi file, timeout via `stdin` JSON, dan mengeluarkan struktur temuan via `stdout` JSON murni.
+   - **Wordlist OSINT Terkurasi**: Menguji 500 path prioritas tinggi (admin panel, backup SQL/ZIP, konfigurasi `.env`/YAML, endpoint REST API, dashboard login, file log sensitif).
+   - **Klasifikasi & Severity**: Hasil diklasifikasikan secara otomatis (`admin_panel`, `backup`, `config`, `api`, `login`, dll.) dengan risk level (`high`, `medium`, `low`).
+   - **Integrasi Penuh**: Didukung oleh collector TypeScript `apps/api/src/collectors/dirsearch.ts`, transform `domain.dirsearch-path-bruteforce`, evidence source `DIRSEARCH_SCAN`, modul layout `engine_dirsearch`, dan telah lolos uji 8 test di `apps/api/src/__tests__/dirsearch.test.ts`.
+
+2. **`xnLinkFinder` (JS Endpoint & Parameter Recon)**:
+   - Menginspeksi bundle JavaScript klien untuk mengekstraksi hidden REST API endpoints, parameter query/POST, form keys, dan potensi secrets/API tokens.
+   - Didukung oleh `vendor/xnlinkfinder-bridge.py` dan unit test komprehensif di `apps/api/src/__tests__/xnlinkfinder.test.ts`.
+
+3. **`Mr.Holmes` (Social, Identity & Dork Engine)**:
+   - Menjalankan engine `Lucksi/Mr.Holmes` via `vendor/mrholmes-bridge.py` untuk mode username, people, email, phone, domain, serta pembuatan Google Dorks terarah.
+
+4. **`Holehe` (Multi-Platform Email Checker)**:
+   - Menguji registrasi email di 120+ platform digital (Twitter, GitHub, Instagram, Spotify, dll.) via `vendor/holehe-bridge.py`.
+
+5. **`phone-geo` (Phone Intelligence & Telco Resolver)**:
+   - Integrasi Twilio Lookup v2 + GetContact, dilengkapi normalisasi nomor lokal (08...) dan deteksi carrier telekomunikasi Indonesia (Telkomsel, Indosat, XL, Tri, Smartfren) serta kode area PSTN secara deterministik.
+
+6. **`dns-security-audit` & `subdomain-takeover`**:
+   - Audit DNS mendalam: validasi konfigurasi SPF, DMARC DKIM, deteksi SaaS verification tokens, serta verifikasi kerentanan dangling DNS / subdomain takeover.
+
+7. **`tls-certificate` & `subdomain-crt`**:
+   - Ekstraksi Subject Alternative Names (SAN) untuk clustering klaster domain perusahaan dan live Certificate Transparency log stream dari `crt.sh`.
+
+8. **`web-tech-fingerprint` & `http-security-audit`**:
+   - Identifikasi web server, CDN, framework, CMS, dan penilaian postur keamanan HTTP security response headers (CSP, HSTS, CORS, X-Frame-Options).
+
+9. **`tracking-id-extractor` & `site-crawler`**:
+   - Ekstraksi Google Analytics (UA-/G-), Tag Manager (GTM-), AdSense (pub-), Facebook Pixel ID untuk korelasi kepemilikan situs lintas domain, serta web crawler internal.
+
+10. **`sensitive-url-classifier` & `social-rapidapi`**:
+    - Deteksi query parameters berisiko tinggi (token otentikasi, open-redirect, file inclusion) dan profiling identitas sosial via RapidAPI.
+
+11. **`company-geo` (Corporate HQ Geolocation & Google Maps Discovery)**:
+    - **Target**: `DOMAIN`, `URL`, `WEBSITE`, `ORGANIZATION` (misal: `kopikenangan.com`).
+    - **Physical Office Reconnaissance**: Berbeda dengan *IP Geolocation* yang hanya melacak server hosting (AWS/Cloudflare), modul ini secara khusus mencari **letak kantor pusat fisik / kantor operasional nyata** organisasi.
+    - **Metode Ekstraksi Multi-Source**:
+      1. Web crawling aman dengan proteksi SSRF (`safeFetch`) ke homepage dan path kontak (`/contact`, `/about-us`, `/tentang-kami`, `/hubungi-kami`).
+      2. Ekstraksi Schema.org JSON-LD terstruktur (`PostalAddress`, `LocalBusiness`, `Organization`, `GeoCoordinates`).
+      3. Ekstraksi link & iframe embed Google Maps (`maps.google.com`, `goo.gl/maps`, `maps.app.goo.gl`, koordinat `@lat,lng` atau query parameter).
+      4. Ekstraksi pola alamat fisik Indonesia & internasional dari body HTML.
+      5. Geocoding koordinat presisi via OpenStreetMap Nominatim API jika alamat fisik ditemukan tanpa koordinat langsung.
+    - **Visualisasi & Interaktivitas Graf**:
+      - Menghasilkan entitas `LOCATION` dan `ADDRESS` terhubung dengan relasi `GEOLOCATED_IN`.
+      - Menampilkan badge **Geo Perusahaan** dengan warna sky pastel (`#38bdf8`) dan tombol direct link **Buka di Google Maps ↗** pada node hover toolbar, panel detail entitas, serta memplot penanda kantor fisik langsung di tab **Geo Map** (`PhoneMapPanel.tsx`).
+
+---
+
+### 7.2 Proteksi Konkurensi Discovery (Active Job Concurrency Guard)
+Untuk mencegah race conditions, duplicate worker spawns, dan graf terdistorsi:
+- **Service Layer**: `discoveryJobService.getActiveJob(caseId, userId)` di `apps/api/src/services/index.ts` memeriksa adanya job dengan status `PENDING` atau `RUNNING` dalam jendela waktu 5 menit terakhir.
+- **API Guard**: Endpoint `POST /investigations/:id/discovery` (baik HTTP standard maupun Server-Sent Events stream) menolak eksekusi bertumpuk dengan respon `409 Conflict`.
+- **Sinkronisasi UI Frontend**:
+  - Tombol **Start Discovery** dan **Add Target** di `apps/web/src/pages/InvestigationDetailPage.tsx` secara otomatis berubah menjadi state indikator kerja `Memproses Modul (X/Y)...` beranimasi spinner amber saat discovery berlangsung.
+  - `StartDiscoveryModal.tsx` menampilkan banner peringatan aktif yang melarang submit ganda serta menyediakan tombol langsung untuk membuka Execution Console.
+  - Sistem toast di `appStore.ts` dan `Toast.tsx` mendukung level notifikasi `warning` untuk mengomunikasikan status eksekusi modul kepada analis.
+
+---
+
+### 7.3 Standar UI/UX Monochrome Anti-Slop
+- **Filter Engine Module Graf (`EngineModuleFilterBar.tsx`)**:
+  - Fixed-width smart dock (~500px) di `bottom-3 left-1/2 -translate-x-1/2` pada canvas graf.
+  - Tombol kanonikal `Semua (Total)`, Top 5 Modul dominan, dropdown kompak `+N Lainnya ▾`, auto-promotion modul terpilih, dan tombol ciutkan (minimize) ke chip kecil ~26px.
+  - Menggunakan palet monokrom gelap workstation (`#0a0a0a`, `#222222`, aksen aktif `bg-white text-black font-semibold`).
+- **Desain Node Graf (`EntityNode.tsx` & `ClusterHubNode.tsx`)**:
+  - Menghilangkan efek warna neon radioaktif, glow halo, dan gradien pelangi.
+  - Kartu node menggunakan styling dark workstation yang bersih (`bg-[#0a0a0a] border-[#222222]`), seleksi bergaris putih kontras tinggi (`bg-white text-black font-semibold`).
+  - **Pewarnaan Font & Badge Berdasarkan Modul**: Label teks dan dot indikator modul pada badge node (misal: `● Shodan Recon`, `● Wayback CDX`, `● xnLinkFinder`) diberi warna pastel/muted terkurasi sesuai modul engine asalnya, sedangkan teks nilai entitas utama tetap mempertahankan warna putih/abu kontras tinggi untuk menjaga keterbacaan data secara optimal (anti-slop).
+
+---
+
+### 7.4 Konfigurasi Lingkungan Pyright & Language Server
+- [pyrightconfig.json](file:///c:/laragon/www/OSINT%20Investigation%20Graph/pyrightconfig.json) dan [.vscode/settings.json](file:///c:/laragon/www/OSINT%20Investigation%20Graph/.vscode/settings.json) telah dikonfigurasi dengan `extraPaths` untuk modul Python vendored:
+  ```json
+  "extraPaths": [
+    "./vendor/Mr.Holmes",
+    "./vendor/dirsearch"
+  ]
+  ```
+  Ini mencegah false-positive error `Cannot find module 'lib.core.api'` atau modul lokal lainnya di IDE / Language Server saat menginspeksi atau mengedit file bridge Python.
+
+---
+
+### 7.5 Status Kualitas Kode (Quality Gate)
+- **TypeScript Strict Mode**: 100% bersih tanpa error (`pnpm typecheck` lolos di seluruh `packages/shared`, `apps/api`, `apps/web`).
+- **Linting**: 100% lolos (`pnpm lint`).
+- **Vitest Test Suite**: 30 test suite lolos, 214 unit dan integration test hijau (`pnpm --filter @nexusgraph/api test`).
+
+---
+
+## 8. Checklist Sebelum Commit / Selesai Modifikasi
 
 Jalankan dan pastikan SEMUA lolos sebelum menyatakan pekerjaan selesai:
 
 - [ ] `pnpm typecheck` — tanpa error TypeScript.
 - [ ] `pnpm lint` — tanpa error lint.
-- [ ] `pnpm --filter @nexusgraph/api test` — semua Vitest suites hijau.
+- [ ] `pnpm --filter @nexusgraph/api test` — semua Vitest suites hijau (214+ tests).
 - [ ] Tidak ada penggunaan `fetch` eksternal baru yang melewati SSRF guard (`apps/api/src/security/ssrf.ts`).
 - [ ] Semua entitas baru melewati `normalize(type, value)` dari `@nexusgraph/shared`.
 - [ ] Tidak ada fake/mock/sample data pada jalur produksi (periksa diff secara manual).
 - [ ] Semua endpoint baru memvalidasi input/output dengan Zod dan memanggil `validateCaseOwnership(caseId, userId)`.
-- [ ] Penghapusan data membersihkan relationships/evidence terkait (tidak ada orphan).
+- [ ] Penghapusan data membersihkan relationships/evidence terkait (tidak ada orphan rows).
 - [ ] Perubahan skema DB dilakukan via migrasi baru bernomor urut, RLS tetap aktif untuk tabel user-scoped.
 - [ ] Tidak ada secret/key yang ter-commit (cek `.env` tidak masuk git; gunakan `.env.example` untuk template).
 - [ ] Logging menggunakan structured logger dengan `requestId`.
-- [ ] Fitur baru memiliki unit/integration test yang sesuai di `apps/api/src/__tests__/`.
+- [ ] Modul atau transform baru didaftarkan di rate limiter dan memiliki unit/integration test di `apps/api/src/__tests__/`.
+- [ ] Modul vendor Python baru wajib didaftarkan di `pyrightconfig.json` dan `.vscode/settings.json` pada bagian `extraPaths`.
 
 ---
 
 *Referensi tambahan: `README.md` (overview & setup), `ARCHITECTURE.md`, `PRD.md`, `supabase/migrations/` (skema & RLS).*
+

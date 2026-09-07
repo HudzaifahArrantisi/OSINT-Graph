@@ -69,8 +69,8 @@ interface AppState {
   setHighlightedPath: (path: { nodeIds: string[]; edgeIds: string[]; confidence: number } | null) => void;
 
   // Toast notifications
-  toasts: Array<{ id: string; message: string; type: 'success' | 'error' | 'info' }>;
-  addToast: (message: string, type?: 'success' | 'error' | 'info') => void;
+  toasts: Array<{ id: string; message: string; type: 'success' | 'error' | 'info' | 'warning' }>;
+  addToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
   removeToast: (id: string) => void;
 }
 

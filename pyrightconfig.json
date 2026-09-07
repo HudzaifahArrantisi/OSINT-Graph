@@ -3,13 +3,17 @@
     "vendor"
   ],
   "extraPaths": [
-    "./vendor/Mr.Holmes"
+    "./vendor/Mr.Holmes",
+    "./vendor/dirsearch"
   ],
   "executionEnvironments": [
     {
       "root": "vendor",
       "extraPaths": [
-        "../vendor/Mr.Holmes"
+        "./vendor/Mr.Holmes",
+        "./vendor/dirsearch",
+        "../vendor/Mr.Holmes",
+        "../vendor/dirsearch"
       ]
     }
   ]

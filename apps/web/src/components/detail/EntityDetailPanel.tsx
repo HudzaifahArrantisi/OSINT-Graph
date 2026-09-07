@@ -943,6 +943,80 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
                   </div>
                 )}
 
+                {/* CORPORATE HQ & PHYSICAL LOCATION CARD */}
+                {Boolean(
+                  (selectedEntity.metadata as any)?.isCompanyGeo ||
+                  (selectedEntity.metadata as any)?.googleMapsUrl ||
+                  (selectedEntity.metadata as any)?.collector === 'company-geo' ||
+                  (selectedEntity.metadata as any)?.latitude !== undefined ||
+                  (selectedEntity.metadata as any)?.lat !== undefined
+                ) && (
+                  <div className="bg-[#0a0a0a] border border-sky-900/50 rounded-card p-3 space-y-2.5 text-xs font-mono shadow-sm">
+                    <div className="flex items-center justify-between border-b border-sky-950 pb-2">
+                      <div className="flex items-center gap-1.5 text-sky-300 font-semibold">
+                        <MapPin className="w-4 h-4 text-sky-400" />
+                        <span>Corporate HQ & Physical Office</span>
+                      </div>
+                      {(selectedEntity.metadata as any)?.googleMapsUrl && (
+                        <a
+                          href={(selectedEntity.metadata as any).googleMapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-[11px] text-sky-400 hover:text-white transition-colors"
+                          title="Buka lokasi di Google Maps"
+                        >
+                          <span>Google Maps</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 text-[11px]">
+                      {Boolean((selectedEntity.metadata as any)?.address || (selectedEntity.metadata as any)?.fullAddress) && (
+                        <div>
+                          <span className="text-neutral-500 block mb-0.5">Alamat Fisik / Kantor:</span>
+                          <span className="text-neutral-200 font-medium leading-relaxed block bg-[#121212] p-1.5 rounded border border-[#222222]">
+                            {(selectedEntity.metadata as any)?.fullAddress || (selectedEntity.metadata as any)?.address}
+                          </span>
+                        </div>
+                      )}
+
+                      {((selectedEntity.metadata as any)?.lat !== undefined || (selectedEntity.metadata as any)?.latitude !== undefined) && (
+                        <div className="flex justify-between items-center py-1">
+                          <span className="text-neutral-500">Koordinat Presisi:</span>
+                          <span className="text-sky-300 font-bold">
+                            {Number((selectedEntity.metadata as any)?.lat ?? (selectedEntity.metadata as any)?.latitude).toFixed(5)},{' '}
+                            {Number((selectedEntity.metadata as any)?.lng ?? (selectedEntity.metadata as any)?.longitude).toFixed(5)}
+                          </span>
+                        </div>
+                      )}
+
+                      {(selectedEntity.metadata as any)?.detectionMethod && (
+                        <div className="flex justify-between items-center py-0.5">
+                          <span className="text-neutral-500">Metode Deteksi:</span>
+                          <span className="text-neutral-300 uppercase text-[10px] bg-[#141414] px-1.5 py-0.5 rounded border border-[#262626]">
+                            {(selectedEntity.metadata as any).detectionMethod}
+                          </span>
+                        </div>
+                      )}
+
+                      {(selectedEntity.metadata as any)?.googleMapsUrl && (
+                        <div className="pt-2">
+                          <a
+                            href={(selectedEntity.metadata as any).googleMapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded bg-sky-950/40 hover:bg-sky-900/60 border border-sky-800/60 text-sky-200 hover:text-white transition-colors text-xs font-sans font-medium"
+                          >
+                            <MapPin className="w-3.5 h-3.5 text-sky-400" />
+                            <span>Lihat di Google Maps Langsung ↗</span>
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-surface-2 rounded-card p-3 border border-border-subtle space-y-2 text-xs">
                   <div className="flex justify-between">
                     <span className="text-text-muted">Type:</span>

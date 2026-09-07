@@ -15,19 +15,18 @@ import {
   Globe2,
   Key,
   Radio,
-  Sparkles,
   Server,
   Building,
   Search,
   Mail,
   Target,
   Layers,
+  FolderSearch,
+  MapPin,
   X,
   ChevronDown,
   ChevronUp,
-  ChevronLeft,
-  ChevronRight,
-  RotateCcw,
+  Check,
 } from 'lucide-react';
 
 const ENGINE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -41,13 +40,14 @@ const ENGINE_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   Globe2,
   Key,
   Radio,
-  Sparkles,
   Server,
   Building,
   Search,
   Mail,
   Target,
   Layers,
+  FolderSearch,
+  MapPin,
 };
 
 export interface EngineModuleFilterBarProps {
@@ -57,6 +57,8 @@ export interface EngineModuleFilterBarProps {
   className?: string;
 }
 
+const MAX_VISIBLE_PILLS = 5;
+
 export function EngineModuleFilterBar({
   nodes,
   selectedEngine,
@@ -64,16 +66,14 @@ export function EngineModuleFilterBar({
   className = '',
 }: EngineModuleFilterBarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
 
-  // Aggregate node counts dynamically per engine module
+  // Aggregate node counts per engine module
   const engineStats = useMemo(() => {
     const counts = new Map<EngineModuleId, { meta: EngineModuleMeta; count: number }>();
 
     nodes.forEach((node) => {
-      // Exclude hub nodes from the count
       if (node.type === 'cluster_hub' || (node.data as any)?.isHub) return;
       const data = node.data || {};
       const meta = getNodeEngineModule(data);
@@ -102,166 +102,122 @@ export function EngineModuleFilterBar({
     return engineStats.find((s) => s.meta.id === selectedEngine)?.meta || null;
   }, [selectedEngine, engineStats]);
 
-  // Check scroll boundaries
-  const updateScrollButtons = () => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 6);
-    setCanScrollRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 6);
-  };
+  // Divide into prominent visible pills and remaining overflow pills
+  const { visibleEngines, overflowEngines } = useMemo(() => {
+    if (engineStats.length <= MAX_VISIBLE_PILLS) {
+      return { visibleEngines: engineStats, overflowEngines: [] };
+    }
 
+    // If selected engine is beyond top pills, promote it so it is immediately visible and clearable
+    const isSelectedInTop =
+      selectedEngine &&
+      engineStats.slice(0, MAX_VISIBLE_PILLS).some((s) => s.meta.id === selectedEngine);
+
+    if (selectedEngine && !isSelectedInTop) {
+      const selectedItem = engineStats.find((s) => s.meta.id === selectedEngine);
+      const topItems = engineStats
+        .filter((s) => s.meta.id !== selectedEngine)
+        .slice(0, MAX_VISIBLE_PILLS - 1);
+      const visible = selectedItem ? [...topItems, selectedItem] : topItems;
+      const visibleIds = new Set(visible.map((s) => s.meta.id));
+      const overflow = engineStats.filter((s) => !visibleIds.has(s.meta.id));
+      return { visibleEngines: visible, overflowEngines: overflow };
+    }
+
+    return {
+      visibleEngines: engineStats.slice(0, MAX_VISIBLE_PILLS),
+      overflowEngines: engineStats.slice(MAX_VISIBLE_PILLS),
+    };
+  }, [engineStats, selectedEngine]);
+
+  // Handle outside click to close dropdown
   useEffect(() => {
-    updateScrollButtons();
-    window.addEventListener('resize', updateScrollButtons);
-    return () => window.removeEventListener('resize', updateScrollButtons);
-  }, [engineStats, isCollapsed]);
-
-  const handleScroll = (direction: 'left' | 'right') => {
-    const el = scrollContainerRef.current;
-    if (!el) return;
-    const amount = direction === 'left' ? -220 : 220;
-    el.scrollBy({ left: amount, behavior: 'smooth' });
-    setTimeout(updateScrollButtons, 250);
-  };
+    const handleClickOutside = (e: MouseEvent) => {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setDropdownOpen(false);
+      }
+    };
+    if (dropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+    }
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [dropdownOpen]);
 
   if (engineStats.length <= 1) {
-    return null; // No need to show filter dock if only 1 engine exists
+    return null;
   }
 
-  // COLLAPSED MINIMAL PILL
+  // COLLAPSED MINIMAL CHIP: Extremely discreet, 0% obstruction
   if (isCollapsed) {
     return (
-      <button
-        onClick={() => setIsCollapsed(false)}
-        className={`flex items-center gap-2 px-3.5 py-1.5 bg-[#0b0f19]/95 hover:bg-[#121826] backdrop-blur-xl border border-[#1f293d] hover:border-sky-500/60 rounded-full shadow-[0_8px_24px_rgba(0,0,0,0.85)] text-xs font-mono text-slate-200 transition-all cursor-pointer group select-none animate-in fade-in duration-150 ${className}`}
-        title="Buka panel kategori modul discovery"
-      >
-        <Sparkles className="w-3.5 h-3.5 text-sky-400 group-hover:scale-110 transition-transform" />
-        <span className="font-medium text-[11px] text-slate-300">Modul Engine:</span>
-        <span className="text-[11px] font-semibold text-white">{engineStats.length} Kategori</span>
+      <div className={`flex items-center ${className}`}>
+        <button
+          onClick={() => setIsCollapsed(false)}
+          className="flex items-center gap-2 h-7 px-2.5 bg-[#080808]/95 hover:bg-[#141414] backdrop-blur-md border border-[#222222] hover:border-neutral-600 rounded-md text-xs text-neutral-300 transition-colors shadow-lg shadow-black/50 cursor-pointer"
+          title="Tampilkan filter modul"
+        >
+          <Layers className="w-3.5 h-3.5 text-neutral-400" />
+          <span className="text-[11px] font-sans text-neutral-300">Modul:</span>
 
-        {/* Mini color dot preview */}
-        <div className="flex items-center -space-x-1 px-1">
-          {engineStats.slice(0, 5).map(({ meta }) => (
-            <span
-              key={meta.id}
-              className="w-2 h-2 rounded-full ring-1 ring-[#0b0f19]"
-              style={{ backgroundColor: meta.color }}
-            />
-          ))}
-          {engineStats.length > 5 && (
-            <span className="text-[9px] text-slate-400 pl-1.5 font-mono">+{engineStats.length - 5}</span>
+          {activeMeta ? (
+            <span className="flex items-center gap-1 text-[10px] font-mono px-1.5 py-0.5 rounded bg-white text-black font-semibold border border-white">
+              <span>{activeMeta.shortName}</span>
+              <span
+                role="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onSelectEngine(null);
+                }}
+                className="hover:opacity-75 cursor-pointer ml-0.5"
+                title="Hapus filter"
+              >
+                <X className="w-2.5 h-2.5" />
+              </span>
+            </span>
+          ) : (
+            <span className="text-[10px] font-mono text-neutral-400">
+              Semua ({totalDiscoveredCount})
+            </span>
           )}
-        </div>
 
-        {activeMeta ? (
-          <span
-            className="flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-semibold border"
-            style={{
-              backgroundColor: `${activeMeta.color}20`,
-              color: activeMeta.color,
-              borderColor: `${activeMeta.color}50`,
-            }}
-          >
-            {activeMeta.shortName}
-          </span>
-        ) : (
-          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-800/80 text-slate-400 border border-slate-700/50">
-            {totalDiscoveredCount} entitas
-          </span>
-        )}
-
-        <ChevronUp className="w-3.5 h-3.5 text-slate-400 group-hover:text-white transition-colors" />
-      </button>
+          <ChevronUp className="w-3.5 h-3.5 text-neutral-500 hover:text-neutral-300 ml-0.5" />
+        </button>
+      </div>
     );
   }
 
-  // EXPANDED WORKSTATION CONTROL DOCK
+  // COMPACT MONOCHROME DOCK: Clean, fixed-width, zero-clutter
   return (
-    <div
-      className={`flex flex-col gap-1.5 bg-[#0a0e17]/95 backdrop-blur-xl border border-[#1d263b] px-3 py-2 rounded-2xl shadow-[0_16px_36px_rgba(0,0,0,0.85)] text-xs select-none max-w-[92vw] sm:max-w-[calc(100vw-360px)] md:max-w-[calc(100vw-450px)] transition-all animate-in fade-in slide-in-from-bottom-2 duration-150 ${className}`}
-    >
-      {/* Top Header Bar */}
-      <div className="flex items-center justify-between gap-3 px-1 border-b border-slate-800/60 pb-1.5">
-        <div className="flex items-center gap-2 font-mono">
-          <div className="flex items-center gap-1.5 text-sky-400">
-            <Sparkles className="w-3.5 h-3.5" />
-            <span className="text-[11px] font-semibold tracking-wider uppercase text-slate-200">
-              Modul Engine
-            </span>
-          </div>
-          <span className="text-slate-600">·</span>
-          <span className="text-[10px] text-slate-400 font-normal">
-            {engineStats.length} kategori ({totalDiscoveredCount} total entitas)
-          </span>
-        </div>
-
-        {/* Actions (Reset & Minimize) */}
-        <div className="flex items-center gap-1.5">
-          {selectedEngine && (
-            <button
-              onClick={() => onSelectEngine(null)}
-              className="flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-mono bg-sky-500/20 text-sky-300 border border-sky-500/40 hover:bg-sky-500/30 transition-all cursor-pointer"
-              title="Kembalikan tampilan seluruh graf"
-            >
-              <RotateCcw className="w-2.5 h-2.5" />
-              <span>Reset Spotlight</span>
-            </button>
-          )}
-
-          <button
-            onClick={() => setIsCollapsed(true)}
-            className="flex items-center gap-1 px-1.5 py-0.5 rounded text-[10.5px] font-mono text-slate-400 hover:text-white hover:bg-slate-800/60 transition-colors cursor-pointer"
-            title="Sembunyikan dock navigasi modul"
-          >
-            <ChevronDown className="w-3.5 h-3.5" />
-            <span className="text-[10px] hidden sm:inline">Minimize</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Module Scroll Track Container */}
-      <div className="relative flex items-center">
-        {/* Scroll Left Button */}
-        {canScrollLeft && (
-          <button
-            onClick={() => handleScroll('left')}
-            className="absolute left-0 z-10 p-1 rounded-full bg-[#0a0e17]/95 border border-slate-700 text-slate-300 hover:text-white hover:border-sky-400 shadow-md transition-all -ml-2"
-            title="Scroll ke kiri"
-          >
-            <ChevronLeft className="w-3.5 h-3.5" />
-          </button>
-        )}
-
-        {/* Scrollable Track */}
-        <div
-          ref={scrollContainerRef}
-          onScroll={updateScrollButtons}
-          className="flex items-center gap-1.5 overflow-x-auto no-scrollbar scroll-smooth py-0.5 px-0.5 w-full"
+    <div className={`relative select-none ${className}`}>
+      <div className="flex items-center gap-1 bg-[#080808]/95 backdrop-blur-md border border-[#222222] rounded-md p-1 shadow-xl shadow-black/60 text-xs">
+        {/* "Semua" Button */}
+        <button
+          onClick={() => onSelectEngine(null)}
+          className={`flex items-center gap-1.5 h-7 px-2.5 rounded text-[11px] font-sans transition-colors cursor-pointer border ${
+            selectedEngine === null
+              ? 'bg-white text-black font-semibold border-white shadow-sm'
+              : 'bg-transparent text-neutral-400 hover:text-white hover:bg-[#181818] border-transparent'
+          }`}
+          title="Tampilkan semua modul"
         >
-          {/* "Semua" Reset Button */}
-          <button
-            onClick={() => onSelectEngine(null)}
-            className={`flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-mono transition-all shrink-0 cursor-pointer border ${
+          <span>Semua</span>
+          <span
+            className={`font-mono text-[10px] px-1 py-0.2 rounded ${
               selectedEngine === null
-                ? 'bg-white text-black font-semibold border-white shadow-sm'
-                : 'bg-[#111624] text-slate-400 hover:text-white hover:bg-slate-800/80 border-slate-800'
+                ? 'bg-black/15 text-black'
+                : 'text-neutral-400 bg-black/60 border border-neutral-800'
             }`}
-            title="Tampilkan seluruh node graf tanpa isolasi"
           >
-            <Layers className="w-3 h-3" />
-            <span>Semua</span>
-            <span
-              className={`text-[9.5px] px-1.5 py-0.2 rounded font-semibold ${
-                selectedEngine === null ? 'bg-black/15 text-black' : 'bg-slate-800 text-slate-300'
-              }`}
-            >
-              {totalDiscoveredCount}
-            </span>
-          </button>
+            {totalDiscoveredCount}
+          </span>
+        </button>
 
-          {/* Engine Module Pills */}
-          {engineStats.map(({ meta, count }) => {
+        {/* Separator */}
+        <div className="w-[1px] h-4 bg-[#222222] mx-0.5 shrink-0" />
+
+        {/* Top Active Module Pills (Always fits, never cuts off) */}
+        <div className="flex items-center gap-1">
+          {visibleEngines.map(({ meta, count }) => {
             const isSelected = selectedEngine === meta.id;
             const IconComponent = (meta.iconName && ENGINE_ICONS[meta.iconName]) || Layers;
 
@@ -269,57 +225,116 @@ export function EngineModuleFilterBar({
               <button
                 key={meta.id}
                 onClick={() => onSelectEngine(isSelected ? null : meta.id)}
-                className={`flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-[11px] font-mono transition-all shrink-0 cursor-pointer border ${
+                className={`flex items-center gap-1.5 h-7 px-2 rounded text-[11px] font-sans transition-colors shrink-0 cursor-pointer border ${
                   isSelected
-                    ? 'font-semibold text-white ring-1'
-                    : 'bg-[#0f1422] text-slate-300 hover:text-white hover:bg-[#161d30] border-slate-800/80 hover:border-slate-700'
+                    ? 'bg-white text-black font-semibold border-white shadow-sm'
+                    : 'bg-[#121212] text-neutral-300 hover:text-white hover:bg-[#1a1a1a] border-[#222222] hover:border-neutral-700'
                 }`}
-                style={{
-                  backgroundColor: isSelected ? `${meta.color}25` : undefined,
-                  borderColor: isSelected ? meta.color : undefined,
-                  boxShadow: isSelected ? `0 0 14px ${meta.color}45` : undefined,
-                }}
-                title={`${meta.name} — ${meta.description} (${count} entitas)`}
+                title={`${meta.name} (${count} entitas)`}
               >
-                {/* Glowing status dot */}
-                <span
-                  className="w-2 h-2 rounded-full shrink-0 transition-transform"
-                  style={{
-                    backgroundColor: meta.color,
-                    boxShadow: isSelected ? `0 0 8px ${meta.color}` : undefined,
-                  }}
+                <IconComponent
+                  className={`w-3 h-3 shrink-0 ${isSelected ? 'text-black' : 'text-neutral-400'}`}
                 />
 
-                <IconComponent className="w-3 h-3 shrink-0" style={{ color: meta.color }} />
-
-                <span className="whitespace-nowrap max-w-[140px] truncate">{meta.shortName}</span>
+                <span className="whitespace-nowrap max-w-[100px] truncate">
+                  {meta.shortName}
+                </span>
 
                 <span
-                  className="text-[9.5px] px-1.5 py-0.2 rounded font-medium transition-colors"
-                  style={{
-                    backgroundColor: isSelected ? `${meta.color}40` : 'rgba(255, 255, 255, 0.07)',
-                    color: isSelected ? '#ffffff' : meta.color,
-                  }}
+                  className={`font-mono text-[9.5px] px-1 py-0.2 rounded ${
+                    isSelected
+                      ? 'bg-black/15 text-black font-medium'
+                      : 'text-neutral-400 bg-black/60 border border-neutral-800'
+                  }`}
                 >
                   {count}
                 </span>
 
-                {isSelected && <X className="w-2.5 h-2.5 ml-0.5 text-white/80 hover:text-white" />}
+                {isSelected && (
+                  <X
+                    className="w-3 h-3 ml-0.5 text-black/70 hover:text-black"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onSelectEngine(null);
+                    }}
+                  />
+                )}
               </button>
             );
           })}
         </div>
 
-        {/* Scroll Right Button */}
-        {canScrollRight && (
-          <button
-            onClick={() => handleScroll('right')}
-            className="absolute right-0 z-10 p-1 rounded-full bg-[#0a0e17]/95 border border-slate-700 text-slate-300 hover:text-white hover:border-sky-400 shadow-md transition-all -mr-2"
-            title="Scroll ke kanan"
-          >
-            <ChevronRight className="w-3.5 h-3.5" />
-          </button>
+        {/* Overflow Dropdown: Neat compact popup for remaining modules */}
+        {overflowEngines.length > 0 && (
+          <div className="relative" ref={dropdownRef}>
+            <button
+              onClick={() => setDropdownOpen((prev) => !prev)}
+              className={`flex items-center gap-1 h-7 px-2 rounded text-[11px] font-sans border transition-colors cursor-pointer ${
+                dropdownOpen
+                  ? 'bg-[#222222] text-white border-neutral-600'
+                  : 'bg-[#121212] text-neutral-400 hover:text-white hover:bg-[#1a1a1a] border-[#222222]'
+              }`}
+              title="Pilih modul lainnya"
+            >
+              <span>+{overflowEngines.length} Lainnya</span>
+              <ChevronDown
+                className={`w-3 h-3 text-neutral-400 transition-transform ${
+                  dropdownOpen ? 'rotate-180' : ''
+                }`}
+              />
+            </button>
+
+            {/* Compact Clean Dropdown (Max height 240px, unobtrusive) */}
+            {dropdownOpen && (
+              <div className="absolute bottom-full right-0 mb-2 w-56 max-h-60 bg-[#0a0a0a]/98 backdrop-blur-md border border-[#262626] rounded-md shadow-2xl shadow-black/80 py-1 z-30 overflow-y-auto divide-y divide-[#1e1e1e] animate-in fade-in zoom-in-95 duration-75">
+                <div className="px-2.5 py-1 text-[10px] uppercase font-mono text-neutral-500 tracking-wider">
+                  Modul Lainnya ({overflowEngines.length})
+                </div>
+
+                <div className="py-0.5 space-y-0.5">
+                  {overflowEngines.map(({ meta, count }) => {
+                    const IconComponent = (meta.iconName && ENGINE_ICONS[meta.iconName]) || Layers;
+
+                    return (
+                      <button
+                        key={meta.id}
+                        onClick={() => {
+                          onSelectEngine(meta.id);
+                          setDropdownOpen(false);
+                        }}
+                        className="w-full flex items-center justify-between px-2.5 py-1.5 text-left text-neutral-300 hover:text-white hover:bg-[#161616] transition-colors cursor-pointer"
+                        title={meta.description}
+                      >
+                        <div className="flex items-center gap-2 truncate pr-2">
+                          <IconComponent className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                          <span className="text-[11px] font-sans truncate">{meta.shortName}</span>
+                        </div>
+                        <span className="text-[9.5px] font-mono text-neutral-400 bg-[#161616] px-1.5 py-0.5 rounded border border-[#262626] shrink-0">
+                          {count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+          </div>
         )}
+
+        {/* Separator */}
+        <div className="w-[1px] h-4 bg-[#222222] mx-0.5 shrink-0" />
+
+        {/* Minimize Button */}
+        <button
+          onClick={() => {
+            setIsCollapsed(true);
+            setDropdownOpen(false);
+          }}
+          className="p-1 rounded text-neutral-500 hover:text-neutral-300 hover:bg-[#181818] transition-colors cursor-pointer"
+          title="Sembunyikan bilah modul"
+        >
+          <ChevronDown className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );

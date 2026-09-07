@@ -361,6 +361,26 @@ export const TRANSFORM_DEFINITIONS: TransformDefinition[] = [
     riskLevel: 'low',
     enabled: true,
   },
+  {
+    id: 'domain.dirsearch-path-bruteforce',
+    name: 'Web Path Discovery (dirsearch)',
+    description: 'Brute-force discover hidden directories, admin panels, backup files, config files, and API endpoints using dirsearch engine with curated OSINT wordlist (500 paths)',
+    inputTypes: ['DOMAIN', 'URL', 'WEBSITE'],
+    outputTypes: ['URL', 'DOCUMENT'],
+    category: 'web',
+    riskLevel: 'medium',
+    enabled: true,
+  },
+  {
+    id: 'domain.company-geo-location',
+    name: 'Corporate HQ & Physical Location (Google Maps)',
+    description: 'Discover real-world corporate headquarters, physical office addresses, Google Maps links, and OpenStreetMap coordinates for company domains or URLs',
+    inputTypes: ['DOMAIN', 'URL', 'WEBSITE', 'ORGANIZATION'],
+    outputTypes: ['LOCATION', 'ADDRESS'],
+    category: 'web',
+    riskLevel: 'low',
+    enabled: true,
+  },
 
   // ─── Intelligence Transforms ────────────────────────────────────────
   {

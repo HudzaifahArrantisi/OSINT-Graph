@@ -36,6 +36,8 @@ import { webTechFingerprintCollector } from './web-tech-fingerprint.js';
 import { trackingIdCollector } from './tracking-id-extractor.js';
 import { siteCrawlerCollector } from './site-crawler.js';
 import { httpSecurityAuditCollector } from './http-security-audit.js';
+import { dirsearchCollector } from './dirsearch.js';
+import { companyGeoCollector } from './company-geo.js';
 import { logger } from '../lib/logger.js';
 
 // Collector registry
@@ -73,6 +75,8 @@ collectors.set('web-tech-fingerprint', webTechFingerprintCollector);
 collectors.set('tracking-id-extractor', trackingIdCollector);
 collectors.set('site-crawler', siteCrawlerCollector);
 collectors.set('http-security-audit', httpSecurityAuditCollector);
+collectors.set('dirsearch', dirsearchCollector);
+collectors.set('company-geo', companyGeoCollector);
 
 export function getCollector(name: CollectorName): Collector | undefined {
   return collectors.get(name);

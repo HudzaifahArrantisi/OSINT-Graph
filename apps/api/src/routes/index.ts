@@ -559,6 +559,19 @@ api.post(
       );
     }
 
+    const activeJob = await discoveryJobService.getActiveJob(caseId, userId);
+    if (activeJob) {
+      return c.json(
+        {
+          error: 'Conflict',
+          message: 'Mesin penelusuran sedang aktif berjalan untuk investigasi ini. Harap tunggu hingga proses selesai di Execution Console.',
+          statusCode: 409,
+          activeJobId: activeJob.id,
+        },
+        409,
+      );
+    }
+
     try {
       const result = await runDiscovery({
         caseId,
@@ -596,6 +609,19 @@ api.post(
       return c.json(
         { error: 'Validation Error', message: parsed.error.message, statusCode: 400 },
         400,
+      );
+    }
+
+    const activeJob = await discoveryJobService.getActiveJob(caseId, userId);
+    if (activeJob) {
+      return c.json(
+        {
+          error: 'Conflict',
+          message: 'Mesin penelusuran sedang aktif berjalan untuk investigasi ini. Harap tunggu hingga proses selesai di Execution Console.',
+          statusCode: 409,
+          activeJobId: activeJob.id,
+        },
+        409,
       );
     }
 

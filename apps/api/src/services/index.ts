@@ -1231,6 +1231,23 @@ export const discoveryJobService = {
     if (error) throw new Error(`Failed to update discovery job: ${error.message}`);
     return data;
   },
+
+  async getActiveJob(caseId: string, userId: string) {
+    if (!(await validateCaseOwnership(caseId, userId))) {
+      throw new Error('Investigation not found or access denied');
+    }
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data } = await db()
+      .from('discovery_jobs')
+      .select('*')
+      .eq('case_id', caseId)
+      .in('status', ['PENDING', 'RUNNING'])
+      .gte('created_at', fiveMinutesAgo)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    return data || null;
+  },
 };
 
 // ─── Transform Run Service ──────────────────────────────────────────

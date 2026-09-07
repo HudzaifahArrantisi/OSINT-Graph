@@ -1,5 +1,5 @@
 import { useAppStore } from '../stores/appStore';
-import { X, CheckCircle2, AlertCircle, Info } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, Info, AlertTriangle } from 'lucide-react';
 
 export function ToastContainer() {
   const { toasts, removeToast } = useAppStore();
@@ -11,14 +11,19 @@ export function ToastContainer() {
       {toasts.map((toast) => (
         <div
           key={toast.id}
-          className="pointer-events-auto flex items-start gap-3 p-3 rounded-card border bg-[#0d0d0d]/95 backdrop-blur-md border-[#262626] text-neutral-200 shadow-2xl transition-all animate-fade-in"
+          className={`pointer-events-auto flex items-start gap-3 p-3 rounded-card border backdrop-blur-md shadow-2xl transition-all animate-fade-in ${
+            toast.type === 'warning'
+              ? 'bg-[#181206]/95 border-amber-500/40 text-amber-200'
+              : 'bg-[#0d0d0d]/95 border-[#262626] text-neutral-200'
+          }`}
         >
           <div className="shrink-0 mt-0.5">
             {toast.type === 'success' && <CheckCircle2 className="w-4 h-4 text-white" />}
-            {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-neutral-400" />}
+            {toast.type === 'error' && <AlertCircle className="w-4 h-4 text-red-400" />}
+            {toast.type === 'warning' && <AlertTriangle className="w-4 h-4 text-amber-400" />}
             {toast.type === 'info' && <Info className="w-4 h-4 text-neutral-400" />}
           </div>
-          <span className="text-xs font-medium leading-relaxed flex-1 break-words text-neutral-200">
+          <span className="text-xs font-medium leading-relaxed flex-1 break-words">
             {toast.message}
           </span>
           <button

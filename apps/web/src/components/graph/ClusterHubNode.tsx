@@ -21,14 +21,12 @@ import {
   AlertTriangle,
   ShieldCheck,
   Radio,
-  Sparkles,
   Server,
   Building,
   Target,
 } from 'lucide-react';
 import {
   ENGINE_MODULE_DEFINITIONS,
-  EngineModuleId,
 } from '@nexusgraph/shared';
 
 const ENGINE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -42,7 +40,6 @@ const ENGINE_ICONS: Record<string, React.ComponentType<{ className?: string }>> 
   Globe2,
   Key,
   Radio,
-  Sparkles,
   Server,
   Building,
   Search,
@@ -90,8 +87,6 @@ export const ClusterHubNode = memo(({ data, selected }: NodeProps) => {
   const title = engineMeta?.shortName || engineMeta?.name || legacyMeta?.title || label;
   const iconName = engineMeta?.iconName;
   const Icon = (iconName && ENGINE_ICONS[iconName]) || legacyMeta?.icon || Layers;
-  const textColor = engineMeta?.textColor || 'text-neutral-200';
-  const badgeBorder = engineMeta?.color ? `border-[${engineMeta.color}]/40` : 'border-[#262626]';
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -125,53 +120,52 @@ export const ClusterHubNode = memo(({ data, selected }: NodeProps) => {
         className="!w-1 !h-1 !bg-neutral-600 !border-0 !opacity-0 group-hover:!opacity-50"
       />
 
-      {/* Hub Pill Badge at the Center of the Satellite */}
+      {/* Hub Pill Badge at the Center of the Satellite (Clean Monochrome Anti-Slop) */}
       <div
         onClick={handleToggle}
-        className={`px-2.5 py-1 rounded-md border flex items-center gap-2 bg-[#0c1017]/95 backdrop-blur-sm transition-all duration-100 cursor-pointer shadow-md ${
-          selected ? 'ring-2 ring-white border-white' : 'hover:border-neutral-300'
+        className={`px-2.5 py-1 rounded-md border flex items-center gap-2 bg-[#0a0a0a]/95 backdrop-blur-sm transition-all duration-100 cursor-pointer shadow-md ${
+          selected
+            ? 'bg-white text-black border-white shadow-xl ring-1 ring-white/30'
+            : 'text-neutral-200 border-[#222222] hover:border-neutral-500 hover:bg-[#121212]'
         }`}
-        style={{
-          borderColor: selected ? '#ffffff' : engineMeta?.color ? `${engineMeta.color}80` : '#262626',
-          boxShadow: engineMeta?.color ? `0 2px 10px ${engineMeta.color}20` : undefined,
-        }}
         title={`Click to ${isCollapsed ? 'expand' : 'collapse'} ${title} (${count} entities)`}
       >
         <div
-          className="p-1 rounded shrink-0 flex items-center justify-center"
-          style={{
-            backgroundColor: engineMeta?.color ? `${engineMeta.color}25` : '#171717',
-            color: engineMeta?.color || '#ffffff',
-          }}
+          className={`p-1 rounded shrink-0 flex items-center justify-center transition-colors ${
+            selected ? 'bg-black text-white' : 'bg-[#141414] text-neutral-400'
+          }`}
         >
           <Icon className="w-3.5 h-3.5" />
         </div>
 
         <div className="flex flex-col text-left">
-          <span className={`text-[10.5px] font-sans font-semibold leading-tight ${textColor}`}>
+          <span
+            className={`text-[10.5px] font-sans font-medium leading-tight ${
+              selected ? 'text-black font-semibold' : 'text-neutral-200'
+            }`}
+          >
             {title}
           </span>
         </div>
 
         {count > 0 && (
           <span
-            className="text-[9.5px] font-mono px-1.5 py-0.5 rounded border font-medium"
-            style={{
-              backgroundColor: engineMeta?.color ? `${engineMeta.color}15` : '#171717',
-              borderColor: engineMeta?.color ? `${engineMeta.color}40` : '#2e2e2e',
-              color: engineMeta?.color || '#e2e8f0',
-            }}
+            className={`text-[9.5px] font-mono px-1.5 py-0.5 rounded border transition-colors ${
+              selected
+                ? 'bg-black/10 text-black border-black/20 font-semibold'
+                : 'bg-[#141414] text-neutral-400 border-[#262626]'
+            }`}
           >
             {count}
           </span>
         )}
 
         {/* Expand / Collapse Indicator Icon */}
-        <div className="text-neutral-400 hover:text-white transition-colors">
+        <div className={selected ? 'text-black/70 hover:text-black' : 'text-neutral-500 hover:text-white'}>
           {isCollapsed ? (
-            <Maximize2 className="w-3 h-3 text-white" />
+            <Maximize2 className="w-3 h-3" />
           ) : (
-            <Minimize2 className="w-3 h-3 text-neutral-500 opacity-60 group-hover:opacity-100" />
+            <Minimize2 className="w-3 h-3 opacity-60 group-hover:opacity-100" />
           )}
         </div>
       </div>

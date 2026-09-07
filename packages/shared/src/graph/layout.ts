@@ -53,6 +53,8 @@ export type EngineModuleId =
   | 'engine_tracking_id'
   | 'engine_site_crawler'
   | 'engine_http_headers'
+  | 'engine_dirsearch'
+  | 'engine_company_geo'
   | 'engine_general';
 
 export interface EngineModuleMeta {
@@ -297,6 +299,30 @@ export const ENGINE_MODULE_DEFINITIONS: Record<EngineModuleId, EngineModuleMeta>
     borderAccent: 'border-l-teal-500',
     iconName: 'ShieldCheck',
   },
+  engine_dirsearch: {
+    id: 'engine_dirsearch',
+    name: 'Web Path Discovery (dirsearch)',
+    shortName: 'dirsearch Paths',
+    category: 'endpoints',
+    description: 'Brute-force path discovery: admin panel, backup, konfigurasi, dan file tersembunyi',
+    color: '#8b5cf6',
+    textColor: 'text-violet-400',
+    badgeBg: 'bg-violet-500/10 border-violet-500/30',
+    borderAccent: 'border-l-violet-500',
+    iconName: 'FolderSearch',
+  },
+  engine_company_geo: {
+    id: 'engine_company_geo',
+    name: 'Corporate HQ & Physical Location',
+    shortName: 'Geo Perusahaan',
+    category: 'identity',
+    description: 'Deteksi letak lokasi kantor pusat, alamat fisik, dan Google Maps perusahaan',
+    color: '#38bdf8',
+    textColor: 'text-sky-400',
+    badgeBg: 'bg-sky-500/10 border-sky-500/30',
+    borderAccent: 'border-l-sky-500',
+    iconName: 'MapPin',
+  },
   engine_general: {
     id: 'engine_general',
     name: 'General OSINT Intelligence',
@@ -473,6 +499,28 @@ export function getNodeEngineModule(data: Record<string, any> = {}): EngineModul
     title.includes('http security')
   ) {
     return ENGINE_MODULE_DEFINITIONS.engine_http_headers;
+  }
+  if (
+    discoveredBy.includes('dirsearch') ||
+    discoveredBy.includes('path-bruteforce') ||
+    metadata.collector === 'dirsearch' ||
+    metadata.dirsearch ||
+    metadata.docKind === 'DIRSEARCH_FINDING' ||
+    title.includes('dirsearch')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_dirsearch;
+  }
+  if (
+    discoveredBy.includes('company-geo') ||
+    discoveredBy.includes('corporate-geo') ||
+    metadata.collector === 'company-geo' ||
+    metadata.isCompanyGeo === true ||
+    metadata.googleMapsUrl ||
+    title.includes('kantor') ||
+    title.includes('headquarters') ||
+    title.includes('corporate hq')
+  ) {
+    return ENGINE_MODULE_DEFINITIONS.engine_company_geo;
   }
 
   // 2. Semantic inference from value & title

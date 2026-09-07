@@ -20,11 +20,21 @@ interface GeoPoint {
   carrier?: string;
   confidence: number;
   label: string;
+  isCompanyGeo?: boolean;
+  googleMapsUrl?: string;
+  address?: string;
 }
 
 const phoneMarkerIcon = L.divIcon({
   className: '',
   html: `<div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#10b981;border:2px solid #064e3b;box-shadow:0 0 12px rgba(16,185,129,0.7);"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d1fae5" stroke-width="2.4"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>`,
+  iconSize: [28, 28],
+  iconAnchor: [14, 14],
+});
+
+const companyGeoMarkerIcon = L.divIcon({
+  className: '',
+  html: `<div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#0284c7;border:2px solid #082f49;box-shadow:0 0 12px rgba(56,189,248,0.7);"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0f9ff" stroke-width="2.4"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></div>`,
   iconSize: [28, 28],
   iconAnchor: [14, 14],
 });
@@ -58,25 +68,34 @@ export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
       }
     }
 
-    // LOCATION entities produced by phone tracking (metadata.sourcePhone present)
+    // LOCATION entities produced by phone tracking or company-geo discovery
     const locations = nodes
-      .filter((n) => n.data?.entityType === 'LOCATION')
+      .filter((n) => n.data?.entityType === 'LOCATION' || n.data?.entityType === 'ADDRESS')
       .map((n) => {
         const meta = (n.data?.metadata || {}) as Record<string, any>;
         const lat = Number(meta.lat ?? meta.latitude);
         const lng = Number(meta.lng ?? meta.longitude);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
+        const isCompanyGeo = Boolean(
+          meta.isCompanyGeo ||
+          meta.googleMapsUrl ||
+          meta.collector === 'company-geo' ||
+          meta.discoveredBy === 'company-geo'
+        );
         return {
           nodeId: n.id,
           lat,
           lng,
-          precision: String(meta.precision || 'COUNTRY'),
+          precision: String(meta.precision || (isCompanyGeo ? 'EXACT_COORDINATES' : 'COUNTRY')),
           countryName: meta.countryName,
           countryIso: meta.countryIso,
           sourcePhone: meta.sourcePhone,
           carrier: carrierByPhone.get(String(meta.sourcePhone || '')),
           confidence: n.data?.confidence ?? 0,
-          label: n.data?.label || n.id,
+          label: n.data?.label || n.data?.title || n.id,
+          isCompanyGeo,
+          googleMapsUrl: meta.googleMapsUrl,
+          address: meta.address || meta.fullAddress,
         } as GeoPoint;
       })
       .filter((p): p is GeoPoint => p !== null);
@@ -155,43 +174,70 @@ export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
           />
           <FitBounds points={geoPoints} />
           {geoPoints.map((p) => {
-            const isCity = p.precision.includes('CITY');
+            const isCompany = Boolean(p.isCompanyGeo);
+            const isCity = p.precision.includes('CITY') || p.precision.includes('EXACT');
+            const radius = isCompany ? 200 : isCity ? 15000 : 500000;
+            const circleColor = isCompany ? '#0284c7' : isCity ? '#06b6d4' : '#f59e0b';
+            const icon = isCompany ? companyGeoMarkerIcon : phoneMarkerIcon;
+
             return (
               <React.Fragment key={p.nodeId}>
                 {/* Accuracy Radius */}
                 <Circle
                   center={[p.lat, p.lng]}
-                  radius={isCity ? 15000 : 500000}
+                  radius={radius}
                   pathOptions={{
-                    color: isCity ? '#06b6d4' : '#f59e0b',
+                    color: circleColor,
                     weight: 1,
-                    fillColor: isCity ? '#06b6d4' : '#f59e0b',
-                    fillOpacity: isCity ? 0.12 : 0.06,
+                    fillColor: circleColor,
+                    fillOpacity: isCompany ? 0.2 : isCity ? 0.12 : 0.06,
                   }}
                 />
-                <Marker position={[p.lat, p.lng]} icon={phoneMarkerIcon}>
+                <Marker position={[p.lat, p.lng]} icon={icon}>
                   <Popup>
-                    <div className="p-1 min-w-[200px] font-sans text-xs">
-                      <div className="font-semibold text-sm text-slate-900 mb-1">
-                        {p.sourcePhone || p.label}
+                    <div className="p-1 min-w-[210px] max-w-[280px] font-sans text-xs">
+                      <div className="font-semibold text-sm text-slate-900 mb-1 leading-snug">
+                        {p.isCompanyGeo ? 'Kantor / Lokasi Perusahaan' : p.sourcePhone || p.label}
                       </div>
+
+                      {p.address && (
+                        <div className="text-slate-700 text-xs mb-1.5 leading-relaxed">
+                          {p.address}
+                        </div>
+                      )}
+
                       {p.carrier && (
                         <div className="text-slate-600 text-xs mb-1">
                           Carrier: <span className="font-medium text-slate-800">{p.carrier}</span>
                         </div>
                       )}
+
                       <div className="text-slate-500 text-[11px] font-mono mb-2">
                         {p.lat.toFixed(4)}, {p.lng.toFixed(4)}
                       </div>
+
+                      {p.googleMapsUrl && (
+                        <a
+                          href={p.googleMapsUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-700 hover:text-sky-900 hover:underline mb-2"
+                        >
+                          <span>Buka di Google Maps ↗</span>
+                        </a>
+                      )}
+
                       <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-200">
                         <span
                           className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            isCity
-                              ? 'bg-cyan-50 text-cyan-700 border border-cyan-200'
-                              : 'bg-amber-50 text-amber-700 border border-amber-200'
+                            isCompany
+                              ? 'bg-sky-50 text-sky-700 border border-sky-200'
+                              : isCity
+                                ? 'bg-cyan-50 text-cyan-700 border border-cyan-200'
+                                : 'bg-amber-50 text-amber-700 border border-amber-200'
                           }`}
                         >
-                          {isCity ? 'City Level' : 'Country Centroid'}
+                          {isCompany ? 'Physical Office' : isCity ? 'City Level' : 'Country Centroid'}
                         </span>
                         <span className="text-[10px] text-slate-500">
                           {p.countryName || 'Verified'}
