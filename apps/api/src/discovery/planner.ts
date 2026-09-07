@@ -133,6 +133,26 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   ],
 };
 
+/** Helper to verify if an environment variable for an API key is configured with a real value */
+export function isApiKeyConfigured(apiKeyName?: string): boolean {
+  if (!apiKeyName) return false;
+  const val = process.env[apiKeyName];
+  if (!val) return false;
+  const trimmed = val.trim();
+  if (!trimmed) return false;
+  // If set to placeholder templates, it is considered not configured
+  if (
+    trimmed.startsWith('your_') ||
+    trimmed.endsWith('_here') ||
+    trimmed === 'your-api-key-here' ||
+    trimmed === 'your_shodan_api_key_here' ||
+    trimmed === 'your_rapidapi_key_here'
+  ) {
+    return false;
+  }
+  return true;
+}
+
 /**
  * Build a discovery plan for a seed.
  * Uses value analysis to intelligently select transforms:
@@ -169,7 +189,14 @@ export function buildDiscoveryPlan(
   for (const id of transformIdSet) {
     const t = getTransform(id);
     if (t && t.enabled) {
-      transforms.push(t);
+      if (t.requiresApiKey) {
+        transforms.push({
+          ...t,
+          apiKeyConfigured: isApiKeyConfigured(t.apiKeyName),
+        });
+      } else {
+        transforms.push(t);
+      }
     }
   }
 

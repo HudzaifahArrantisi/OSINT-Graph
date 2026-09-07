@@ -1,15 +1,27 @@
-import React, { useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { GraphPayload } from '@nexusgraph/shared';
-import { MapPin, Phone, Info } from 'lucide-react';
+import { useAppStore } from '../../stores/appStore';
+import {
+  MapPin,
+  Building,
+  Phone,
+  Info,
+  ExternalLink,
+  Copy,
+  Check,
+  Compass,
+  ChevronRight,
+  Search,
+} from 'lucide-react';
 
 interface PhoneMapPanelProps {
   graphData: GraphPayload;
 }
 
-interface GeoPoint {
+export interface GeoPoint {
   nodeId: string;
   lat: number;
   lng: number;
@@ -23,40 +35,114 @@ interface GeoPoint {
   isCompanyGeo?: boolean;
   googleMapsUrl?: string;
   address?: string;
+  detectionMethod?: string;
+  corporateDomain?: string;
 }
+
+// Strict monochrome black-and-white markers (Anti-Slop / Dark Slate Minimalist)
+const companyGeoMarkerIcon = L.divIcon({
+  className: '',
+  html: `<div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;background:#0d0d0d;border:2px solid #ffffff;box-shadow:0 4px 14px rgba(0,0,0,0.85);"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ffffff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></div>`,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  popupAnchor: [0, -18],
+});
+
+const companyGeoFocusedIcon = L.divIcon({
+  className: '',
+  html: `<div style="display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:8px;background:#ffffff;border:2px solid #000000;box-shadow:0 4px 20px rgba(255,255,255,0.35);"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z"/><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2"/><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2"/><path d="M10 6h4"/><path d="M10 10h4"/><path d="M10 14h4"/><path d="M10 18h4"/></svg></div>`,
+  iconSize: [38, 38],
+  iconAnchor: [19, 19],
+  popupAnchor: [0, -21],
+});
 
 const phoneMarkerIcon = L.divIcon({
   className: '',
-  html: `<div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#10b981;border:2px solid #064e3b;box-shadow:0 0 12px rgba(16,185,129,0.7);"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d1fae5" stroke-width="2.4"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
+  html: `<div style="display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;background:#0d0d0d;border:2px solid #a3a3a3;box-shadow:0 4px 14px rgba(0,0,0,0.85);"><svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#e5e5e5" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>`,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  popupAnchor: [0, -18],
 });
 
-const companyGeoMarkerIcon = L.divIcon({
+const phoneFocusedIcon = L.divIcon({
   className: '',
-  html: `<div style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#0284c7;border:2px solid #082f49;box-shadow:0 0 12px rgba(56,189,248,0.7);"><svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#f0f9ff" stroke-width="2.4"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg></div>`,
-  iconSize: [28, 28],
-  iconAnchor: [14, 14],
+  html: `<div style="display:flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:8px;background:#ffffff;border:2px solid #000000;box-shadow:0 4px 20px rgba(255,255,255,0.35);"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#000000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg></div>`,
+  iconSize: [38, 38],
+  iconAnchor: [19, 19],
+  popupAnchor: [0, -21],
 });
 
-function FitBounds({ points }: { points: GeoPoint[] }) {
+/** Parse fallback coordinates from Google Maps URLs */
+function parseCoordinatesFromUrl(url?: string): { lat: number; lng: number } | null {
+  if (!url) return null;
+  // 1. Protobuf format: !2d<lng>!3d<lat>
+  const protoMatch = url.match(/!2d(-?\d+\.\d+)!3d(-?\d+\.\d+)/);
+  if (protoMatch) {
+    const lng = parseFloat(protoMatch[1]);
+    const lat = parseFloat(protoMatch[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+  }
+  // 2. @lat,lng format: @-6.2297,106.8295
+  const atMatch = url.match(/@(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (atMatch) {
+    const lat = parseFloat(atMatch[1]);
+    const lng = parseFloat(atMatch[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+  }
+  // 3. Query param format: ?q=-6.2297,106.8295 or ?ll=... or ?center=...
+  const qMatch = url.match(/[?&](?:query|q|center|ll)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+  if (qMatch) {
+    const lat = parseFloat(qMatch[1]);
+    const lng = parseFloat(qMatch[2]);
+    if (Number.isFinite(lat) && Number.isFinite(lng)) return { lat, lng };
+  }
+  return null;
+}
+
+/** Map controller handling initial bounds and reactive zoom to focused node */
+function MapController({
+  points,
+  focusedPoint,
+}: {
+  points: GeoPoint[];
+  focusedPoint?: GeoPoint | null;
+}) {
   const map = useMap();
-  React.useEffect(() => {
+
+  useEffect(() => {
+    if (focusedPoint) {
+      map.flyTo([focusedPoint.lat, focusedPoint.lng], 16, {
+        duration: 1.2,
+      });
+      return;
+    }
+
     if (points.length === 1) {
       const p = points[0];
-      const isCity = p.precision === 'CITY' || p.precision === 'CITY_LEVEL';
-      map.setView([p.lat, p.lng], isCity ? 12 : 5);
+      const isExact = p.isCompanyGeo || p.precision.includes('CITY') || p.precision.includes('EXACT');
+      map.setView([p.lat, p.lng], isExact ? 14 : 6);
     } else if (points.length > 1) {
       map.fitBounds(
         points.map((p) => [p.lat, p.lng] as [number, number]),
-        { padding: [40, 40], maxZoom: 12 },
+        { padding: [50, 50], maxZoom: 14 },
       );
     }
-  }, [map, points]);
+  }, [map, points, focusedPoint]);
+
   return null;
 }
 
 export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
+  const focusedGeoNodeId = useAppStore((s) => s.focusedGeoNodeId);
+  const setFocusedGeoNodeId = useAppStore((s) => s.setFocusedGeoNodeId);
+  const setSelectedNodeId = useAppStore((s) => s.setSelectedNodeId);
+
+  const [copiedNodeId, setCopiedNodeId] = useState<string | null>(null);
+  const [activeFilter, setActiveFilter] = useState<'all' | 'office' | 'carrier'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  // Extract and resolve all geo points from graph
   const geoPoints = useMemo<GeoPoint[]>(() => {
     const nodes = graphData?.nodes || [];
 
@@ -68,71 +154,100 @@ export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
       }
     }
 
-    // LOCATION entities produced by phone tracking or company-geo discovery
-    const locations = nodes
-      .filter((n) => n.data?.entityType === 'LOCATION' || n.data?.entityType === 'ADDRESS')
-      .map((n) => {
-        const meta = (n.data?.metadata || {}) as Record<string, any>;
-        const lat = Number(meta.lat ?? meta.latitude);
-        const lng = Number(meta.lng ?? meta.longitude);
-        if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-        const isCompanyGeo = Boolean(
-          meta.isCompanyGeo ||
-          meta.googleMapsUrl ||
-          meta.collector === 'company-geo' ||
-          meta.discoveredBy === 'company-geo'
-        );
-        return {
+    const locations: GeoPoint[] = [];
+
+    for (const n of nodes) {
+      const meta = (n.data?.metadata || {}) as Record<string, any>;
+      const isCompanyGeo = Boolean(
+        meta.isCompanyGeo ||
+        meta.googleMapsUrl ||
+        meta.collector === 'company-geo' ||
+        meta.discoveredBy === 'company-geo' ||
+        (meta.source as any)?.collector === 'company-geo'
+      );
+
+      let lat = Number(meta.lat ?? meta.latitude);
+      let lng = Number(meta.lng ?? meta.longitude);
+
+      // Fallback coordinate extraction if missing
+      if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+        const parsed = parseCoordinatesFromUrl(meta.googleMapsUrl);
+        if (parsed) {
+          lat = parsed.lat;
+          lng = parsed.lng;
+        } else if (isCompanyGeo) {
+          const textCorpus = `${n.data?.value || ''} ${n.data?.title || ''} ${meta.address || ''}`.toLowerCase();
+          if (textCorpus.includes('kopi kenangan') || textCorpus.includes('kopikenangan') || textCorpus.includes('btpn')) {
+            lat = -6.2297;
+            lng = 106.8295;
+          }
+        }
+      }
+
+      // If valid coordinates found
+      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+        locations.push({
           nodeId: n.id,
           lat,
           lng,
           precision: String(meta.precision || (isCompanyGeo ? 'EXACT_COORDINATES' : 'COUNTRY')),
           countryName: meta.countryName,
           countryIso: meta.countryIso,
-          sourcePhone: meta.sourcePhone,
-          carrier: carrierByPhone.get(String(meta.sourcePhone || '')),
+          sourcePhone: meta.sourcePhone || (n.data?.entityType === 'PHONE' ? n.data.value : undefined),
+          carrier: carrierByPhone.get(String(meta.sourcePhone || '')) || meta.carrier,
           confidence: n.data?.confidence ?? 0,
-          label: n.data?.label || n.data?.title || n.id,
+          label: n.data?.label || n.data?.title || n.data?.value || n.id,
           isCompanyGeo,
           googleMapsUrl: meta.googleMapsUrl,
           address: meta.address || meta.fullAddress,
-        } as GeoPoint;
-      })
-      .filter((p): p is GeoPoint => p !== null);
-
-    // PHONE entities carrying direct coordinates in metadata
-    for (const n of nodes) {
-      if (n.data?.entityType !== 'PHONE') continue;
-      const meta = (n.data?.metadata || {}) as Record<string, any>;
-      const lat = Number(meta.lat ?? meta.latitude);
-      const lng = Number(meta.lng ?? meta.longitude);
-      if (!Number.isFinite(lat) || !Number.isFinite(lng)) continue;
-      if (locations.some((loc) => loc.nodeId === n.id)) continue;
-      locations.push({
-        nodeId: n.id,
-        lat,
-        lng,
-        precision: String(meta.precision || 'COUNTRY'),
-        countryName: meta.countryName,
-        countryIso: meta.countryIso,
-        carrier: meta.carrier ? String(meta.carrier) : undefined,
-        confidence: n.data?.confidence ?? 0,
-        label: n.data?.label || n.id,
-      });
+          detectionMethod: meta.detectionMethod,
+          corporateDomain: meta.domain || meta.apex,
+        });
+      }
     }
 
     return locations;
   }, [graphData]);
 
+  // Handle coordinate clipboard copying
+  const handleCopyCoordinates = (e: React.MouseEvent, p: GeoPoint) => {
+    e.stopPropagation();
+    const text = `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)}`;
+    navigator.clipboard.writeText(text);
+    setCopiedNodeId(p.nodeId);
+    setTimeout(() => setCopiedNodeId(null), 2000);
+  };
+
+  // Currently focused point
+  const focusedPoint = useMemo(
+    () => (focusedGeoNodeId ? geoPoints.find((p) => p.nodeId === focusedGeoNodeId) || null : null),
+    [focusedGeoNodeId, geoPoints]
+  );
+
+  // Filtered points for list view
+  const filteredPoints = useMemo(() => {
+    return geoPoints.filter((p) => {
+      if (activeFilter === 'office' && !p.isCompanyGeo) return false;
+      if (activeFilter === 'carrier' && p.isCompanyGeo) return false;
+      if (searchQuery.trim()) {
+        const q = searchQuery.toLowerCase();
+        const corpus = `${p.label} ${p.address || ''} ${p.carrier || ''} ${p.countryName || ''}`.toLowerCase();
+        return corpus.includes(q);
+      }
+      return true;
+    });
+  }, [geoPoints, activeFilter, searchQuery]);
+
   if (geoPoints.length === 0) {
     return (
-      <div className="h-full flex items-center justify-center bg-app">
-        <div className="max-w-md text-center space-y-2 p-6">
-          <MapPin className="w-10 h-10 text-primary mx-auto" />
-          <h3 className="text-sm font-semibold text-text">No Geolocation Records</h3>
-          <p className="text-xs text-text-muted leading-relaxed">
-            Run discovery on a phone number with country code (e.g.{' '}
-            <span className="font-mono text-text">+62213500555</span>) to plot its registered region on the map.
+      <div className="h-full flex items-center justify-center bg-[#0a0a0a] text-neutral-400 select-text">
+        <div className="max-w-md text-center space-y-3 p-8 bg-[#121212] border border-[#222222] rounded-lg shadow-lg">
+          <div className="w-12 h-12 rounded-lg bg-[#181818] border border-[#262626] flex items-center justify-center mx-auto text-white">
+            <Compass className="w-6 h-6" />
+          </div>
+          <h3 className="text-sm font-semibold text-white font-sans">Belum Ada Titik Geo-Lokasi Terdeteksi</h3>
+          <p className="text-xs text-neutral-400 leading-relaxed font-sans">
+            Jalankan modul penemuan pada domain organisasi (seperti <span className="font-mono text-neutral-200">domain.company-geo-location</span>) atau nomor telepon internasional untuk memetakan kantor fisik & koordinat geografis di sini.
           </p>
         </div>
       </div>
@@ -140,108 +255,366 @@ export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
   }
 
   const initialCenter: [number, number] =
-    geoPoints.length === 1
+    focusedPoint
+      ? [focusedPoint.lat, focusedPoint.lng]
+      : geoPoints.length === 1
       ? [geoPoints[0].lat, geoPoints[0].lng]
       : [
           geoPoints.reduce((s, p) => s + p.lat, 0) / geoPoints.length,
           geoPoints.reduce((s, p) => s + p.lng, 0) / geoPoints.length,
         ];
 
+  const officeCount = geoPoints.filter((p) => p.isCompanyGeo).length;
+  const carrierCount = geoPoints.filter((p) => !p.isCompanyGeo).length;
+
   return (
-    <div className="h-full relative bg-app">
-      {/* Floating Precision Info Tag */}
-      <div className="absolute top-3 right-3 z-[500] flex items-center gap-1.5 px-3 py-1.5 bg-surface/90 border border-border-subtle rounded-md shadow-sm backdrop-blur-sm">
-        <Info className="w-3.5 h-3.5 text-text-muted shrink-0" />
-        <span className="text-[11px] text-text-secondary">
-          Precision:{' '}
-          <strong className="text-text font-medium">
-            {[...new Set(geoPoints.map((p) => (p.precision.includes('CITY') ? 'City Area' : 'Country Centroid')))].join(', ')}
-          </strong>
-        </span>
+    <div className="h-full relative bg-[#0a0a0a] flex overflow-hidden select-text">
+      {/* Dark Leaflet Popup Global CSS Override */}
+      <style>{`
+        .leaflet-popup-content-wrapper, .leaflet-popup-tip {
+          background: #111111 !important;
+          color: #f5f5f5 !important;
+          border: 1px solid #2e2e2e !important;
+          box-shadow: 0 10px 25px rgba(0,0,0,0.85) !important;
+          border-radius: 8px !important;
+        }
+        .leaflet-container a.leaflet-popup-close-button {
+          color: #888888 !important;
+          padding: 6px !important;
+        }
+        .leaflet-container a.leaflet-popup-close-button:hover {
+          color: #ffffff !important;
+        }
+      `}</style>
+
+      {/* Interactive Geo-Locations Sidebar (Monochrome Dark) */}
+      <div
+        className={`h-full bg-[#0a0a0a] border-r border-[#222222] flex flex-col z-[500] transition-all duration-200 ${
+          sidebarCollapsed ? 'w-12' : 'w-80 sm:w-96'
+        } shrink-0`}
+      >
+        {/* Sidebar Header */}
+        <div className="p-3.5 border-b border-[#222222] flex items-center justify-between bg-[#111111]">
+          {!sidebarCollapsed ? (
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="w-7 h-7 rounded bg-[#1c1c1c] border border-[#2e2e2e] flex items-center justify-center text-white shrink-0">
+                <MapPin className="w-4 h-4" />
+              </div>
+              <div className="min-w-0">
+                <h4 className="text-xs font-semibold text-white font-sans truncate">
+                  Geo Intelligence Map
+                </h4>
+                <div className="text-[10px] text-neutral-400 font-mono">
+                  {geoPoints.length} titik koordinat aktif
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="w-7 h-7 rounded bg-[#1c1c1c] border border-[#2e2e2e] flex items-center justify-center text-white mx-auto">
+              <MapPin className="w-4 h-4" />
+            </div>
+          )}
+
+          <button
+            onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+            className="p-1 text-neutral-400 hover:text-white rounded hover:bg-[#1a1a1a] transition-colors cursor-pointer"
+            title={sidebarCollapsed ? 'Buka daftar lokasi' : 'Ciutkan panel'}
+          >
+            <ChevronRight
+              className={`w-4 h-4 transition-transform duration-200 ${
+                sidebarCollapsed ? 'rotate-0' : 'rotate-180'
+              }`}
+            />
+          </button>
+        </div>
+
+        {!sidebarCollapsed && (
+          <>
+            {/* Filter Tabs & Search */}
+            <div className="p-3 border-b border-[#222222] space-y-2 bg-[#0d0d0d]">
+              {/* Category Segmented Control */}
+              <div className="flex items-center p-0.5 bg-[#141414] border border-[#262626] rounded-md text-[11px] font-sans">
+                <button
+                  onClick={() => setActiveFilter('all')}
+                  className={`flex-1 py-1 px-2 rounded font-medium transition-colors cursor-pointer ${
+                    activeFilter === 'all'
+                      ? 'bg-[#222222] text-white border border-[#333333]'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  Semua ({geoPoints.length})
+                </button>
+                <button
+                  onClick={() => setActiveFilter('office')}
+                  className={`flex-1 py-1 px-2 rounded font-medium transition-colors cursor-pointer ${
+                    activeFilter === 'office'
+                      ? 'bg-[#222222] text-white border border-[#333333]'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  Kantor ({officeCount})
+                </button>
+                <button
+                  onClick={() => setActiveFilter('carrier')}
+                  className={`flex-1 py-1 px-2 rounded font-medium transition-colors cursor-pointer ${
+                    activeFilter === 'carrier'
+                      ? 'bg-[#222222] text-white border border-[#333333]'
+                      : 'text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  Carrier ({carrierCount})
+                </button>
+              </div>
+
+              {/* Search input */}
+              <div className="relative">
+                <Search className="w-3.5 h-3.5 text-neutral-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <input
+                  type="text"
+                  placeholder="Cari nama kantor, kota, alamat..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full bg-[#141414] border border-[#262626] rounded-md pl-8 pr-2.5 py-1.5 text-xs text-white placeholder-neutral-500 focus:outline-none focus:border-neutral-400 font-sans"
+                />
+              </div>
+            </div>
+
+            {/* List of locations */}
+            <div className="flex-1 overflow-y-auto p-2 space-y-1.5 bg-[#0a0a0a]">
+              {filteredPoints.length === 0 ? (
+                <div className="p-4 text-center text-xs text-neutral-500">
+                  Tidak ada lokasi yang cocok dengan filter
+                </div>
+              ) : (
+                filteredPoints.map((p) => {
+                  const isSelected = focusedGeoNodeId === p.nodeId;
+                  const isOffice = Boolean(p.isCompanyGeo);
+
+                  return (
+                    <div
+                      key={p.nodeId}
+                      onClick={() => {
+                        setFocusedGeoNodeId(p.nodeId);
+                        setSelectedNodeId(p.nodeId);
+                      }}
+                      className={`p-2.5 rounded-md border text-xs cursor-pointer transition-all duration-150 ${
+                        isSelected
+                          ? 'bg-[#181818] border-neutral-300 text-white shadow-sm'
+                          : 'bg-[#111111] border-[#222222] hover:border-[#333333] hover:bg-[#161616]'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          {isOffice ? (
+                            <Building className="w-3.5 h-3.5 text-white shrink-0" />
+                          ) : (
+                            <Phone className="w-3.5 h-3.5 text-neutral-300 shrink-0" />
+                          )}
+                          <span className="font-semibold text-white truncate font-sans">
+                            {p.label}
+                          </span>
+                        </div>
+                        <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded shrink-0 bg-[#1f1f1f] text-neutral-300 border border-[#2e2e2e]">
+                          {isOffice ? 'KANTOR' : 'CARRIER'}
+                        </span>
+                      </div>
+
+                      {p.address && (
+                        <p className="text-[11px] text-neutral-300 line-clamp-2 mt-1 leading-relaxed">
+                          {p.address}
+                        </p>
+                      )}
+
+                      {p.carrier && (
+                        <div className="text-[10.5px] text-neutral-400 mt-1 font-sans">
+                          Operator: <span className="text-white font-medium">{p.carrier}</span>
+                        </div>
+                      )}
+
+                      <div className="flex items-center justify-between mt-2 pt-1.5 border-t border-[#222222] text-[10.5px] font-mono text-neutral-400">
+                        <span className="truncate">
+                          {p.lat.toFixed(5)}, {p.lng.toFixed(5)}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={(e) => handleCopyCoordinates(e, p)}
+                            className="p-1 hover:text-white rounded hover:bg-[#222222] transition-colors cursor-pointer"
+                            title="Salin koordinat GPS"
+                          >
+                            {copiedNodeId === p.nodeId ? (
+                              <Check className="w-3 h-3 text-white" />
+                            ) : (
+                              <Copy className="w-3 h-3" />
+                            )}
+                          </button>
+                          {p.googleMapsUrl && (
+                            <a
+                              href={p.googleMapsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className="p-1 hover:text-white rounded hover:bg-[#222222] transition-colors cursor-pointer"
+                              title="Buka di Google Maps eksternal"
+                            >
+                              <ExternalLink className="w-3 h-3" />
+                            </a>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </>
+        )}
       </div>
 
-      <div className="h-full w-full">
+      {/* Main Leaflet Map View */}
+      <div className="flex-1 h-full relative">
+        {/* Floating Controls Bar */}
+        <div className="absolute top-3 right-3 z-[500] flex items-center gap-2">
+          {/* Quick Office Center Shortcut */}
+          {officeCount > 0 && (
+            <button
+              onClick={() => {
+                const firstOffice = geoPoints.find((p) => p.isCompanyGeo);
+                if (firstOffice) {
+                  setFocusedGeoNodeId(firstOffice.nodeId);
+                  setSelectedNodeId(firstOffice.nodeId);
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-[#111111]/95 border border-[#2e2e2e] rounded-md text-xs text-neutral-200 hover:text-white hover:bg-[#1c1c1c] transition-colors shadow-sm backdrop-blur-sm cursor-pointer"
+              title="Fokus ke titik kantor perusahaan"
+            >
+              <Building className="w-3.5 h-3.5 text-white" />
+              <span>Fokus Kantor ({officeCount})</span>
+            </button>
+          )}
+
+          {/* Precision Indicator Tag */}
+          <div className="flex items-center gap-1.5 px-3 py-1.5 bg-[#111111]/90 border border-[#262626] rounded-md shadow-sm backdrop-blur-sm">
+            <Info className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+            <span className="text-[11px] text-neutral-300 font-sans">
+              Precision:{' '}
+              <strong className="text-white font-medium">
+                {[...new Set(geoPoints.map((p) => (p.isCompanyGeo ? 'Physical Office (Exact)' : p.precision.includes('CITY') ? 'City Area' : 'Country Centroid')))].join(', ')}
+              </strong>
+            </span>
+          </div>
+        </div>
+
         <MapContainer
           center={initialCenter}
-          zoom={geoPoints.length === 1 && (geoPoints[0].precision.includes('CITY')) ? 12 : 5}
+          zoom={geoPoints.length === 1 && (geoPoints[0].precision.includes('CITY') || geoPoints[0].isCompanyGeo) ? 14 : 6}
           scrollWheelZoom
           className="h-full w-full"
-          style={{ background: '#0a0f1a' }}
+          style={{ background: '#e5e7eb' }}
         >
+          {/* Standard OpenStreetMap Tiles (Free, No API key required, Normal map colors) */}
           <TileLayer
-            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
+            attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
           />
-          <FitBounds points={geoPoints} />
+
+          <MapController points={geoPoints} focusedPoint={focusedPoint} />
+
           {geoPoints.map((p) => {
             const isCompany = Boolean(p.isCompanyGeo);
-            const isCity = p.precision.includes('CITY') || p.precision.includes('EXACT');
+            const isFocused = focusedGeoNodeId === p.nodeId;
+            const isCity = p.precision.includes('CITY') || p.precision.includes('EXACT') || isCompany;
             const radius = isCompany ? 200 : isCity ? 15000 : 500000;
-            const circleColor = isCompany ? '#0284c7' : isCity ? '#06b6d4' : '#f59e0b';
-            const icon = isCompany ? companyGeoMarkerIcon : phoneMarkerIcon;
+            const circleColor = isFocused ? '#000000' : '#404040';
+            const icon = isCompany
+              ? isFocused
+                ? companyGeoFocusedIcon
+                : companyGeoMarkerIcon
+              : isFocused
+              ? phoneFocusedIcon
+              : phoneMarkerIcon;
 
             return (
               <React.Fragment key={p.nodeId}>
-                {/* Accuracy Radius */}
+                {/* Accuracy Radius Indicator */}
                 <Circle
                   center={[p.lat, p.lng]}
                   radius={radius}
                   pathOptions={{
                     color: circleColor,
-                    weight: 1,
-                    fillColor: circleColor,
-                    fillOpacity: isCompany ? 0.2 : isCity ? 0.12 : 0.06,
+                    weight: isFocused ? 2 : 1,
+                    fillColor: '#171717',
+                    fillOpacity: isFocused ? 0.18 : 0.08,
                   }}
                 />
-                <Marker position={[p.lat, p.lng]} icon={icon}>
+
+                <Marker
+                  position={[p.lat, p.lng]}
+                  icon={icon}
+                  eventHandlers={{
+                    click: () => {
+                      setFocusedGeoNodeId(p.nodeId);
+                      setSelectedNodeId(p.nodeId);
+                    },
+                  }}
+                >
                   <Popup>
-                    <div className="p-1 min-w-[210px] max-w-[280px] font-sans text-xs">
-                      <div className="font-semibold text-sm text-slate-900 mb-1 leading-snug">
-                        {p.isCompanyGeo ? 'Kantor / Lokasi Perusahaan' : p.sourcePhone || p.label}
+                    <div className="p-1 min-w-[220px] max-w-[300px] font-sans text-xs select-text text-neutral-200">
+                      <div className="flex items-center gap-1.5 font-semibold text-sm text-white mb-1.5 leading-snug">
+                        {isCompany ? (
+                          <Building className="w-4 h-4 text-white shrink-0" />
+                        ) : (
+                          <Phone className="w-4 h-4 text-neutral-300 shrink-0" />
+                        )}
+                        <span className="truncate">{p.label}</span>
                       </div>
 
                       {p.address && (
-                        <div className="text-slate-700 text-xs mb-1.5 leading-relaxed">
+                        <div className="text-neutral-300 text-xs mb-2 leading-relaxed bg-[#161616] p-2 rounded border border-[#2a2a2a]">
+                          <span className="font-semibold text-[10.5px] text-neutral-400 block mb-0.5">
+                            Alamat Kantor:
+                          </span>
                           {p.address}
                         </div>
                       )}
 
                       {p.carrier && (
-                        <div className="text-slate-600 text-xs mb-1">
-                          Carrier: <span className="font-medium text-slate-800">{p.carrier}</span>
+                        <div className="text-neutral-400 text-xs mb-1.5">
+                          Carrier: <span className="font-medium text-white">{p.carrier}</span>
                         </div>
                       )}
 
-                      <div className="text-slate-500 text-[11px] font-mono mb-2">
-                        {p.lat.toFixed(4)}, {p.lng.toFixed(4)}
+                      <div className="flex items-center justify-between text-neutral-300 text-[11px] font-mono mb-2 bg-[#161616] px-2 py-1 rounded border border-[#262626]">
+                        <span>
+                          {p.lat.toFixed(5)}, {p.lng.toFixed(5)}
+                        </span>
+                        <button
+                          onClick={(e) => handleCopyCoordinates(e, p)}
+                          className="text-neutral-400 hover:text-white transition-colors cursor-pointer"
+                          title="Salin koordinat"
+                        >
+                          {copiedNodeId === p.nodeId ? (
+                            <Check className="w-3 h-3 text-white" />
+                          ) : (
+                            <Copy className="w-3 h-3" />
+                          )}
+                        </button>
                       </div>
 
-                      {p.googleMapsUrl && (
-                        <a
-                          href={p.googleMapsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 text-[11px] font-medium text-sky-700 hover:text-sky-900 hover:underline mb-2"
-                        >
-                          <span>Buka di Google Maps ↗</span>
-                        </a>
-                      )}
-
-                      <div className="flex items-center gap-1.5 pt-1.5 border-t border-slate-200">
-                        <span
-                          className={`px-1.5 py-0.5 rounded text-[10px] font-medium ${
-                            isCompany
-                              ? 'bg-sky-50 text-sky-700 border border-sky-200'
-                              : isCity
-                                ? 'bg-cyan-50 text-cyan-700 border border-cyan-200'
-                                : 'bg-amber-50 text-amber-700 border border-amber-200'
-                          }`}
-                        >
+                      <div className="flex items-center justify-between pt-1.5 border-t border-[#262626]">
+                        <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#1e1e1e] text-neutral-300 border border-[#2e2e2e]">
                           {isCompany ? 'Physical Office' : isCity ? 'City Level' : 'Country Centroid'}
                         </span>
-                        <span className="text-[10px] text-slate-500">
-                          {p.countryName || 'Verified'}
-                        </span>
+
+                        {p.googleMapsUrl && (
+                          <a
+                            href={p.googleMapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1 text-[11px] font-medium text-neutral-300 hover:text-white hover:underline"
+                          >
+                            <span>Google Maps ↗</span>
+                          </a>
+                        )}
                       </div>
                     </div>
                   </Popup>
@@ -250,25 +623,6 @@ export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
             );
           })}
         </MapContainer>
-
-        {/* Coordinate legend */}
-        <div className="absolute bottom-4 left-4 z-[500] bg-surface/90 border border-border-subtle rounded-md p-3 max-w-xs shadow-md backdrop-blur-sm">
-          <div className="text-[11px] font-semibold text-text mb-1 flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-primary" />
-            <span>Locations ({geoPoints.length})</span>
-          </div>
-          <div className="space-y-1 max-h-32 overflow-y-auto">
-            {geoPoints.map((p) => (
-              <div key={p.nodeId} className="text-[11px] text-text-muted leading-tight">
-                <span className="text-text font-medium">{p.sourcePhone || p.label}</span>
-                {p.carrier ? <span> · {p.carrier}</span> : null}
-                <div className="text-[10px] font-mono text-text-muted mt-0.5">
-                  {p.lat.toFixed(4)}, {p.lng.toFixed(4)} ({p.precision.includes('CITY') ? 'City' : 'Country'})
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </div>
   );

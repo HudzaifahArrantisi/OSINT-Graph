@@ -21,6 +21,7 @@ import {
   CheckSquare2,
   Square,
   Layers,
+  AlertTriangle,
 } from 'lucide-react';
 import { api } from '../../lib/api';
 import { useAppStore } from '../../stores/appStore';
@@ -203,6 +204,23 @@ export function StartDiscoveryModal({
   };
 
   const isSocialIdentity = seedType === 'USERNAME';
+
+  // Modules requiring third-party API key (e.g. Shodan, RapidAPI)
+  const selectedApiTransforms = plannedTransforms.filter(
+    (t) =>
+      selectedTransformIds.includes(t.id) &&
+      Boolean(t.requiresApiKey || t.apiKeyName || t.id.includes('rapidapi') || t.id.includes('shodan')),
+  );
+
+  const selectedMissingApiTransforms = selectedApiTransforms.filter(
+    (t) => t.apiKeyConfigured === false,
+  );
+
+  const handleDeselectMissingApiTransforms = () => {
+    if (discoveryState === 'running') return;
+    const missingIds = new Set(selectedMissingApiTransforms.map((t) => t.id));
+    setSelectedTransformIds((prev) => prev.filter((id) => !missingIds.has(id)));
+  };
 
   const handleStartDiscovery = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -570,6 +588,15 @@ export function StartDiscoveryModal({
                   );
                 })}
               </div>
+
+              {plannedTransforms.find((t) => t.id.includes('rapidapi'))?.apiKeyConfigured === false && (
+                <div className="p-2.5 rounded bg-amber-500/10 border border-amber-500/25 text-amber-300 text-[11px] flex items-center gap-2">
+                  <AlertTriangle className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <span>
+                    <strong>RAPIDAPI_KEY</strong> belum diatur di file <code className="bg-black/40 px-1 py-0.2 rounded font-mono text-[10px]">.env</code> server. Profiling mendalam Instagram/TikTok/LinkedIn membutuhkan key ini.
+                  </span>
+                </div>
+              )}
             </div>
           )}
 
@@ -624,8 +651,10 @@ export function StartDiscoveryModal({
               ) : (
                 plannedTransforms.map((t) => {
                   const isSelected = selectedTransformIds.includes(t.id);
-                  const isApiRequired =
-                    t.requiresApiKey || t.apiKeyName || t.id.includes('rapidapi');
+                  const isApiRequired = Boolean(
+                    t.requiresApiKey || t.apiKeyName || t.id.includes('rapidapi') || t.id.includes('shodan'),
+                  );
+                  const isWhois = t.id === 'domain.whois-rdap';
 
                   return (
                     <div
@@ -660,15 +689,41 @@ export function StartDiscoveryModal({
                       </div>
 
                       <div className="flex items-center gap-2 shrink-0">
-                        {isApiRequired && (
+                        {isApiRequired ? (
+                          t.apiKeyConfigured === false ? (
+                            <span
+                              title={`Membutuhkan variabel ${t.apiKeyName || 'API_KEY'} pada file .env backend (saat ini belum terkonfigurasi)`}
+                              className="text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-amber-500/15 border border-amber-500/35 text-amber-300 flex items-center gap-1 font-semibold"
+                            >
+                              <AlertTriangle className="w-2.5 h-2.5 text-amber-400 shrink-0" />
+                              <span>Butuh {t.apiKeyName || 'API Key'}</span>
+                            </span>
+                          ) : t.apiKeyConfigured === true ? (
+                            <span
+                              title={`Variabel ${t.apiKeyName || 'API_KEY'} telah siap di server`}
+                              className="text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/35 text-emerald-300 flex items-center gap-1 font-medium"
+                            >
+                              <Key className="w-2.5 h-2.5 text-emerald-400 shrink-0" />
+                              <span>{t.apiKeyName || 'API'} Siap</span>
+                            </span>
+                          ) : (
+                            <span
+                              title={`Membutuhkan ${t.apiKeyName || 'API Key'} pada file .env backend`}
+                              className="text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-neutral-800 border border-neutral-700 text-neutral-300 flex items-center gap-1"
+                            >
+                              <Key className="w-2.5 h-2.5 text-neutral-400 shrink-0" />
+                              <span>Butuh {t.apiKeyName || 'API Key'}</span>
+                            </span>
+                          )
+                        ) : isWhois ? (
                           <span
-                            title="Membutuhkan API Key pada file .env"
-                            className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-neutral-800 border border-neutral-700 text-neutral-300 flex items-center gap-1"
+                            title="Menggunakan protokol terbuka RFC 7483 RDAP (Publik & Bebas API Key)"
+                            className="text-[9.5px] font-mono px-1.5 py-0.5 rounded bg-sky-500/10 border border-sky-500/25 text-sky-300 flex items-center gap-1"
                           >
-                            <Key className="w-2.5 h-2.5 text-neutral-400" />
-                            <span>API</span>
+                            <span>RDAP Bebas Key</span>
                           </span>
-                        )}
+                        ) : null}
+
                         <span className="text-[10px] text-neutral-500 font-mono">
                           {isSelected ? 'Aktif' : 'Lewati'}
                         </span>
@@ -678,6 +733,71 @@ export function StartDiscoveryModal({
                 })
               )}
             </div>
+
+            {/* API Key Warning Alert Banner for Selected Modules */}
+            {selectedMissingApiTransforms.length > 0 && (
+              <div className="p-3 mt-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-200 text-xs space-y-2 animate-in fade-in duration-150">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-start gap-2.5">
+                    <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+                    <div className="space-y-1">
+                      <div className="font-semibold text-white flex items-center gap-2">
+                        <span>Peringatan: Modul Membutuhkan API Key</span>
+                        <span className="text-[10px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-mono border border-amber-500/30">
+                          {selectedMissingApiTransforms.length} modul belum diatur
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-neutral-300 leading-relaxed">
+                        Modul berikut memerlukan variabel API Key pada file{' '}
+                        <code className="px-1 py-0.5 rounded bg-black/50 text-amber-300 font-mono text-[10px]">
+                          .env
+                        </code>{' '}
+                        backend agar dapat berjalan:
+                      </p>
+                      <div className="space-y-1 pt-0.5">
+                        {selectedMissingApiTransforms.map((t) => (
+                          <div key={t.id} className="flex items-center gap-2 text-[11px]">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-400 shrink-0" />
+                            <span className="font-medium text-white">{t.name}:</span>
+                            <span className="font-mono text-[10px] px-1.5 py-0.2 rounded bg-black/40 text-amber-300 border border-amber-500/40">
+                              {t.apiKeyName || 'API_KEY'}
+                            </span>
+                            <span className="text-neutral-400 text-[10.5px]">
+                              (dilewati jika tanpa key)
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                      <p className="text-[10.5px] text-neutral-400 pt-1 border-t border-amber-500/20 mt-1.5">
+                        💡 <em>Catatan:</em> Modul <strong>WHOIS / RDAP</strong>, <strong>DNS Resolution</strong>, <strong>Wayback CDX</strong>, dan <strong>xnLinkFinder</strong> bekerja menggunakan protokol publik terbuka (bebas API Key & gratis).
+                      </p>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleDeselectMissingApiTransforms}
+                    className="px-2.5 py-1 rounded bg-amber-500/20 hover:bg-amber-500/30 text-amber-200 border border-amber-500/40 text-[10.5px] font-semibold shrink-0 cursor-pointer transition-colors whitespace-nowrap"
+                  >
+                    Lewati Modul Ini
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Confirmation when all selected API transforms have configured keys */}
+            {selectedMissingApiTransforms.length === 0 && selectedApiTransforms.length > 0 && (
+              <div className="p-2.5 mt-2 rounded-lg bg-emerald-500/10 border border-emerald-500/25 text-emerald-300 text-xs flex items-center gap-2 animate-in fade-in duration-150">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span className="text-[11px] leading-relaxed">
+                  Seluruh API Key untuk modul terpilih (
+                  <strong className="font-mono">
+                    {selectedApiTransforms.map((t) => t.apiKeyName).filter(Boolean).join(', ')}
+                  </strong>
+                  ) telah terkonfigurasi aktif di server.
+                </span>
+              </div>
+            )}
           </div>
 
           {/* Action Buttons */}
@@ -708,7 +828,6 @@ export function StartDiscoveryModal({
                     selectedTransformIds.includes('social.rapidapi-social-lookup'))
                 }
                 loading={discoveryState === 'running'}
-                icon={isDiscovering ? <Loader2 className="w-3.5 h-3.5 animate-spin text-amber-400" /> : <Sparkles className="w-3.5 h-3.5" />}
               >
                 {isDiscovering
                   ? 'Menunggu Modul Selesai di Console...'

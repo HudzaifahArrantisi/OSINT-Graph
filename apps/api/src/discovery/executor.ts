@@ -341,7 +341,13 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
 
     try {
       const abortController = new AbortController();
-      const timeout = setTimeout(() => abortController.abort(), 30_000);
+      const isHeavyTransform =
+        transformId.includes('dirsearch') ||
+        transformId.includes('site-crawler') ||
+        transformId.includes('xnlinkfinder') ||
+        transformId.includes('mrholmes');
+      const timeoutMs = isHeavyTransform ? 55_000 : 35_000;
+      const timeout = setTimeout(() => abortController.abort(), timeoutMs);
 
       const result = await executeTransform(
         transformId,
@@ -575,6 +581,16 @@ export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutp
 
       // Determine final transform status
       const finalStatus = result.status;
+
+      // Emit warnings if transform had warnings (e.g. unconfigured API keys or domain resolution skips)
+      if (result.warnings && result.warnings.length > 0) {
+        for (const w of result.warnings) {
+          emitProgress('warn', `[${transformName}] Catatan: ${w}`, {
+            transformId,
+            transformName,
+          });
+        }
+      }
 
       // Update transform run record
       await transformRunService.update(record.id, {

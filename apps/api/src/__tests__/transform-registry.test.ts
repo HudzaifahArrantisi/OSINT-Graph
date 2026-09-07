@@ -5,7 +5,7 @@ import {
   getTransform,
   getTransformsGroupedByCategory,
 } from '../transforms/registry.js';
-import { buildDiscoveryPlan } from '../discovery/planner.js';
+import { buildDiscoveryPlan, isApiKeyConfigured } from '../discovery/planner.js';
 import { filterSeedEchoes } from '../transforms/adapter.js';
 
 describe('Transform Registry & Planning Tests', () => {
@@ -81,5 +81,68 @@ describe('Transform Registry & Planning Tests', () => {
       'nurulfikri.ac.id',
       'https://instagram.com/nurulfikri',
     ]);
+  });
+
+  describe('API Key Requirements & Detection', () => {
+    it('marks Shodan and RapidAPI transforms as requiring API keys', () => {
+      const shodan = getTransform('infrastructure.shodan-recon');
+      expect(shodan).toBeDefined();
+      expect(shodan?.requiresApiKey).toBe(true);
+      expect(shodan?.apiKeyName).toBe('SHODAN_API_KEY');
+
+      const rapidApi = getTransform('social.rapidapi-social-lookup');
+      expect(rapidApi).toBeDefined();
+      expect(rapidApi?.requiresApiKey).toBe(true);
+      expect(rapidApi?.apiKeyName).toBe('RAPIDAPI_KEY');
+    });
+
+    it('confirms WHOIS and DNS transforms do NOT require API keys (open protocols)', () => {
+      const whois = getTransform('domain.whois-rdap');
+      expect(whois).toBeDefined();
+      expect(whois?.requiresApiKey).toBeFalsy();
+
+      const dns = getTransform('domain.resolve-dns');
+      expect(dns).toBeDefined();
+      expect(dns?.requiresApiKey).toBeFalsy();
+    });
+
+    it('correctly evaluates isApiKeyConfigured for set, empty, and placeholder keys', () => {
+      const origKey = process.env.TEST_CUSTOM_API_KEY;
+
+      process.env.TEST_CUSTOM_API_KEY = 'valid_secret_key_12345';
+      expect(isApiKeyConfigured('TEST_CUSTOM_API_KEY')).toBe(true);
+
+      process.env.TEST_CUSTOM_API_KEY = '';
+      expect(isApiKeyConfigured('TEST_CUSTOM_API_KEY')).toBe(false);
+
+      process.env.TEST_CUSTOM_API_KEY = '   ';
+      expect(isApiKeyConfigured('TEST_CUSTOM_API_KEY')).toBe(false);
+
+      process.env.TEST_CUSTOM_API_KEY = 'your_rapidapi_key_here';
+      expect(isApiKeyConfigured('TEST_CUSTOM_API_KEY')).toBe(false);
+
+      process.env.TEST_CUSTOM_API_KEY = 'your-api-key-here';
+      expect(isApiKeyConfigured('TEST_CUSTOM_API_KEY')).toBe(false);
+
+      delete process.env.TEST_CUSTOM_API_KEY;
+      expect(isApiKeyConfigured('TEST_CUSTOM_API_KEY')).toBe(false);
+
+      if (origKey !== undefined) {
+        process.env.TEST_CUSTOM_API_KEY = origKey;
+      }
+    });
+
+    it('attaches apiKeyConfigured boolean to planned transforms requiring keys', () => {
+      const plan = buildDiscoveryPlan('IP_ADDRESS', '8.8.8.8');
+      const shodan = plan.transforms.find((t) => t.id === 'infrastructure.shodan-recon');
+      expect(shodan).toBeDefined();
+      expect(shodan?.requiresApiKey).toBe(true);
+      expect(typeof shodan?.apiKeyConfigured).toBe('boolean');
+
+      const whoisPlan = buildDiscoveryPlan('DOMAIN', 'example.com');
+      const whois = whoisPlan.transforms.find((t) => t.id === 'domain.whois-rdap');
+      expect(whois).toBeDefined();
+      expect(whois?.requiresApiKey).toBeFalsy();
+    });
   });
 });

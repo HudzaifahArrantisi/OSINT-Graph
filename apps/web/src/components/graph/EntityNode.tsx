@@ -5,6 +5,7 @@ import {
   getNodeEngineModule,
   EngineModuleMeta,
 } from '@nexusgraph/shared';
+import { useAppStore } from '../../stores/appStore';
 import { ConfidenceBadge } from '../ui/ConfidenceBadge';
 import { getNavigableUrl } from '../detail/EntityDetailPanel';
 import {
@@ -37,6 +38,7 @@ import {
   Radar,
   AlertTriangle,
   ShieldCheck,
+  ChevronRight,
 } from 'lucide-react';
 
 const ENGINE_ICONS: Record<string, React.ComponentType<{ className?: string }>> = {
@@ -159,6 +161,10 @@ export const EntityNode = memo(({ id, data, selected }: NodeProps) => {
   const [copied, setCopied] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
 
+  const setActiveWorkspaceView = useAppStore((s) => s.setActiveWorkspaceView);
+  const setFocusedGeoNodeId = useAppStore((s) => s.setFocusedGeoNodeId);
+  const setSelectedNodeId = useAppStore((s) => s.setSelectedNodeId);
+
   const nodeData = (data || {}) as Record<string, any>;
   const entityType = (nodeData.entityType as EntityType) || 'DOMAIN';
   const value = String(nodeData.value || nodeData.label || '');
@@ -172,6 +178,15 @@ export const EntityNode = memo(({ id, data, selected }: NodeProps) => {
 
   const Icon = ENTITY_ICONS[entityType] || Globe2;
   const { mainText, subText, queryParams } = formatEntityDisplay(entityType, value, title);
+
+  const isGeoLocation = Boolean(
+    nodeData.metadata?.isCompanyGeo ||
+    nodeData.metadata?.googleMapsUrl ||
+    entityType === 'LOCATION' ||
+    entityType === 'ADDRESS' ||
+    nodeData.metadata?.lat !== undefined ||
+    nodeData.metadata?.latitude !== undefined
+  );
 
   const provenance =
     nodeData.metadata?.discoveredBy ||
@@ -307,21 +322,40 @@ export const EntityNode = memo(({ id, data, selected }: NodeProps) => {
             </a>
           )}
 
-          {/* Direct Google Maps Action for Corporate HQ / Location Nodes */}
-          {nodeData.metadata?.googleMapsUrl && (
-            <a
-              href={nodeData.metadata.googleMapsUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="mt-2 flex items-center justify-between gap-1.5 text-[10.5px] font-mono text-sky-300 hover:text-white bg-sky-950/30 hover:bg-sky-900/40 border border-sky-800/40 hover:border-sky-600 px-2 py-1 rounded transition-colors group/maps cursor-pointer"
-              title="Buka lokasi di Google Maps"
-            >
-              <div className="flex items-center gap-1.5 min-w-0">
-                <MapPin className="w-3 h-3 text-sky-400 shrink-0" />
-                <span className="truncate">Buka di Google Maps ↗</span>
-              </div>
-              <ExternalLink className="w-3 h-3 shrink-0 text-sky-400 group-hover/maps:text-white" />
-            </a>
+          {/* Direct Geo Map Action for Corporate HQ / Location Nodes */}
+          {isGeoLocation && (
+            <div className="mt-2 space-y-1">
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setFocusedGeoNodeId(id);
+                  setSelectedNodeId(id);
+                  setActiveWorkspaceView('map');
+                }}
+                className="w-full flex items-center justify-between gap-1.5 text-[10.5px] font-mono text-neutral-200 hover:text-white bg-[#161616] hover:bg-[#222222] border border-[#2a2a2a] hover:border-neutral-400 px-2 py-1 rounded transition-colors group/geomap cursor-pointer shadow-sm"
+                title="Tampilkan dan fokuskan pada Tab Geo Map"
+              >
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <MapPin className="w-3.5 h-3.5 text-white shrink-0" />
+                  <span className="truncate font-semibold font-sans">Lihat di Tab Geo Map</span>
+                </div>
+                <ChevronRight className="w-3 h-3 text-neutral-400 group-hover/geomap:text-white group-hover/geomap:translate-x-0.5 transition-transform shrink-0" />
+              </button>
+
+              {nodeData.metadata?.googleMapsUrl && (
+                <a
+                  href={nodeData.metadata.googleMapsUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center justify-between gap-1 text-[9.5px] font-mono text-neutral-400 hover:text-white px-1 py-0.5 transition-colors cursor-pointer"
+                  title="Buka di Google Maps eksternal"
+                >
+                  <span className="truncate">Google Maps Eksternal</span>
+                  <ExternalLink className="w-2.5 h-2.5 shrink-0" />
+                </a>
+              )}
+            </div>
           )}
 
           {/* Target Seed Dossier Action */}

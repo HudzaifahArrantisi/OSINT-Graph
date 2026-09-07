@@ -33,6 +33,8 @@ import {
   Cpu,
   Lock,
   CheckCircle2,
+  MapPin,
+  FolderSearch,
 } from 'lucide-react';
 import type { Entity, Relationship, Evidence, TimelineEvent } from '@nexusgraph/shared';
 
@@ -62,7 +64,7 @@ export function getNavigableUrl(entity?: { type?: string; value: string; metadat
   if (['DOMAIN', 'WEBSITE', 'SUBDOMAIN'].includes(t)) {
     return `https://${val}`;
   }
-  if (['URL'].includes(t)) {
+  if (['URL', 'DOCUMENT'].includes(t)) {
     return val.startsWith('http') ? val : `https://${val}`;
   }
   if (['SOCIAL_PROFILE', 'GITHUB_PROFILE', 'GITLAB_PROFILE', 'YOUTUBE_CHANNEL'].includes(t)) {
@@ -83,7 +85,14 @@ export function getNavigableUrl(entity?: { type?: string; value: string; metadat
 
 export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: EntityDetailPanelProps) {
   const queryClient = useQueryClient();
-  const { selectedNodeId, selectedEdgeId, setSelectedNodeId, addToast } = useAppStore();
+  const {
+    selectedNodeId,
+    selectedEdgeId,
+    setSelectedNodeId,
+    addToast,
+    setActiveWorkspaceView,
+    setFocusedGeoNodeId,
+  } = useAppStore();
   const [activeTab, setActiveTab] = useState<'overview' | 'transforms' | 'relationships' | 'evidence' | 'timeline' | 'raw'>('overview');
   const [copied, setCopied] = useState(false);
   const [deleteConfirm, setDeleteConfirm] = useState<{
@@ -951,10 +960,10 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
                   (selectedEntity.metadata as any)?.latitude !== undefined ||
                   (selectedEntity.metadata as any)?.lat !== undefined
                 ) && (
-                  <div className="bg-[#0a0a0a] border border-sky-900/50 rounded-card p-3 space-y-2.5 text-xs font-mono shadow-sm">
-                    <div className="flex items-center justify-between border-b border-sky-950 pb-2">
-                      <div className="flex items-center gap-1.5 text-sky-300 font-semibold">
-                        <MapPin className="w-4 h-4 text-sky-400" />
+                  <div className="bg-[#0a0a0a] border border-[#262626] rounded-card p-3 space-y-2.5 text-xs font-mono shadow-sm">
+                    <div className="flex items-center justify-between border-b border-[#1f1f1f] pb-2">
+                      <div className="flex items-center gap-1.5 text-white font-semibold">
+                        <MapPin className="w-4 h-4 text-white" />
                         <span>Corporate HQ & Physical Office</span>
                       </div>
                       {(selectedEntity.metadata as any)?.googleMapsUrl && (
@@ -962,7 +971,7 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
                           href={(selectedEntity.metadata as any).googleMapsUrl}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-[11px] text-sky-400 hover:text-white transition-colors"
+                          className="flex items-center gap-1 text-[11px] text-neutral-400 hover:text-white transition-colors"
                           title="Buka lokasi di Google Maps"
                         >
                           <span>Google Maps</span>
@@ -984,7 +993,7 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
                       {((selectedEntity.metadata as any)?.lat !== undefined || (selectedEntity.metadata as any)?.latitude !== undefined) && (
                         <div className="flex justify-between items-center py-1">
                           <span className="text-neutral-500">Koordinat Presisi:</span>
-                          <span className="text-sky-300 font-bold">
+                          <span className="text-white font-bold">
                             {Number((selectedEntity.metadata as any)?.lat ?? (selectedEntity.metadata as any)?.latitude).toFixed(5)},{' '}
                             {Number((selectedEntity.metadata as any)?.lng ?? (selectedEntity.metadata as any)?.longitude).toFixed(5)}
                           </span>
@@ -1000,17 +1009,115 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
                         </div>
                       )}
 
-                      {(selectedEntity.metadata as any)?.googleMapsUrl && (
-                        <div className="pt-2">
+                      {/* Direct Geo Map View Navigation Button */}
+                      <div className="pt-2 space-y-1.5">
+                        <button
+                          onClick={() => {
+                            if (selectedEntity?.id) {
+                              setFocusedGeoNodeId(selectedEntity.id);
+                            }
+                            setActiveWorkspaceView('map');
+                          }}
+                          className="w-full flex items-center justify-center gap-1.5 py-2 px-3 rounded bg-[#161616] hover:bg-[#222222] border border-[#2a2a2a] hover:border-neutral-400 text-white transition-colors text-xs font-sans font-semibold cursor-pointer shadow-sm"
+                          title="Buka titik koordinat kantor ini di tab Geo Map"
+                        >
+                          <MapPin className="w-3.5 h-3.5 text-white shrink-0" />
+                          <span>Lihat di Tab Geo Map</span>
+                        </button>
+
+                        {(selectedEntity.metadata as any)?.googleMapsUrl && (
                           <a
                             href={(selectedEntity.metadata as any).googleMapsUrl}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="w-full flex items-center justify-center gap-1.5 py-1.5 px-2.5 rounded bg-sky-950/40 hover:bg-sky-900/60 border border-sky-800/60 text-sky-200 hover:text-white transition-colors text-xs font-sans font-medium"
+                            className="w-full flex items-center justify-center gap-1.5 py-1 px-2.5 rounded bg-[#121212] hover:bg-[#181818] border border-[#222222] text-neutral-400 hover:text-white transition-colors text-[11px] font-sans"
+                            title="Buka lokasi di Google Maps eksternal"
                           >
-                            <MapPin className="w-3.5 h-3.5 text-sky-400" />
-                            <span>Lihat di Google Maps Langsung ↗</span>
+                            <span>Google Maps Eksternal ↗</span>
                           </a>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* 6. WEB PATH & FILE DISCOVERY (DIRSEARCH) CARD */}
+                {Boolean(
+                  (selectedEntity.metadata as any)?.pathCategory ||
+                  (selectedEntity.metadata as any)?.docKind === 'DIRSEARCH_FINDING' ||
+                  (selectedEntity.metadata as any)?.docKind === 'DIRSEARCH_DOCUMENT' ||
+                  (selectedEntity.metadata as any)?.collector === 'dirsearch' ||
+                  (selectedEntity.metadata as any)?.source?.collector === 'dirsearch'
+                ) && (
+                  <div className="bg-[#0a0a0a] border border-[#262626] rounded-card p-3 space-y-2.5 text-xs font-mono shadow-sm">
+                    <div className="flex items-center justify-between border-b border-[#1f1f1f] pb-2">
+                      <div className="flex items-center gap-1.5 text-neutral-200 font-semibold">
+                        <FolderSearch className="w-4 h-4 text-violet-400" />
+                        <span>Web Path & File Discovery Intel</span>
+                      </div>
+                      {Boolean((selectedEntity.metadata as any)?.riskLevel) && (
+                        <span
+                          className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                            String((selectedEntity.metadata as any).riskLevel) === 'high'
+                              ? 'bg-rose-950/60 text-rose-300 border border-rose-500/40'
+                              : String((selectedEntity.metadata as any).riskLevel) === 'medium'
+                              ? 'bg-amber-950/60 text-amber-300 border border-amber-500/40'
+                              : 'bg-neutral-900 text-neutral-300 border border-neutral-700'
+                          }`}
+                        >
+                          Risk: {(selectedEntity.metadata as any).riskLevel}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="space-y-1.5 text-[11px]">
+                      {/* Category Label */}
+                      <div className="flex justify-between items-center">
+                        <span className="text-neutral-500">Kategori File / Endpoint:</span>
+                        <span className="text-neutral-200 font-semibold bg-[#141414] px-1.5 py-0.5 rounded border border-[#222222]">
+                          {(selectedEntity.metadata as any)?.categoryLabel || (selectedEntity.metadata as any)?.pathCategory || 'Path Aktif'}
+                        </span>
+                      </div>
+
+                      {/* HTTP Status */}
+                      <div className="flex justify-between items-center">
+                        <span className="text-neutral-500">Status Respon:</span>
+                        <span className="text-emerald-400 font-bold">
+                          HTTP {(selectedEntity.metadata as any)?.httpStatus || 200} OK
+                        </span>
+                      </div>
+
+                      {/* Content Type */}
+                      {Boolean((selectedEntity.metadata as any)?.contentType) && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-neutral-500">Content-Type:</span>
+                          <span className="text-neutral-300 font-mono text-[10px]">
+                            {(selectedEntity.metadata as any).contentType}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* File Size */}
+                      {Boolean((selectedEntity.metadata as any)?.contentLength !== undefined) && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-neutral-500">Ukuran File:</span>
+                          <span className="text-neutral-300">
+                            {Number((selectedEntity.metadata as any).contentLength) > 1024 * 1024
+                              ? `${(Number((selectedEntity.metadata as any).contentLength) / (1024 * 1024)).toFixed(2)} MB`
+                              : Number((selectedEntity.metadata as any).contentLength) > 1024
+                              ? `${(Number((selectedEntity.metadata as any).contentLength) / 1024).toFixed(1)} KB`
+                              : `${(selectedEntity.metadata as any).contentLength} bytes`}
+                          </span>
+                        </div>
+                      )}
+
+                      {/* Response Time */}
+                      {Boolean((selectedEntity.metadata as any)?.responseTimeMs) && (
+                        <div className="flex justify-between items-center">
+                          <span className="text-neutral-500">Waktu Respon:</span>
+                          <span className="text-neutral-400">
+                            {(selectedEntity.metadata as any).responseTimeMs} ms
+                          </span>
                         </div>
                       )}
                     </div>

@@ -504,8 +504,10 @@ export function getNodeEngineModule(data: Record<string, any> = {}): EngineModul
     discoveredBy.includes('dirsearch') ||
     discoveredBy.includes('path-bruteforce') ||
     metadata.collector === 'dirsearch' ||
+    (metadata.source as any)?.collector === 'dirsearch' ||
     metadata.dirsearch ||
     metadata.docKind === 'DIRSEARCH_FINDING' ||
+    metadata.docKind === 'DIRSEARCH_DOCUMENT' ||
     title.includes('dirsearch')
   ) {
     return ENGINE_MODULE_DEFINITIONS.engine_dirsearch;

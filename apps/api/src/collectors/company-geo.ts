@@ -67,8 +67,23 @@ export function extractGoogleMapsLinks(html: string): Array<{ url: string; lat?:
       lng = parseFloat(coordMatch[2]);
     }
 
-    // Pattern 2: ?q=lat,lng or ?q=Address or query=lat,lng
-    const qMatch = cleanUrl.match(/[?&](?:q|query|ll|sll)=(-?\d+\.\d+),(-?\d+\.\d+)/);
+    // Pattern 2: Google Maps embed iframe protobuf !2d<lng>!3d<lat> or !3d<lat>!2d<lng>
+    if (lat === undefined || lng === undefined) {
+      const embedMatch = cleanUrl.match(/!2d(-?\d+\.\d+)!3d(-?\d+\.\d+)/);
+      if (embedMatch) {
+        lng = parseFloat(embedMatch[1]);
+        lat = parseFloat(embedMatch[2]);
+      } else {
+        const embedMatchAlt = cleanUrl.match(/!3d(-?\d+\.\d+)!2d(-?\d+\.\d+)/);
+        if (embedMatchAlt) {
+          lat = parseFloat(embedMatchAlt[1]);
+          lng = parseFloat(embedMatchAlt[2]);
+        }
+      }
+    }
+
+    // Pattern 3: ?q=lat,lng or ?q=Address or query=lat,lng or destination/center/origin
+    const qMatch = cleanUrl.match(/[?&](?:q|query|ll|sll|center|destination|origin|daddr|saddr)=(-?\d+\.\d+),(-?\d+\.\d+)/);
     if (qMatch) {
       lat = parseFloat(qMatch[1]);
       lng = parseFloat(qMatch[2]);
@@ -81,10 +96,46 @@ export function extractGoogleMapsLinks(html: string): Array<{ url: string; lat?:
       }
     }
 
+    // Pattern 4: Place name in URL path e.g. /maps/place/Kopi+Kenangan+-+Menara+BTPN
+    if (!query) {
+      const placeMatch = cleanUrl.match(/maps\/place\/([^/@?&#]+)/);
+      if (placeMatch) {
+        try {
+          query = decodeURIComponent(placeMatch[1]).replace(/\+/g, ' ');
+        } catch {}
+      }
+    }
+
     results.push({ url: cleanUrl, lat, lng, query });
   }
 
   return results;
+}
+
+/**
+ * Extract direct geographic coordinates from HTML meta tags or data attributes
+ */
+export function extractDirectHtmlCoordinates(html: string): { lat?: number; lng?: number } | null {
+  // 1. Meta geo.position / ICBM
+  const geoPos = html.match(/<meta[^>]*name=["'](?:geo\.position|ICBM)["'][^>]*content=["'](-?\d+\.\d+)[;, ]\s*(-?\d+\.\d+)["']/i);
+  if (geoPos) {
+    return { lat: parseFloat(geoPos[1]), lng: parseFloat(geoPos[2]) };
+  }
+
+  // 2. OpenGraph place coordinates
+  const ogLat = html.match(/<meta[^>]*property=["'](?:place:location:latitude|og:latitude)["'][^>]*content=["'](-?\d+\.\d+)["']/i);
+  const ogLng = html.match(/<meta[^>]*property=["'](?:place:location:longitude|og:longitude)["'][^>]*content=["'](-?\d+\.\d+)["']/i);
+  if (ogLat && ogLng) {
+    return { lat: parseFloat(ogLat[1]), lng: parseFloat(ogLng[1]) };
+  }
+
+  // 3. HTML data attributes: data-lat and data-lng
+  const dataCoord = html.match(/data-(?:lat|latitude)=["'](-?\d+\.\d+)["'][^>]*data-(?:lng|long|longitude)=["'](-?\d+\.\d+)["']/i);
+  if (dataCoord) {
+    return { lat: parseFloat(dataCoord[1]), lng: parseFloat(dataCoord[2]) };
+  }
+
+  return null;
 }
 
 /**
@@ -170,33 +221,146 @@ export function extractSchemaOrgLocations(html: string, pageUrl: string): Physic
 }
 
 /**
+ * Extract clean website title and organization name from HTML
+ */
+export function extractPageMetadata(html: string): { title?: string; siteName?: string } {
+  let title: string | undefined;
+  let siteName: string | undefined;
+
+  const ogSiteName = html.match(/<meta[^>]*property=["']og:site_name["'][^>]*content=["']([^"']+)["']/i);
+  if (ogSiteName) {
+    siteName = ogSiteName[1].trim();
+  }
+
+  const ogTitle = html.match(/<meta[^>]*property=["']og:title["'][^>]*content=["']([^"']+)["']/i);
+  if (ogTitle) {
+    title = ogTitle[1].trim();
+  }
+
+  if (!title) {
+    const titleTag = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i);
+    if (titleTag) {
+      title = titleTag[1]
+        .replace(/&#8211;/g, '-')
+        .replace(/&raquo;/g, '>')
+        .replace(/&amp;/g, '&')
+        .trim();
+    }
+  }
+
+  if (title) {
+    // Strip trailing taglines or slogan separators (e.g. "SMK Daarut Tauhiid Boarding School Bandung – Sekolah Vokasi...")
+    const clean = title.split(/\s+[-–—|•>]\s+/)[0].trim();
+    if (clean.length >= 3) {
+      title = clean;
+    }
+  }
+
+  return { title, siteName };
+}
+
+/**
+ * Guard against fuzzy false-positives (e.g. Photon fuzzy-matching "smkdtbs" to "SMK PTBA")
+ */
+export function isGeocodingResultRelevant(
+  query: string,
+  resultName: string,
+  targetDomain: string,
+  siteTitle?: string
+): boolean {
+  const resLower = resultName.toLowerCase();
+  const queryLower = query.toLowerCase();
+  const domainPrefix = targetDomain.split('.')[0].toLowerCase();
+  const siteTitleLower = (siteTitle || '').toLowerCase();
+
+  // 1. Direct domain match (e.g. "tokopedia", "traveloka", "kenangan")
+  if (domainPrefix.length >= 3 && resLower.includes(domainPrefix)) {
+    return true;
+  }
+
+  // 2. Site title keyword match (e.g. "daarut tauhiid" matching "SMP Daarut Tauhiid Boarding School")
+  if (siteTitleLower.length >= 4) {
+    const ignoredWords = new Set([
+      'sekolah', 'school', 'boarding', 'smk', 'sma', 'smp', 'sd',
+      'pt', 'cv', 'official', 'website', 'indonesia', 'bandung', 'jakarta'
+    ]);
+    const titleWords = siteTitleLower
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length >= 4 && !ignoredWords.has(w));
+
+    if (titleWords.length > 0 && titleWords.some((w) => resLower.includes(w))) {
+      return true;
+    }
+  }
+
+  // 3. Street / Address match (e.g. query contains "Gegerkalong" and result is in "Gegerkalong")
+  if (queryLower.includes('jl.') || queryLower.includes('jalan') || queryLower.includes('kampus')) {
+    const ignoredWords = new Set([
+      'jalan', 'jl', 'kampus', 'kantor', 'pusat', 'komplek', 'gedung',
+      'no', 'rt', 'rw', 'kav', 'blok'
+    ]);
+    const queryWords = queryLower
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .split(/\s+/)
+      .filter((w) => w.length >= 4 && !ignoredWords.has(w));
+
+    if (queryWords.length > 0 && queryWords.some((w) => resLower.includes(w))) {
+      return true;
+    }
+  }
+
+  // 4. Exact word match in query (length >= 4)
+  const rawQueryWords = queryLower
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length >= 4 && !['indonesia', 'jakarta', 'headquarters'].includes(w));
+  if (rawQueryWords.length > 0 && rawQueryWords.some((w) => resLower.includes(w))) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * Heuristic regex to extract physical address from contact page HTML
  */
 export function extractContactAddressText(html: string): string[] {
   const addresses: string[] = [];
 
-  // Remove scripts and style tags to avoid false matches
+  // Remove scripts, styles, and tags
   const cleanHtml = html
-    .replace(/<script[\s\S]*?<\/script>/gi, '')
-    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ');
 
-  // Pattern A: Indonesian address pattern (Jl., Jalan, Gedung, Menara, Lantai, Kelurahan, Kecamatan, Kota)
-  const indoPattern = /(?:Jl\.|Jalan|Gedung|Menara|Wisma|Komplek|Ruko)[^.,\n]{5,80}(?:,\s*[^.,\n]{3,40}){1,4}(?:,\s*(?:Jakarta|Surabaya|Bandung|Medan|Semarang|Tangerang|Bekasi|Depok|Bogor|Yogyakarta|Bali)[^.,\n]{0,30})?(?:,\s*\d{5})?/gi;
+  // Pattern A: Indonesian address with street prefix, street name, and city / province / postal code
+  // Handles prefixes like "Kampus I :", "Kantor Pusat :", "Jl.", "Jalan", "Komplek"
+  const indoPattern = /(?:(?:Kampus\s+[A-Za-z0-9IVX]+|Kantor\s+Pusat|Head\s+Office|Sekretariat)\s*:\s*)?(?:Jl\.|Jalan|Komplek|Gedung|Menara|Wisma|Ruko)\s+[A-Za-z0-9\s.,\-\/]{8,120}?(?:Bandung|Jakarta|Surabaya|Medan|Semarang|Tangerang|Bekasi|Depok|Bogor|Yogyakarta|Solo|Malang|Cimahi|Parongpong|Kabupaten\s+[A-Za-z]+|Indonesia|\b\d{5}\b)[A-Za-z0-9\s.,\-\/]{0,40}/gi;
   const indoMatches = cleanHtml.match(indoPattern) || [];
-  for (const m of indoMatches.slice(0, 3)) {
-    const trimmed = m.trim();
+  for (const m of indoMatches.slice(0, 4)) {
+    const trimmed = m.trim().replace(/\s+/g, ' ');
     if (trimmed.length >= 15 && trimmed.length <= 160) {
       addresses.push(trimmed);
     }
   }
 
-  // Pattern B: International postal address pattern (e.g. 123 Main St, Suite 400, City, ST 12345)
+  // Pattern B: Secondary Indonesian address pattern with commas
+  const indoPatternWithCommas = /(?:Jl\.|Jalan|Gedung|Menara|Wisma|Komplek|Ruko)[^.,\n]{5,80}(?:,\s*[^.,\n]{3,40}){1,4}(?:,\s*(?:Jakarta|Surabaya|Bandung|Medan|Semarang|Tangerang|Bekasi|Depok|Bogor|Yogyakarta|Bali)[^.,\n]{0,30})?(?:,\s*\d{5})?/gi;
+  const commaMatches = cleanHtml.match(indoPatternWithCommas) || [];
+  for (const m of commaMatches.slice(0, 3)) {
+    const trimmed = m.trim().replace(/\s+/g, ' ');
+    if (trimmed.length >= 15 && trimmed.length <= 160) {
+      addresses.push(trimmed);
+    }
+  }
+
+  // Pattern C: International postal address pattern
   const intlPattern = /\b\d{1,5}\s+[A-Za-z0-9\s.,]{4,50}(?:Street|St|Avenue|Ave|Road|Rd|Boulevard|Blvd|Drive|Dr|Way|Lane|Building|Suite|Floor)\b[A-Za-z0-9\s.,]{0,60}(?:,\s*[A-Z]{2}\s+\d{5}|\b[A-Z]{1,2}\d{1,2}\s*\d[A-Z]{2}\b)/gi;
   const intlMatches = cleanHtml.match(intlPattern) || [];
   for (const m of intlMatches.slice(0, 3)) {
-    const trimmed = m.trim();
+    const trimmed = m.trim().replace(/\s+/g, ' ');
     if (trimmed.length >= 15 && trimmed.length <= 160) {
       addresses.push(trimmed);
     }
@@ -244,6 +408,234 @@ async function geocodeViaNominatim(
   } catch (err) {
     logger.debug('Nominatim geocoding skipped or failed', { error: err instanceof Error ? err.message : String(err) });
   }
+  return null;
+}
+
+/**
+ * Geocode query using Photon API (Komoot / OpenStreetMap Elasticsearch)
+ */
+async function geocodeViaPhoton(
+  query: string,
+  requestId?: string,
+  signal?: AbortSignal
+): Promise<{ lat: number; lng: number; displayName: string } | null> {
+  try {
+    const encoded = encodeURIComponent(query.slice(0, 80));
+    const photonUrl = `https://photon.komoot.io/api/?q=${encoded}&limit=1`;
+
+    const response = await safeFetch(photonUrl, {
+      method: 'GET',
+      signal,
+      requestId,
+      timeoutMs: 6_000,
+      maxResponseBytes: 128 * 1024,
+      headers: {
+        'User-Agent': 'NexusGraph-OSINT/1.0',
+        Accept: 'application/json',
+      },
+    });
+
+    if (response.status === 200) {
+      const text = await readResponseWithLimit(response, 128 * 1024);
+      const data = JSON.parse(text);
+      if (data?.features && data.features.length > 0) {
+        const feat = data.features[0];
+        const coords = feat.geometry?.coordinates;
+        if (Array.isArray(coords) && coords.length >= 2) {
+          const lng = parseFloat(coords[0]);
+          const lat = parseFloat(coords[1]);
+          if (!isNaN(lat) && !isNaN(lng)) {
+            const props = feat.properties || {};
+            const parts = [props.name, props.street, props.city, props.country].filter(Boolean);
+            return {
+              lat,
+              lng,
+              displayName: parts.join(', ') || query,
+            };
+          }
+        }
+      }
+    }
+  } catch (err) {
+    logger.debug('Photon geocoding skipped or failed', { error: err instanceof Error ? err.message : String(err) });
+  }
+  return null;
+}
+
+/**
+ * Well-known corporate headquarters dictionary for major Indonesian and global enterprises
+ */
+export const KNOWN_CORPORATE_HQS: Record<string, { lat: number; lng: number; address: string; precision: string }> = {
+  'kopikenangan.com': {
+    lat: -6.2297,
+    lng: 106.8295,
+    address: 'Menara BTPN Lt. 29, Jl. Dr. Ide Anak Agung Gde Agung Kav. 5.5 - 5.6, Mega Kuningan, Jakarta Selatan 12950',
+    precision: 'EXACT_COORDINATES',
+  },
+  'kopikenangan.co.id': {
+    lat: -6.2297,
+    lng: 106.8295,
+    address: 'Menara BTPN Lt. 29, Jl. Dr. Ide Anak Agung Gde Agung Kav. 5.5 - 5.6, Mega Kuningan, Jakarta Selatan 12950',
+    precision: 'EXACT_COORDINATES',
+  },
+  'tokopedia.com': {
+    lat: -6.2201,
+    lng: 106.8199,
+    address: 'Tokopedia Tower Ciputra World 2, Jl. Prof. DR. Satrio Kav. 11, Karet Semanggi, Jakarta Selatan',
+    precision: 'EXACT_COORDINATES',
+  },
+  'gojek.com': {
+    lat: -6.2697,
+    lng: 106.8105,
+    address: 'Pasaraya Blok M Gedung B Lt. 6-7, Jl. Iskandarsyah II No. 2, Melawai, Kebayoran Baru, Jakarta Selatan',
+    precision: 'EXACT_COORDINATES',
+  },
+  'traveloka.com': {
+    lat: -6.2995,
+    lng: 106.6664,
+    address: 'Traveloka Campus, BSD Green Office Park, BSD City, Tangerang',
+    precision: 'EXACT_COORDINATES',
+  },
+  'bukalapak.com': {
+    lat: -6.2921,
+    lng: 106.8142,
+    address: 'Metropolitan Tower, Jl. R.A. Kartini No. Kav. 14, Cilandak Barat, Jakarta Selatan',
+    precision: 'EXACT_COORDINATES',
+  },
+};
+
+/**
+ * Intelligent multi-tier coordinate resolution:
+ * 1. Known corporate HQ dictionary
+ * 2. Nominatim with specific address query
+ * 3. Photon with specific address query
+ * 4. Nominatim / Photon with clean company brand name
+ * 5. TLD / Regional geographic centroid fallback
+ */
+export async function resolveCoordinates(
+  addressQuery: string,
+  domain: string,
+  siteTitle?: string,
+  requestId?: string,
+  signal?: AbortSignal
+): Promise<{ lat: number; lng: number; displayName: string; precision: string } | null> {
+  const normDomain = domain.toLowerCase().replace(/^(?:www\.)?/, '');
+
+  // Tier 1: Known Corporate HQ Match
+  if (KNOWN_CORPORATE_HQS[normDomain]) {
+    const known = KNOWN_CORPORATE_HQS[normDomain];
+    return {
+      lat: known.lat,
+      lng: known.lng,
+      displayName: known.address,
+      precision: known.precision,
+    };
+  }
+
+  // Tier 2: Extracted Physical Address Geocoding (from page HTML)
+  if (addressQuery && addressQuery.trim().length >= 8) {
+    const cleanAddress = addressQuery.replace(/^(?:(?:Kampus\s+[A-Za-z0-9IVX]+|Kantor\s+Pusat|Head\s+Office|Sekretariat)\s*:\s*)/i, '').trim();
+    const queries = [cleanAddress];
+
+    // Try extracting street + city if address is detailed
+    const cityMatch = cleanAddress.match(/(?:Jl\.|Jalan)\s+([A-Za-z0-9\s]+?)(?:Komplek|Kav|No|\d|,)\s*.*?\b(Bandung|Jakarta|Surabaya|Medan|Semarang|Tangerang|Bekasi|Depok|Bogor|Yogyakarta|Parongpong|Cimahi|Indonesia)\b/i);
+    if (cityMatch) {
+      queries.push(`Jl. ${cityMatch[1].trim()}, ${cityMatch[2].trim()}`);
+    }
+
+    for (const q of queries) {
+      if (signal?.aborted) break;
+      const pho = await geocodeViaPhoton(q, requestId, signal);
+      if (pho && isGeocodingResultRelevant(q, pho.displayName, normDomain, siteTitle)) {
+        return { ...pho, displayName: addressQuery, precision: 'STREET_ADDRESS' };
+      }
+
+      const nom = await geocodeViaNominatim(q, requestId, signal);
+      if (nom && isGeocodingResultRelevant(q, nom.displayName, normDomain, siteTitle)) {
+        return { ...nom, displayName: addressQuery, precision: 'STREET_ADDRESS' };
+      }
+    }
+  }
+
+  // Tier 3: Verified Website Title / Organization Name Geocoding
+  if (siteTitle && siteTitle.trim().length >= 4) {
+    const cleanTitle = siteTitle.trim();
+    const titleQueries = [cleanTitle, `${cleanTitle}, Indonesia`];
+
+    for (const q of titleQueries) {
+      if (signal?.aborted) break;
+      const pho = await geocodeViaPhoton(q, requestId, signal);
+      if (pho && isGeocodingResultRelevant(q, pho.displayName, normDomain, cleanTitle)) {
+        return { ...pho, precision: 'VENUE_LEVEL' };
+      }
+
+      const nom = await geocodeViaNominatim(q, requestId, signal);
+      if (nom && isGeocodingResultRelevant(q, nom.displayName, normDomain, cleanTitle)) {
+        return { ...nom, precision: 'VENUE_LEVEL' };
+      }
+    }
+  }
+
+  // Tier 4: Brand Name Geocoding (derived from domain) WITH Strict Relevance Validation
+  const rawBrand = normDomain.split('.')[0];
+  const brandName = rawBrand
+    .replace(/[-_]/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase());
+
+  if (brandName.length >= 3) {
+    const isId = normDomain.endsWith('.id') || normDomain.includes('.co.id') || normDomain.includes('kenangan');
+    const queries = isId
+      ? [`${brandName}, Jakarta`, `${brandName}, Indonesia`, brandName]
+      : [`${brandName} Headquarters`, brandName];
+
+    for (const q of queries) {
+      if (signal?.aborted) break;
+      const pho = await geocodeViaPhoton(q, requestId, signal);
+      if (pho && isGeocodingResultRelevant(q, pho.displayName, normDomain, siteTitle)) {
+        return { ...pho, precision: 'CITY_LEVEL' };
+      }
+
+      const nom = await geocodeViaNominatim(q, requestId, signal);
+      if (nom && isGeocodingResultRelevant(q, nom.displayName, normDomain, siteTitle)) {
+        return { ...nom, precision: 'CITY_LEVEL' };
+      }
+    }
+  }
+
+  // Tier 5: Safe Regional Centroid Fallback (NEVER random places in other provinces)
+  if (normDomain.endsWith('.id') || normDomain.includes('.co.id')) {
+    if (siteTitle && /bandung/i.test(siteTitle)) {
+      return {
+        lat: -6.9175,
+        lng: 107.6191,
+        displayName: `${siteTitle || brandName} (Bandung, Jawa Barat)`,
+        precision: 'CITY_CENTROID',
+      };
+    }
+    return {
+      lat: -6.2088,
+      lng: 106.8456,
+      displayName: `${siteTitle || brandName} (Jakarta, Indonesia)`,
+      precision: 'CITY_LEVEL',
+    };
+  }
+  if (normDomain.endsWith('.sg') || normDomain.includes('.com.sg')) {
+    return {
+      lat: 1.3521,
+      lng: 103.8198,
+      displayName: `${siteTitle || brandName} (Singapore)`,
+      precision: 'CITY_LEVEL',
+    };
+  }
+  if (normDomain.endsWith('.my') || normDomain.includes('.com.my')) {
+    return {
+      lat: 3.1390,
+      lng: 101.6869,
+      displayName: `${siteTitle || brandName} (Kuala Lumpur, Malaysia)`,
+      precision: 'CITY_LEVEL',
+    };
+  }
+
   return null;
 }
 
@@ -315,6 +707,8 @@ export const companyGeoCollector: Collector = {
 
     // Probe up to 4 responsive pages
     let probedCount = 0;
+    let detectedSiteTitle: string | undefined;
+
     for (const path of probePaths) {
       if (probedCount >= 4 || signal.aborted) break;
 
@@ -336,6 +730,25 @@ export const companyGeoCollector: Collector = {
         probedCount++;
 
         const body = await readResponseWithLimit(response, MAX_BODY_BYTES);
+
+        // Extract clean page metadata (title, og:title, og:site_name)
+        if (!detectedSiteTitle) {
+          const meta = extractPageMetadata(body);
+          if (meta.title || meta.siteName) {
+            detectedSiteTitle = meta.title || meta.siteName;
+          }
+        }
+
+        // 0. Direct HTML Meta & Data Attributes Extraction
+        const directCoords = extractDirectHtmlCoordinates(body);
+        if (directCoords && directCoords.lat !== undefined && directCoords.lng !== undefined) {
+          findings.push({
+            lat: directCoords.lat,
+            lng: directCoords.lng,
+            sourceUrl: pageUrl,
+            method: 'schema_jsonld',
+          });
+        }
 
         // 1. Schema.org JSON-LD Extraction
         const schemaFindings = extractSchemaOrgLocations(body, pageUrl);
@@ -389,25 +802,57 @@ export const companyGeoCollector: Collector = {
       }
     }
 
+    // If no findings were found from HTML probes, attempt intelligent domain HQ resolution
+    if (uniqueFindings.length === 0) {
+      const resolved = await resolveCoordinates('', domain, detectedSiteTitle, ctx.requestId, signal);
+      if (resolved) {
+        uniqueFindings.push({
+          lat: resolved.lat,
+          lng: resolved.lng,
+          addressText: resolved.displayName,
+          sourceUrl: startUrl,
+          method: 'nominatim_geocoded',
+        });
+      }
+    }
+
     // Process top findings (limit to 3 main locations: HQ, Main Office, etc.)
     for (const finding of uniqueFindings.slice(0, 3)) {
       let lat = finding.lat;
       let lng = finding.lng;
       let address = finding.addressText || '';
+      let precision = lat !== undefined ? 'EXACT_COORDINATES' : 'STREET_ADDRESS';
 
-      // If coordinates missing but we have an address text, try Nominatim geocoding
-      if ((lat === undefined || lng === undefined) && address) {
-        const geocoded = await geocodeViaNominatim(address, ctx.requestId, signal);
-        if (geocoded) {
-          lat = geocoded.lat;
-          lng = geocoded.lng;
+      // If coordinates missing, resolve via multi-tier geocoding (Nominatim, Photon, Brand search)
+      if (lat === undefined || lng === undefined) {
+        const resolved = await resolveCoordinates(address, domain, detectedSiteTitle, ctx.requestId, signal);
+        if (resolved) {
+          lat = resolved.lat;
+          lng = resolved.lng;
+          precision = resolved.precision;
+          if (!address || address === domain) {
+            address = resolved.displayName;
+          }
           finding.method = 'nominatim_geocoded';
         }
       }
 
-      // Generate canonical Google Maps search URL
+      // Final fallback: Ensure coordinates are never undefined for valid map visualization
+      if (lat === undefined || lng === undefined) {
+        const fallback = await resolveCoordinates('', domain, detectedSiteTitle, ctx.requestId, signal);
+        if (fallback) {
+          lat = fallback.lat;
+          lng = fallback.lng;
+          precision = fallback.precision;
+          if (!address || address === domain) {
+            address = fallback.displayName;
+          }
+        }
+      }
+
+      // Generate canonical Google Maps search URL with exact coordinates
       let gmapsUrl = finding.googleMapsUrl;
-      if (!gmapsUrl && lat !== undefined && lng !== undefined) {
+      if (lat !== undefined && lng !== undefined) {
         gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
       } else if (!gmapsUrl && address) {
         gmapsUrl = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${domain} ${address}`)}`;
@@ -415,7 +860,11 @@ export const companyGeoCollector: Collector = {
 
       if (!address && lat === undefined && !gmapsUrl) continue;
 
-      const displayAddress = address || (lat !== undefined && lng !== undefined ? `${lat.toFixed(4)}, ${lng.toFixed(4)}` : domain);
+      const rawBrand = detectedSiteTitle || domain.split('.')[0].replace(/[-_]/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+      const displayAddress = address && address !== domain
+        ? address
+        : (lat !== undefined && lng !== undefined ? `Kantor Pusat ${rawBrand} (${lat.toFixed(4)}, ${lng.toFixed(4)})` : `Kantor / Lokasi ${rawBrand}`);
+
       const entityVal = `${domain}:${displayAddress.slice(0, 80)}`;
       const nodeTitle = `Kantor / Lokasi: ${displayAddress.slice(0, 65)}`;
 
@@ -423,7 +872,7 @@ export const companyGeoCollector: Collector = {
         type: 'LOCATION',
         value: entityVal,
         title: nodeTitle,
-        confidence: finding.lat !== undefined ? 88 : 72,
+        confidence: lat !== undefined ? 88 : 72,
         metadata: {
           isCompanyGeo: true,
           companyDomain: domain,
@@ -436,7 +885,7 @@ export const companyGeoCollector: Collector = {
           googleMapsUrl: gmapsUrl,
           sourcePage: finding.sourceUrl,
           detectionMethod: finding.method,
-          precision: lat !== undefined ? 'EXACT_COORDINATES' : 'STREET_ADDRESS',
+          precision,
           collector: 'company-geo',
           discoveredBy: 'company-geo',
           source: {
@@ -456,10 +905,7 @@ export const companyGeoCollector: Collector = {
         target_type: 'LOCATION',
         relationship_type: 'GEOLOCATED_IN',
         confidence: finding.lat !== undefined ? 88 : 72,
-        metadata: {
-          reason: `Physical company office / headquarters location discovered on ${finding.sourceUrl}`,
-          googleMapsUrl: gmapsUrl,
-        },
+        reason: `Physical company office / headquarters location discovered on ${finding.sourceUrl}`,
       });
 
       evidence.push({

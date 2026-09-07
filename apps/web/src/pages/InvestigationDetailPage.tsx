@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../lib/api';
@@ -24,7 +24,6 @@ import {
   Shield,
   RefreshCw,
   Plus,
-  Compass,
   ArrowLeft,
   ChevronLeft,
   ChevronRight,
@@ -57,9 +56,10 @@ export function InvestigationDetailPage() {
     isDiscovering,
     discoveryProgress,
     liveDiscoveryLogs,
+    activeWorkspaceView,
+    setActiveWorkspaceView,
   } = useAppStore();
 
-  const [activeWorkspaceView, setActiveWorkspaceView] = useState<'graph' | 'map' | 'timeline' | 'evidence' | 'notes'>('graph');
   const [discoveryModalOpen, setDiscoveryModalOpen] = useState(false);
   const [exportModalOpen, setExportModalOpen] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState('');
@@ -248,6 +248,18 @@ export function InvestigationDetailPage() {
     enabled: !!caseId,
   });
 
+  // Count discovered geographic locations (Company HQ, physical addresses, phones with geo)
+  const geoNodesCount = useMemo(() => {
+    if (!graphData?.nodes) return 0;
+    return graphData.nodes.filter((n) => {
+      const et = n.data?.entityType;
+      const meta = (n.data?.metadata || {}) as Record<string, any>;
+      const hasCoords = Number.isFinite(Number(meta.lat ?? meta.latitude)) && Number.isFinite(Number(meta.lng ?? meta.longitude));
+      const isCompany = Boolean(meta.isCompanyGeo || meta.googleMapsUrl || meta.collector === 'company-geo');
+      return et === 'LOCATION' || et === 'ADDRESS' || (et === 'PHONE' && hasCoords) || isCompany;
+    }).length;
+  }, [graphData]);
+
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['graph', caseId] });
     queryClient.invalidateQueries({ queryKey: ['entities', caseId] });
@@ -424,13 +436,14 @@ export function InvestigationDetailPage() {
             {(
               [
                 { id: 'graph', label: 'Graph', icon: Network },
-                { id: 'map', label: 'Geo Map', icon: MapPin },
+                { id: 'map', label: 'Geo Map', icon: MapPin, count: geoNodesCount },
                 { id: 'timeline', label: 'Timeline', icon: Clock },
                 { id: 'notes', label: 'Notes', icon: FileText },
               ] as const
             ).map((v) => {
               const Icon = v.icon;
               const active = activeWorkspaceView === v.id;
+              const hasCount = typeof (v as any).count === 'number' && (v as any).count > 0;
               return (
                 <button
                   key={v.id}
@@ -443,6 +456,11 @@ export function InvestigationDetailPage() {
                 >
                   <Icon className="w-3.5 h-3.5" />
                   <span>{v.label}</span>
+                  {hasCount && (
+                    <span className="font-mono text-[9.5px] px-1.5 py-0.2 rounded bg-[#1f1f1f] border border-[#333333] text-neutral-200 font-semibold">
+                      {(v as any).count}
+                    </span>
+                  )}
                 </button>
               );
             })}
@@ -512,11 +530,10 @@ export function InvestigationDetailPage() {
             <Button
               variant="primary"
               size="sm"
-              icon={<Compass className="w-3.5 h-3.5" />}
               onClick={() => setDiscoveryModalOpen(true)}
               className="font-medium"
             >
-              <span>Start Discovery</span>
+              <span>Start</span>
             </Button>
           )}
         </div>
@@ -863,11 +880,9 @@ export function InvestigationDetailPage() {
                 ) : !hasNodes ? (
                   <div className="flex items-center justify-center h-full">
                     <EmptyState
-                      icon={<Compass className="w-10 h-10 text-primary" />}
                       title="Investigation graph is empty"
                       description="Enter an organization name, domain, email, username, or IP to start automated multi-category discovery."
                       actionLabel="Start Discovery"
-                      actionIcon={<Sparkles className="w-4 h-4 text-amber-300" />}
                       onAction={() => setDiscoveryModalOpen(true)}
                     />
                   </div>

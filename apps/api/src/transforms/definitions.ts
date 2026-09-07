@@ -112,7 +112,7 @@ export const TRANSFORM_DEFINITIONS: TransformDefinition[] = [
   {
     id: 'domain.whois-rdap',
     name: 'WHOIS / RDAP Registration Lookup',
-    description: 'Query authoritative RFC 7483 RDAP records for domain registrar, creation/expiration dates, nameservers, and registrant details',
+    description: 'Query authoritative RFC 7483 RDAP records for domain registrar, creation/expiration dates, nameservers, and registrant details (Protokol Terbuka RFC 7483, Tanpa API Key)',
     inputTypes: ['DOMAIN', 'WEBSITE', 'URL'],
     outputTypes: ['ORGANIZATION', 'NS_RECORD', 'PERSON'],
     category: 'infrastructure',
@@ -289,6 +289,8 @@ export const TRANSFORM_DEFINITIONS: TransformDefinition[] = [
     category: 'infrastructure',
     riskLevel: 'low',
     enabled: true,
+    requiresApiKey: true,
+    apiKeyName: 'SHODAN_API_KEY',
   },
   {
     id: 'domain.subdomain-takeover',
@@ -364,7 +366,7 @@ export const TRANSFORM_DEFINITIONS: TransformDefinition[] = [
   {
     id: 'domain.dirsearch-path-bruteforce',
     name: 'Web Path Discovery (dirsearch)',
-    description: 'Brute-force discover hidden directories, admin panels, backup files, config files, and API endpoints using dirsearch engine with curated OSINT wordlist (500 paths)',
+    description: 'Brute-force discover hidden directories, admin panels, backup files, config files, sensitive documents (PDF, DOCX, XLSX), frontend JS scripts, PHP handlers, and API endpoints using dirsearch engine',
     inputTypes: ['DOMAIN', 'URL', 'WEBSITE'],
     outputTypes: ['URL', 'DOCUMENT'],
     category: 'web',

@@ -261,6 +261,7 @@ export interface TransformDefinition {
   enabled: boolean;
   requiresApiKey?: boolean;
   apiKeyName?: string;
+  apiKeyConfigured?: boolean;
 }
 
 export interface TransformResult {

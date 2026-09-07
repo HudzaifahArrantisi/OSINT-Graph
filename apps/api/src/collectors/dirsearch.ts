@@ -19,6 +19,7 @@
  */
 
 import { spawn } from 'node:child_process';
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import type {
@@ -28,14 +29,35 @@ import type {
   EntityCandidate,
   RelationshipCandidate,
   EvidenceCandidate,
+  EntityType,
 } from '@nexusgraph/shared';
 import { normalizeDomain, normalizeUrl } from '@nexusgraph/shared';
 import { validateUrl } from '../security/ssrf.js';
 import { logger } from '../lib/logger.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const BRIDGE_PATH = path.resolve(__dirname, '../../../../vendor/dirsearch-bridge.py');
-const ENGINE_TIMEOUT_MS = 90_000;
+
+function resolveBridgePath(): string {
+  const candidates = [
+    path.resolve(process.cwd(), 'vendor/dirsearch-bridge.py'),
+    path.resolve(__dirname, '../../../../vendor/dirsearch-bridge.py'),
+    path.resolve(__dirname, '../../../vendor/dirsearch-bridge.py'),
+    path.resolve(__dirname, '../../vendor/dirsearch-bridge.py'),
+  ];
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate)) {
+        return candidate;
+      }
+    } catch {
+      // Continue to next candidate
+    }
+  }
+  return path.resolve(__dirname, '../../../../vendor/dirsearch-bridge.py');
+}
+
+const BRIDGE_PATH = resolveBridgePath();
+const ENGINE_TIMEOUT_MS = 45_000;
 const MAX_STDOUT_BYTES = 8 * 1024 * 1024;
 
 export interface DirsearchFinding {
@@ -64,13 +86,21 @@ export interface DirsearchBridgeOutput {
   error?: string;
 }
 
-function runBridge(payload: {
-  target: string;
-  extensions?: string[];
-  timeout?: number;
-  max_entries?: number;
-}): Promise<DirsearchBridgeOutput> {
+function runBridge(
+  payload: {
+    target: string;
+    extensions?: string[];
+    timeout?: number;
+    max_entries?: number;
+  },
+  signal?: AbortSignal,
+): Promise<DirsearchBridgeOutput> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(new Error('dirsearch cancelled by caller before start'));
+      return;
+    }
+
     const pythonBin = process.env.PYTHON_BIN || 'python';
     const child = spawn(pythonBin, [BRIDGE_PATH], {
       stdio: ['pipe', 'pipe', 'pipe'],
@@ -86,18 +116,37 @@ function runBridge(payload: {
     let stdoutBytes = 0;
     let killed = false;
 
+    const cleanup = () => {
+      clearTimeout(timer);
+      if (signal && onAbort) {
+        signal.removeEventListener('abort', onAbort);
+      }
+    };
+
     const timer = setTimeout(() => {
       killed = true;
+      cleanup();
       child.kill('SIGTERM');
       reject(new Error(`dirsearch engine timed out after ${ENGINE_TIMEOUT_MS}ms`));
     }, ENGINE_TIMEOUT_MS);
+
+    const onAbort = () => {
+      killed = true;
+      cleanup();
+      child.kill('SIGTERM');
+      reject(new Error('dirsearch execution aborted by caller'));
+    };
+
+    if (signal) {
+      signal.addEventListener('abort', onAbort, { once: true });
+    }
 
     child.stdout.on('data', (chunk: Buffer) => {
       stdoutBytes += chunk.length;
       if (stdoutBytes > MAX_STDOUT_BYTES) {
         killed = true;
+        cleanup();
         child.kill('SIGTERM');
-        clearTimeout(timer);
         reject(new Error('dirsearch stdout exceeded maximum buffer size'));
         return;
       }
@@ -109,12 +158,12 @@ function runBridge(payload: {
     });
 
     child.on('error', (err) => {
-      clearTimeout(timer);
+      cleanup();
       reject(new Error(`Failed to start dirsearch bridge: ${err.message}`));
     });
 
     child.on('close', (code) => {
-      clearTimeout(timer);
+      cleanup();
       if (killed) return;
 
       if (code !== 0 && !stdout.trim()) {
@@ -146,17 +195,22 @@ function runBridge(payload: {
 /** Map dirsearch category to a human-readable Indonesian label */
 function categoryLabel(category: string): string {
   const labels: Record<string, string> = {
+    hidden_file: 'File Tersembunyi (Dotfile / Backup)',
+    hidden_directory: 'Direktori Tersembunyi (Internal / Secret)',
     admin_panel: 'Panel Admin',
     login_portal: 'Portal Login',
-    backup_file: 'File Backup',
-    config_file: 'File Konfigurasi',
+    backup_file: 'File Backup & Archive',
+    config_file: 'File Konfigurasi & Secret',
+    sensitive_document: 'Dokumen Sensitif (PDF/Office)',
+    source_code_js: 'Frontend Script & Config (JS)',
+    server_script_php: 'Script Server (PHP)',
     api_endpoint: 'Endpoint API',
-    version_control: 'Version Control',
-    info_disclosure: 'Info Disclosure',
+    version_control: 'Version Control (Git/SVN)',
+    info_disclosure: 'Info Disclosure / Profiling',
     database_interface: 'Database Interface',
-    log_file: 'File Log',
-    upload_directory: 'Direktori Upload',
-    sensitive_directory: 'Direktori Sensitif',
+    log_file: 'File Log Sistem',
+    upload_directory: 'Direktori Upload / Storage',
+    sensitive_directory: 'Direktori Internal Sensitif',
     redirect: 'Redirect',
     forbidden: 'Forbidden (403)',
     discovered_path: 'Path Ditemukan',
@@ -219,12 +273,41 @@ export const dirsearchCollector: Collector = {
     });
 
     try {
-      const bridgeOutput = await runBridge({
-        target: targetUrl,
-        extensions: ['php', 'html', 'js', 'txt', 'bak', 'old', 'zip', 'sql'],
-        timeout: 5,
-        max_entries: 500,
-      });
+      const bridgeOutput = await runBridge(
+        {
+          target: targetUrl,
+          extensions: [
+            'php',
+            'js',
+            'pdf',
+            'docx',
+            'doc',
+            'xlsx',
+            'xls',
+            'csv',
+            'sql',
+            'zip',
+            'json',
+            'env',
+            'log',
+            'txt',
+            'bak',
+            'old',
+            'save',
+            'swp',
+            'tar.gz',
+            'sqlite',
+            'sqlite3',
+            'yml',
+            'yaml',
+            'ini',
+            'conf',
+          ],
+          timeout: 2.5,
+          max_entries: 350,
+        },
+        ctx.signal,
+      );
 
       if (bridgeOutput.error) {
         warnings.push(`dirsearch bridge error: ${bridgeOutput.error}`);
@@ -237,7 +320,15 @@ export const dirsearchCollector: Collector = {
         }
       }
 
-      const results = bridgeOutput.results || [];
+      // STRICT FILTER & DEDUPLICATION: Only accept HTTP 200 OK findings and eliminate duplicates
+      const seenUrls = new Set<string>();
+      const results = (bridgeOutput.results || []).filter((r) => {
+        if (r.status !== 200) return false;
+        const norm = normalizeUrl(r.url) || r.url;
+        if (seenUrls.has(norm)) return false;
+        seenUrls.add(norm);
+        return true;
+      });
       const stats = bridgeOutput.stats;
 
       logger.info('dirsearch web path discovery completed', {
@@ -258,13 +349,26 @@ export const dirsearchCollector: Collector = {
         const confidence = riskToConfidence(finding.risk_level);
         const normalizedUrl = normalizeUrl(finding.url);
 
+        const isHidden =
+          finding.category === 'hidden_file' ||
+          finding.category === 'hidden_directory' ||
+          finding.path.startsWith('.') ||
+          finding.path.startsWith('_') ||
+          /\.(bak|old|save|swp|backup)$/i.test(finding.path);
+
+        const isDocument =
+          finding.category === 'sensitive_document' ||
+          /\.(pdf|docx?|xlsx?|csv|odt|rtf)$/i.test(finding.path);
+
+        const entityType: EntityType = isDocument ? 'DOCUMENT' : 'URL';
+
         entities.push({
-          type: 'URL',
+          type: entityType,
           value: normalizedUrl || finding.url,
-          title: `[${finding.status}] ${label}: /${finding.path}`,
+          title: `[200] ${label}: /${finding.path}`,
           confidence,
           metadata: {
-            httpStatus: finding.status,
+            httpStatus: 200,
             contentLength: finding.length,
             contentType: finding.content_type,
             responseTimeMs: Math.round(finding.elapsed * 1000),
@@ -272,7 +376,14 @@ export const dirsearchCollector: Collector = {
             pathCategory: finding.category,
             riskLevel: finding.risk_level,
             categoryLabel: label,
-            docKind: 'DIRSEARCH_FINDING',
+            isDocument,
+            isHidden,
+            hiddenType: isHidden
+              ? finding.category === 'hidden_file' || finding.path.startsWith('.') || /\.(bak|old|save|swp)$/i.test(finding.path)
+                ? 'DOTFILE_OR_BACKUP'
+                : 'INTERNAL_DIRECTORY'
+              : undefined,
+            docKind: isDocument ? 'DIRSEARCH_DOCUMENT' : 'DIRSEARCH_FINDING',
             source: {
               collector: 'dirsearch',
               transform: 'domain.dirsearch-path-bruteforce',
@@ -286,10 +397,14 @@ export const dirsearchCollector: Collector = {
           source_value: primarySourceVal,
           source_type: primarySourceType,
           target_value: normalizedUrl || finding.url,
-          target_type: 'URL',
+          target_type: entityType,
           relationship_type: 'LINKS_TO',
           confidence,
-          reason: `Path tersembunyi terdeteksi oleh dirsearch: /${finding.path} (HTTP ${finding.status}, ${label})`,
+          reason: isHidden
+            ? `File/path tersembunyi terdeteksi aktif oleh dirsearch: /${finding.path} (HTTP 200 OK, ${label})`
+            : isDocument
+              ? `Dokumen sensitif terdeteksi oleh dirsearch: /${finding.path} (HTTP 200 OK, ${label})`
+              : `Path aktif terdeteksi oleh dirsearch: /${finding.path} (HTTP 200 OK, ${label})`,
         });
       }
 

@@ -135,9 +135,10 @@ Platform saat ini memiliki 17 kolektor aktif yang terdaftar di `apps/api/src/col
 1. **`dirsearch` (Web Path Brute-Force Discovery Engine)**:
    - **Engine Vendored**: Mengintegrasikan mesin asli `maurosoria/dirsearch` di `vendor/dirsearch/`.
    - **Bridge Python**: `vendor/dirsearch-bridge.py` mengeksekusi fuzzer secara non-interaktif, menerima input target, ekstensi file, timeout via `stdin` JSON, dan mengeluarkan struktur temuan via `stdout` JSON murni.
-   - **Wordlist OSINT Terkurasi**: Menguji 500 path prioritas tinggi (admin panel, backup SQL/ZIP, konfigurasi `.env`/YAML, endpoint REST API, dashboard login, file log sensitif).
-   - **Klasifikasi & Severity**: Hasil diklasifikasikan secara otomatis (`admin_panel`, `backup`, `config`, `api`, `login`, dll.) dengan risk level (`high`, `medium`, `low`).
-   - **Integrasi Penuh**: Didukung oleh collector TypeScript `apps/api/src/collectors/dirsearch.ts`, transform `domain.dirsearch-path-bruteforce`, evidence source `DIRSEARCH_SCAN`, modul layout `engine_dirsearch`, dan telah lolos uji 8 test di `apps/api/src/__tests__/dirsearch.test.ts`.
+   - **Recon File & Path Tersembunyi**: Mendeteksi dotfiles (`.env*`, `.git/*`, `.htaccess*`, `.DS_Store`, `.well-known/*`), direktori tersembunyi/internal (`_admin/`, `_backup/`, `_test/`, `_api/`, `secret/`, `hidden/`, `private/`, `internal/`), dan file cadangan swap/backup (`.bak`, `.old`, `.swp`, `~`, `db.sqlite*`).
+   - **Filter Ketat Status HTTP 200**: Hanya meneruskan temuan dengan status HTTP 200 OK murni. Dilengkapi guard deteksi *soft-404* dan *catch-all rewrite* berbasis ukuran baseline homepage untuk menyaring false positive.
+   - **Klasifikasi & Severity**: Hasil diklasifikasikan secara otomatis (`hidden_file`, `hidden_directory`, `admin_panel`, `backup_file`, `config_file`, `api_endpoint`, `login_portal`, dll.) dengan risk level (`high`, `medium`, `low`).
+   - **Integrasi Penuh**: Didukung oleh collector TypeScript `apps/api/src/collectors/dirsearch.ts`, transform `domain.dirsearch-path-bruteforce`, evidence source `DIRSEARCH_SCAN`, modul layout `engine_dirsearch`, dan telah lolos uji 16 test di `apps/api/src/__tests__/dirsearch.test.ts`.
 
 2. **`xnLinkFinder` (JS Endpoint & Parameter Recon)**:
    - Menginspeksi bundle JavaScript klien untuk mengekstraksi hidden REST API endpoints, parameter query/POST, form keys, dan potensi secrets/API tokens.
@@ -172,10 +173,12 @@ Platform saat ini memiliki 17 kolektor aktif yang terdaftar di `apps/api/src/col
     - **Physical Office Reconnaissance**: Berbeda dengan *IP Geolocation* yang hanya melacak server hosting (AWS/Cloudflare), modul ini secara khusus mencari **letak kantor pusat fisik / kantor operasional nyata** organisasi.
     - **Metode Ekstraksi Multi-Source**:
       1. Web crawling aman dengan proteksi SSRF (`safeFetch`) ke homepage dan path kontak (`/contact`, `/about-us`, `/tentang-kami`, `/hubungi-kami`).
-      2. Ekstraksi Schema.org JSON-LD terstruktur (`PostalAddress`, `LocalBusiness`, `Organization`, `GeoCoordinates`).
-      3. Ekstraksi link & iframe embed Google Maps (`maps.google.com`, `goo.gl/maps`, `maps.app.goo.gl`, koordinat `@lat,lng` atau query parameter).
-      4. Ekstraksi pola alamat fisik Indonesia & internasional dari body HTML.
-      5. Geocoding koordinat presisi via OpenStreetMap Nominatim API jika alamat fisik ditemukan tanpa koordinat langsung.
+      2. Ekstraksi metadata halaman (`<title>`, `og:site_name`, `og:title`) untuk mengidentifikasi nama resmi entitas/institusi secara presisi (misal: "SMK Daarut Tauhiid Boarding School Bandung").
+      3. Ekstraksi Schema.org JSON-LD terstruktur (`PostalAddress`, `LocalBusiness`, `Organization`, `GeoCoordinates`).
+      4. Ekstraksi link & iframe embed Google Maps (`maps.google.com`, `goo.gl/maps`, `maps.app.goo.gl`, koordinat `@lat,lng` atau query parameter).
+      5. Ekstraksi pola alamat fisik Indonesia & internasional dari body HTML dengan dukungan format prefix (`Kampus I :`, `Kantor Pusat :`) tanpa mewajibkan pemisah koma kaku.
+      6. Multi-tier Geocoding (Photon + Nominatim) dilengkapi **Relevance Guard** (`isGeocodingResultRelevant`) untuk menyaring dan menolak false-positive dari fuzzy matching (mencegah singkatan domain seperti `smkdtbs` keliru dipetakan ke entitas acak seperti `SMK PTBA` di Tanjung Enim).
+      7. Fallback regional centroid cerdas berbasis kota teridentifikasi dari metadata situs (misal Bandung / Jawa Barat).
     - **Visualisasi & Interaktivitas Graf**:
       - Menghasilkan entitas `LOCATION` dan `ADDRESS` terhubung dengan relasi `GEOLOCATED_IN`.
       - Menampilkan badge **Geo Perusahaan** dengan warna sky pastel (`#38bdf8`) dan tombol direct link **Buka di Google Maps ↗** pada node hover toolbar, panel detail entitas, serta memplot penanda kantor fisik langsung di tab **Geo Map** (`PhoneMapPanel.tsx`).
@@ -220,7 +223,7 @@ Untuk mencegah race conditions, duplicate worker spawns, dan graf terdistorsi:
 ### 7.5 Status Kualitas Kode (Quality Gate)
 - **TypeScript Strict Mode**: 100% bersih tanpa error (`pnpm typecheck` lolos di seluruh `packages/shared`, `apps/api`, `apps/web`).
 - **Linting**: 100% lolos (`pnpm lint`).
-- **Vitest Test Suite**: 30 test suite lolos, 214 unit dan integration test hijau (`pnpm --filter @nexusgraph/api test`).
+- **Vitest Test Suite**: 31 test suite lolos, 245 unit dan integration test hijau (`pnpm --filter @nexusgraph/api test`).
 
 ---
 

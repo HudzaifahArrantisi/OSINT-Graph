@@ -68,6 +68,14 @@ interface AppState {
   highlightedPath: { nodeIds: string[]; edgeIds: string[]; confidence: number } | null;
   setHighlightedPath: (path: { nodeIds: string[]; edgeIds: string[]; confidence: number } | null) => void;
 
+  // Active workspace view: graph | map | timeline | notes | evidence
+  activeWorkspaceView: 'graph' | 'map' | 'timeline' | 'notes' | 'evidence';
+  setActiveWorkspaceView: (view: 'graph' | 'map' | 'timeline' | 'notes' | 'evidence') => void;
+
+  // Focused node for Geo Map navigation
+  focusedGeoNodeId: string | null;
+  setFocusedGeoNodeId: (nodeId: string | null) => void;
+
   // Toast notifications
   toasts: Array<{ id: string; message: string; type: 'success' | 'error' | 'info' | 'warning' }>;
   addToast: (message: string, type?: 'success' | 'error' | 'info' | 'warning') => void;
@@ -85,6 +93,14 @@ const defaultFilter: GraphFilter = {
 export const useAppStore = create<AppState>((set) => ({
   selectedCaseId: null,
   setSelectedCaseId: (id) => set({ selectedCaseId: id }),
+
+  // Workspace view
+  activeWorkspaceView: 'graph',
+  setActiveWorkspaceView: (view) => set({ activeWorkspaceView: view }),
+
+  // Focused node for Geo Map navigation
+  focusedGeoNodeId: null,
+  setFocusedGeoNodeId: (nodeId) => set({ focusedGeoNodeId: nodeId }),
 
   selectedNodeId: null,
   setSelectedNodeId: (id) =>
