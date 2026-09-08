@@ -22,7 +22,7 @@ import {
   MessageSquare,
   Shield,
   Activity,
-  Sparkles,
+  Fingerprint,
 } from 'lucide-react';
 import type { Entity } from '@nexusgraph/shared';
 
@@ -192,7 +192,7 @@ export function SocialProfileDetailList({ entity, onCopy }: SocialProfileDetailL
       <div className="bg-surface-2 rounded-card border border-border-subtle overflow-hidden">
         <div className="px-3 py-2 bg-surface-3/50 border-b border-border-subtle flex items-center justify-between">
           <div className="flex items-center gap-1.5 text-xs font-semibold text-text">
-            <Sparkles className="w-3.5 h-3.5 text-primary" />
+            <Fingerprint className="w-3.5 h-3.5 text-primary" />
             <span>Detail Intelligence ({platform ? platform.toUpperCase() : entity.type})</span>
           </div>
           <span className="text-[10px] text-text-muted font-mono uppercase">Structured Attributes</span>

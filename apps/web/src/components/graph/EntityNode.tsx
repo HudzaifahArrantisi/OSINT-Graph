@@ -87,6 +87,8 @@ const ENTITY_ICONS: Record<EntityType, React.ComponentType<{ className?: string 
   NS_RECORD: Server,
   PUBLIC_MENTION: LinkIcon,
   WEBSITE: Globe2,
+  CLOUD_BUCKET: Archive,
+  IDENTITY_PROVIDER: Key,
 };
 
 function formatEntityDisplay(type: EntityType, value: string, title?: string): { mainText: string; subText: string; queryParams?: string } {

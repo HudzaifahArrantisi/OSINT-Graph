@@ -73,12 +73,30 @@ export async function getUserComplete(username: string): Promise<any> {
   }
 }
 
+/**
+ * Search TikTok users by keyword.
+ */
+export async function searchUsers(keyword: string): Promise<any> {
+  try {
+    if (!keyword) throw new Error('keyword is required');
+    return await callRapidAPI(
+      HOST,
+      `/searchUser?keyword=${encodeURIComponent(keyword.trim())}`,
+      'GET',
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`[tiktok.searchUsers] Failed for "${keyword}": ${message}`);
+  }
+}
+
 export const tiktok = {
   HOST,
   getUserSecUid,
   getUserInfoById,
   getProfile,
   getUserComplete,
+  searchUsers,
 };
 
 export default tiktok;

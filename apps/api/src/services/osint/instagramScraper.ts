@@ -79,9 +79,27 @@ export async function getUserReels(userId: string | number): Promise<any> {
   }
 }
 
+/**
+ * Search Instagram users by name, keyword, or partial username.
+ */
+export async function searchUsers(query: string): Promise<any> {
+  try {
+    if (!query) throw new Error('query is required');
+    return await callRapidAPI(
+      HOST,
+      `/search_users?query=${encodeURIComponent(query.trim())}`,
+      'GET',
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`[instagramScraper.searchUsers] Failed for query "${query}": ${message}`);
+  }
+}
+
 export const instagramScraper = {
   HOST,
   getUserInfo,
+  searchUsers,
   searchFollowers,
   searchFollowing,
   getUserReels,

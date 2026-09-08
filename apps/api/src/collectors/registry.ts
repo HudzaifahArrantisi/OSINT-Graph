@@ -41,6 +41,7 @@ import { companyGeoCollector } from './company-geo.js';
 import { wellKnownReconCollector } from './well-known-recon.js';
 import { passiveDnsCollector } from './passive-dns.js';
 import { cloudBucketFinderCollector } from './cloud-bucket-finder.js';
+import { getcontactCollector } from './getcontact.js';
 import { logger } from '../lib/logger.js';
 
 // Collector registry
@@ -83,6 +84,7 @@ collectors.set('company-geo', companyGeoCollector);
 collectors.set('well-known-recon', wellKnownReconCollector);
 collectors.set('passive-dns', passiveDnsCollector);
 collectors.set('cloud-bucket-finder', cloudBucketFinderCollector);
+collectors.set('getcontact', getcontactCollector);
 
 export function getCollector(name: CollectorName): Collector | undefined {
   return collectors.get(name);

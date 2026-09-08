@@ -1,6 +1,26 @@
 import { callRapidAPI } from '../../lib/rapidapi.js';
 
 export const HOST = process.env.LINKEDIN_RAPIDAPI_HOST || 'linkedin-api8.p.rapidapi.com';
+export const FALLBACK_HOST = 'real-time-linkedin-scraper-api.p.rapidapi.com';
+
+async function callLinkedIn(
+  path: string,
+  method: 'GET' | 'POST' = 'GET',
+  body: any = null,
+): Promise<any> {
+  try {
+    return await callRapidAPI(HOST, path, method, body);
+  } catch (err: any) {
+    const msg = String(err?.message || '').toLowerCase();
+    if (
+      (msg.includes('403') || msg.includes('not subscribed') || msg.includes('429') || msg.includes('quota')) &&
+      HOST !== FALLBACK_HOST
+    ) {
+      return await callRapidAPI(FALLBACK_HOST, path, method, body);
+    }
+    throw err;
+  }
+}
 
 /**
  * Get LinkedIn full profile data by username (Main Endpoint).
@@ -10,8 +30,7 @@ export async function getProfileByUsername(username: string): Promise<any> {
   try {
     if (!username) throw new Error('username is required');
     const cleanUsername = username.replace(/^@/, '').trim();
-    return await callRapidAPI(
-      HOST,
+    return await callLinkedIn(
       `/?username=${encodeURIComponent(cleanUsername)}`,
       'GET',
     );
@@ -28,8 +47,7 @@ export async function getProfileByUsername(username: string): Promise<any> {
 export async function getProfileByUrl(url: string): Promise<any> {
   try {
     if (!url) throw new Error('url is required');
-    return await callRapidAPI(
-      HOST,
+    return await callLinkedIn(
       `/get-profile-data-by-url?url=${encodeURIComponent(url.trim())}`,
       'GET',
     );
@@ -47,8 +65,7 @@ export async function getProfileRecentActivity(username: string): Promise<any> {
   try {
     if (!username) throw new Error('username is required');
     const cleanUsername = username.replace(/^@/, '').trim();
-    return await callRapidAPI(
-      HOST,
+    return await callLinkedIn(
       `/get-profile-recent-activity-time?username=${encodeURIComponent(cleanUsername)}`,
       'GET',
     );
@@ -68,8 +85,7 @@ export async function getProfilePosts(username: string): Promise<any> {
   try {
     if (!username) throw new Error('username is required');
     const cleanUsername = username.replace(/^@/, '').trim();
-    return await callRapidAPI(
-      HOST,
+    return await callLinkedIn(
       `/get-profile-posts?username=${encodeURIComponent(cleanUsername)}`,
       'GET',
     );
@@ -87,8 +103,7 @@ export async function getConnectionCount(username: string): Promise<any> {
   try {
     if (!username) throw new Error('username is required');
     const cleanUsername = username.replace(/^@/, '').trim();
-    return await callRapidAPI(
-      HOST,
+    return await callLinkedIn(
       `/connection-count?username=${encodeURIComponent(cleanUsername)}`,
       'GET',
     );
@@ -106,8 +121,7 @@ export async function getDataConnectionCount(username: string): Promise<any> {
   try {
     if (!username) throw new Error('username is required');
     const cleanUsername = username.replace(/^@/, '').trim();
-    return await callRapidAPI(
-      HOST,
+    return await callLinkedIn(
       `/data-connection-count?username=${encodeURIComponent(cleanUsername)}`,
       'GET',
     );
@@ -125,8 +139,7 @@ export async function getAboutProfile(username: string): Promise<any> {
   try {
     if (!username) throw new Error('username is required');
     const cleanUsername = username.replace(/^@/, '').trim();
-    return await callRapidAPI(
-      HOST,
+    return await callLinkedIn(
       `/about-this-profile?username=${encodeURIComponent(cleanUsername)}`,
       'GET',
     );
@@ -143,8 +156,7 @@ export async function getAboutProfile(username: string): Promise<any> {
 export async function searchLocations(keyword: string): Promise<any> {
   try {
     if (!keyword) throw new Error('keyword is required');
-    return await callRapidAPI(
-      HOST,
+    return await callLinkedIn(
       `/search-locations?keyword=${encodeURIComponent(keyword.trim())}`,
       'GET',
     );
@@ -162,8 +174,7 @@ export async function getInterestsSchools(username: string, page: number = 1): P
   try {
     if (!username) throw new Error('username is required');
     const cleanUsername = username.replace(/^@/, '').trim();
-    return await callRapidAPI(
-      HOST,
+    return await callLinkedIn(
       '/profiles/interests/schools',
       'POST',
       { username: cleanUsername, page },
@@ -182,8 +193,7 @@ export async function getInterestsCompanies(username: string, page: number = 1):
   try {
     if (!username) throw new Error('username is required');
     const cleanUsername = username.replace(/^@/, '').trim();
-    return await callRapidAPI(
-      HOST,
+    return await callLinkedIn(
       '/profiles/interests/companies',
       'POST',
       { username: cleanUsername, page },
@@ -191,6 +201,22 @@ export async function getInterestsCompanies(username: string, page: number = 1):
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new Error(`[linkedin.getInterestsCompanies] Failed for "${username}": ${message}`);
+  }
+}
+
+/**
+ * Search people on LinkedIn by keywords or name.
+ */
+export async function searchPeople(keywords: string, page: number = 1): Promise<any> {
+  try {
+    if (!keywords) throw new Error('keywords is required');
+    return await callLinkedIn(
+      `/search-people?keywords=${encodeURIComponent(keywords.trim())}&page=${page}`,
+      'GET',
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`[linkedin.searchPeople] Failed for "${keywords}": ${message}`);
   }
 }
 
@@ -207,6 +233,7 @@ export const linkedin = {
   getDataConnectionCount,
   getAboutProfile,
   searchLocations,
+  searchPeople,
   getInterestsSchools,
   getInterestsCompanies,
   getAllProfileData,

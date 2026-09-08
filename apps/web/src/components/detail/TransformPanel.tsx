@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { Button } from '../ui/Button';
 import { useAppStore } from '../../stores/appStore';
-import { Play, Sparkles, AlertCircle, CheckCircle2, ChevronRight, Globe, Share2, Code2, Cpu, Phone } from 'lucide-react';
+import { Play, Zap, AlertCircle, CheckCircle2, ChevronRight, Globe, Share2, Code2, Cpu, Phone, Workflow } from 'lucide-react';
 import type { TransformDefinition } from '@nexusgraph/shared';
 
 interface TransformPanelProps {
@@ -19,7 +19,7 @@ const CATEGORY_ICONS: Record<string, React.ComponentType<{ className?: string }>
   developer: Code2,
   infrastructure: Cpu,
   contact: Phone,
-  intelligence: Sparkles,
+  intelligence: Zap,
 };
 
 export function TransformPanel({ caseId, entityId, entityType, entityValue }: TransformPanelProps) {
@@ -77,14 +77,14 @@ export function TransformPanel({ caseId, entityId, entityType, entityValue }: Tr
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <span className="text-xs font-semibold text-text uppercase tracking-wider flex items-center gap-1.5">
-          <Sparkles className="w-3.5 h-3.5 text-primary" />
+          <Workflow className="w-3.5 h-3.5 text-primary" />
           Available Transforms ({data?.transforms?.length || 0})
         </span>
       </div>
 
       <div className="space-y-2.5">
         {categories.map((category) => {
-          const CategoryIcon = CATEGORY_ICONS[category] || Sparkles;
+          const CategoryIcon = CATEGORY_ICONS[category] || Zap;
           const transforms = grouped[category] || [];
 
           return (

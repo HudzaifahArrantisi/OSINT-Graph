@@ -108,19 +108,19 @@ pnpm format
 
 ## 6. Frontend & UI/UX Standards (Anti-Slop & Monochrome Theme)
 
-Frontend NexusGraph mengadopsi standar **Anti-Slop Security Workstation** dengan estetika **Hitam-Putih / Monochrome**:
+Frontend NexusGraph mengadopsi standar **Anti-Slop Security Workstation** dengan estetika **Hitam-Putih / Monochrome**. Rujukan detail lengkap, token warna, tipografi, dan kamus ikon tersedia di [DESIGN.md](file:///c:/laragon/www/OSINT%20Investigation%20Graph/DESIGN.md):
 1. **Palet Warna Netral (Monochrome)**:
-   - Base Backgrounds: `#080808` / `#0a0a0a` (canvas/docks), `#111111` (header/cards).
-   - Subtle Borders: `#222222` (default border), `#2e2e2e` (hover/subtle highlight).
+   - Base Backgrounds: `#050505` (canvas), `#0a0a0a` (modal/docks), `#0e0e0e` / `#121212` / `#141414` (cards/inputs).
+   - Subtle Borders: `#181818` (subtle divider), `#222222` / `#262626` (default border), `#2e2e2e` / `#404040` (hover highlight).
    - Dilarang menggunakan warna neon glow, saturated halos (`shadow-[0_0_24px_...]`), maupun gradien pelangi.
 2. **Status Aktif & Kontras**:
    - Status tombol aktif menggunakan kontras tinggi monokrom (`bg-white text-black font-semibold border-white`).
-   - Status non-aktif menggunakan dark neutral (`bg-[#121212] text-neutral-300 hover:text-white hover:bg-[#1a1a1a] border-[#222222]`).
+   - Status non-aktif menggunakan dark neutral (`bg-[#141414] text-neutral-300 hover:text-white hover:bg-[#1a1a1a] border-[#222222]`).
 3. **Typography & Icons**:
-   - Hindari emoji/ikon AI-cliché (`Sparkles` ✨, 🚀, dll.). Selalu gunakan Lucide SVG icons semantik (`Layers`, `Filter`, `Target`, `Shield`, `Search`).
-   - Angka metrik, IP, domain, hash, dan total entitas wajib menggunakan `font-mono`.
+   - Hindari emoji/ikon AI-cliché (`Sparkles` ✨, 🚀, dll.). Selalu gunakan Lucide SVG icons semantik (`Layers`, `Filter`, `Target`, `Shield`, `Search`, `Fingerprint`, `Workflow`).
+   - Angka metrik, IP, domain, hash, port, dan total entitas wajib menggunakan `font-mono` (JetBrains Mono).
 4. **Docking & Canvas Non-Intrusive**:
-   - Kontrol graf melayang (floating docks) wajib memiliki lebar kompak dan terkontrol (tidak membentang memenuhi layar hingga bertabrakan dengan Console/Minimap).
+   - Kontrol graf melayang (floating docks) wajib memiliki lebar kompak dan terkontrol (~500px, tidak membentang memenuhi layar hingga bertabrakan dengan Console/Minimap).
    - Menyediakan fitur minimize 1-klik agar kanvas investigasi dapat dieksplorasi tanpa hambatan visual.
 
 ---

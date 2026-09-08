@@ -214,4 +214,193 @@ describe('social-rapidapi collector and transform integration', () => {
     expect(res.transformId).toBe('social.rapidapi-social-lookup');
     expect(res.entities.length).toBeGreaterThan(0);
   });
+
+  it('enforces zero dummy invariant when accounts do not exist or 404', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async () => {
+      // Simulate 404 Not Found from upstream APIs
+      return new Response(JSON.stringify({ detail: 'User not found' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+
+    const res = await socialRapidapiCollector.run('nonexistent_user_xyz_9999', {
+      requestId: 'test-404',
+      caseId: 'case-123',
+      signal: AbortSignal.timeout(5000),
+      platforms: ['instagram', 'tiktok', 'linkedin'],
+    });
+
+    // Zero fake SOCIAL_PROFILE entities must be emitted!
+    const profiles = res.entities.filter((e) => e.type === 'SOCIAL_PROFILE');
+    expect(profiles.length).toBe(0);
+    expect(res.warnings.length).toBeGreaterThan(0);
+  });
+
+  it('executes Mode A Global Name Search when input contains spaces or is PERSON', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+      const urlStr = typeof input === 'string' ? input : input?.url || '';
+
+      if (urlStr.includes('search_users')) {
+        return new Response(
+          JSON.stringify({
+            users: [
+              {
+                user: {
+                  username: 'hudzaifaharrantisi',
+                  full_name: 'Hudzaifah Arrantisi',
+                  biography: 'Security Researcher',
+                  follower_count: 320,
+                  is_verified: false,
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      if (urlStr.includes('/search/user') || urlStr.includes('/searchUser')) {
+        return new Response(
+          JSON.stringify({
+            userInfoList: [
+              {
+                user: {
+                  uniqueId: 'hudzaifah_arrantisi',
+                  nickname: 'Hudzaifah Arrantisi',
+                  signature: 'Tech enthusiast',
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      if (urlStr.includes('search-people')) {
+        return new Response(
+          JSON.stringify({
+            items: [
+              {
+                username: 'hudzaifah-arrantisi-pro',
+                full_name: 'Hudzaifah Arrantisi',
+                headline: 'Cyber Security Specialist',
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
+
+    const res = await socialRapidapiCollector.run('hudzaifah arrantisi', {
+      requestId: 'test-name-search',
+      caseId: 'case-123',
+      signal: AbortSignal.timeout(5000),
+      platforms: ['instagram', 'tiktok', 'linkedin'],
+    });
+
+    // Emits root PERSON node
+    const person = res.entities.find(
+      (e) => e.type === 'PERSON' && e.value === 'hudzaifah arrantisi',
+    );
+    expect(person).toBeDefined();
+
+    // Discovered real social profiles
+    const profiles = res.entities.filter((e) => e.type === 'SOCIAL_PROFILE');
+    expect(profiles.length).toBeGreaterThanOrEqual(3);
+
+    // Instagram profile was discovered and linked to PERSON
+    expect(
+      profiles.some((p) => p.value === 'https://www.instagram.com/hudzaifaharrantisi'),
+    ).toBe(true);
+
+    // TikTok profile was discovered and linked to PERSON
+    expect(
+      profiles.some((p) => p.value === 'https://www.tiktok.com/@hudzaifah_arrantisi'),
+    ).toBe(true);
+
+    // LinkedIn profile was discovered and linked to PERSON
+    expect(
+      profiles.some(
+        (p) => p.value === 'https://www.linkedin.com/in/hudzaifah-arrantisi-pro',
+      ),
+    ).toBe(true);
+
+    // Ensure relationships link PERSON to SOCIAL_PROFILE with SAME_AS or POSSIBLY_SAME_AS
+    const rels = res.relationships.filter(
+      (r) =>
+        r.source_type === 'PERSON' &&
+        r.source_value === 'hudzaifah arrantisi' &&
+        r.target_type === 'SOCIAL_PROFILE',
+    );
+    expect(rels.length).toBeGreaterThanOrEqual(3);
+    expect(rels.every((r) => r.relationship_type === 'SAME_AS')).toBe(true);
+  });
+
+  it('successfully recovers Instagram data via backup scrapers (2025 scraper and looter) when primary has quota 429', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+      const urlStr = typeof input === 'string' ? input : input?.url || '';
+
+      // Primary scraper & stable fail with 429 quota error
+      if (urlStr.includes('instagram-scraper2') || urlStr.includes('instagram-scraper-stable')) {
+        return new Response(
+          JSON.stringify({ message: 'You have exceeded the MONTHLY quota for Requests on your current plan' }),
+          { status: 429, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      // Backup 1: instagram-scraper-20251 succeeds
+      if (urlStr.includes('instagram-scraper-20251')) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              user: {
+                username: 'jyfrah',
+                full_name: 'Jyfrah Backup Recon',
+                biography: 'Cyber Security Analyst | Backup scraper test',
+                follower_count: 840,
+                following_count: 120,
+                profile_pic_url_hd: 'https://images.instagram.com/jyfrah.jpg',
+                is_verified: false,
+              },
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      // Backup 2: instagram-looter2 succeeds
+      if (urlStr.includes('instagram-looter2')) {
+        return new Response(
+          JSON.stringify({
+            username: 'jyfrah',
+            full_name: 'Jyfrah Backup Recon',
+            edge_followed_by: { count: 840 },
+            edge_follow: { count: 120 },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
+
+    const res = await socialRapidapiCollector.run('jyfrah', {
+      requestId: 'test-backup-scrapers',
+      caseId: 'case-123',
+      signal: AbortSignal.timeout(5000),
+      platforms: ['instagram'],
+    });
+
+    const igProfile = res.entities.find(
+      (e) => e.type === 'SOCIAL_PROFILE' && e.value === 'https://www.instagram.com/jyfrah',
+    );
+    expect(igProfile).toBeDefined();
+    expect(igProfile?.metadata?.username).toBe('jyfrah');
+    expect(igProfile?.metadata?.full_name).toBe('Jyfrah Backup Recon');
+    expect(igProfile?.metadata?.followers_count).toBe(840);
+  });
 });

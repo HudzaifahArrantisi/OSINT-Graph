@@ -1,5 +1,8 @@
 # designSystem.md
 
+> [!NOTE]
+> Spesifikasi desain kanonikal dan panduan anti-slop monochrome terbaru didokumentasikan di [DESIGN.md](file:///c:/laragon/www/OSINT%20Investigation%20Graph/DESIGN.md).
+
 # NexusGraph Design System
 
 **Version:** 1.0  

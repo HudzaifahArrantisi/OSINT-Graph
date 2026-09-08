@@ -20,7 +20,8 @@ import {
   Shield,
   ArrowRight,
   Trash2,
-  Sparkles,
+  Workflow,
+  Target,
   Copy,
   Check,
   Compass,
@@ -372,7 +373,7 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
                 : 'border-transparent text-text-muted hover:text-text-secondary'
             }`}
           >
-            {tab === 'transforms' && <Sparkles className="w-3 h-3 text-primary" />}
+            {tab === 'transforms' && <Workflow className="w-3 h-3 text-primary" />}
             {tab}
             {tab === 'relationships' && ` (${connectedRelationships.length})`}
             {tab === 'evidence' && ` (${linkedEvidence.length})`}
@@ -391,7 +392,7 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
                   <div className="bg-amber-500/10 border border-amber-500/30 rounded-card p-3 space-y-2.5">
                     <div className="flex items-center justify-between text-xs">
                       <div className="flex items-center gap-1.5 font-semibold text-amber-300">
-                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                        <Target className="w-3.5 h-3.5 text-amber-400" />
                         <span>Investigation Seed Target</span>
                       </div>
                       <span className="text-[10px] font-mono bg-amber-500/20 text-amber-300 px-1.5 py-0.5 rounded border border-amber-500/30">

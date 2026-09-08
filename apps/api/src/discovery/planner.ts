@@ -136,6 +136,7 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   PHONE: [
     'phone.geo-metadata',
     'contact.mrholmes-phone',
+    'contact.getcontact-intelligence',
   ],
 };
 

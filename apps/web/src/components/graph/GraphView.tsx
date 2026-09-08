@@ -690,8 +690,8 @@ function GraphViewInner({ graphData }: GraphViewProps) {
 
       {filterOpen && <GraphFilterBar onClose={() => setFilterOpen(false)} />}
 
-      {/* Unobtrusive Engine Module Filter Bar (Bottom Center) */}
-      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+      {/* Unobtrusive Engine Module Filter Bar (Bottom Center - dynamically adapts to sidebars and canvas width) */}
+      <div className="absolute bottom-2.5 left-1/2 -translate-x-1/2 z-20 pointer-events-auto max-w-[calc(100%-24px)] flex justify-center">
         <EngineModuleFilterBar
           nodes={nodes}
           selectedEngine={selectedEngineFilter}
@@ -784,12 +784,12 @@ function GraphViewInner({ graphData }: GraphViewProps) {
           size={1}
           color="rgba(30, 41, 59, 0.35)"
         />
-        <Controls showInteractive={false} position="bottom-left" />
+        <Controls showInteractive={false} position="bottom-left" className="!bottom-12 !left-3" />
         <MiniMap
           nodeColor={(node) => (node.type === 'cluster_hub' ? '#38bdf8' : '#7c6cff')}
           maskColor="rgba(11, 15, 20, 0.7)"
           position="bottom-right"
-          className="!bg-surface !border !border-border-subtle"
+          className="!bg-surface !border !border-border-subtle !bottom-12 !right-3"
         />
       </ReactFlow>
     </div>

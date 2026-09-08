@@ -5,6 +5,7 @@ dotenv.config({ path: resolve(process.cwd(), '.env') });
 dotenv.config({ path: resolve(process.cwd(), '../../.env') });
 
 const hostQueues = new Map<string, Promise<void>>();
+const quotaExhaustedHosts = new Map<string, number>();
 
 /**
  * Enforces rate limiting (maximum 1 request per second per host).
@@ -58,6 +59,13 @@ export async function callRapidAPI<T = any>(
   const url = `https://${cleanHost}${formattedPath}`;
   const httpMethod = method.toUpperCase();
 
+  const quotaExpires = quotaExhaustedHosts.get(cleanHost);
+  if (quotaExpires && Date.now() < quotaExpires) {
+    throw new Error(
+      `RapidAPI [${cleanHost}] quota is exhausted (429). Skipping request until backoff expires in ${Math.round((quotaExpires - Date.now()) / 1000)}s.`,
+    );
+  }
+
   return scheduleHostRequest(cleanHost, async () => {
     const headers: Record<string, string> = {
       'x-rapidapi-key': apiKey,
@@ -107,6 +115,9 @@ export async function callRapidAPI<T = any>(
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => '');
+      if (response.status === 429 || errorText.toLowerCase().includes('quota')) {
+        quotaExhaustedHosts.set(cleanHost, Date.now() + 5 * 60 * 1000); // 5 min backoff
+      }
       throw new Error(
         `RapidAPI [${cleanHost}] error (${response.status} ${response.statusText}): ${
           errorText || 'No error response body'

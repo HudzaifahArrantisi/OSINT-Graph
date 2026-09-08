@@ -290,6 +290,13 @@ const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
     },
     collectors: [{ name: 'mrholmes-engine' }],
   },
+  'contact.getcontact-intelligence': {
+    deriveInput: (v, st) => {
+      if (st !== 'PHONE') return null;
+      return v.trim();
+    },
+    collectors: [{ name: 'getcontact' }],
+  },
   'infrastructure.shodan-recon': {
     deriveInput: (v, st, analysis) => {
       if (st === 'IP_ADDRESS' || st === 'DOMAIN' || st === 'URL') return v.trim();

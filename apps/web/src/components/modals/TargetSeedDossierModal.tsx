@@ -14,7 +14,7 @@ import {
   Copy,
   Check,
   Search,
-  Sparkles,
+  Fingerprint,
   Layers,
   Lock,
   Mail,
@@ -185,36 +185,29 @@ export function TargetSeedDossierModal({
     >
       <div className="flex flex-col gap-4 -mt-2">
         {/* Header Title Bar */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-[#222222]">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-sky-500/20 to-purple-500/20 border border-sky-500/40 flex items-center justify-center shrink-0 shadow-inner">
-              <Target className="w-5 h-5 text-sky-400" />
+            <div className="w-10 h-10 rounded-lg bg-[#141414] border border-[#262626] flex items-center justify-center shrink-0 text-white">
+              <Target className="w-5 h-5 text-white" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-mono uppercase tracking-wider font-semibold px-1.5 py-0.5 rounded bg-sky-500/15 text-sky-300 border border-sky-500/30">
+                <span className="text-[10px] font-mono uppercase tracking-wider font-semibold px-2 py-0.5 rounded bg-white text-black border border-white">
                   {seedType} TARGET SEED
                 </span>
                 {aggregatedIntel.waf && (
-                  <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                    🛡️ {aggregatedIntel.waf}
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#161616] text-neutral-300 border border-[#2a2a2a] flex items-center gap-1">
+                    <Shield className="w-3 h-3 text-neutral-400" />
+                    {aggregatedIntel.waf}
                   </span>
                 )}
                 {aggregatedIntel.securityReport?.grade && (
-                  <span
-                    className={`text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${
-                      aggregatedIntel.securityReport.grade.startsWith('A')
-                        ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                        : aggregatedIntel.securityReport.grade === 'B'
-                          ? 'bg-sky-500/20 text-sky-300 border-sky-500/40'
-                          : 'bg-amber-500/20 text-amber-300 border-amber-500/40'
-                    }`}
-                  >
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#161616] text-neutral-200 border border-[#333333]">
                     Grade {aggregatedIntel.securityReport.grade}
                   </span>
                 )}
               </div>
-              <h2 className="text-base font-mono font-bold text-white mt-1 select-text">
+              <h2 className="text-base font-mono font-bold text-white mt-1 select-text tracking-tight">
                 {seedValue}
               </h2>
             </div>
@@ -224,16 +217,20 @@ export function TargetSeedDossierModal({
           <div className="flex items-center gap-2 shrink-0">
             <button
               onClick={() => handleCopy(seedValue)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono bg-slate-900 border border-slate-700 hover:border-slate-500 text-slate-300 hover:text-white transition-all cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono bg-[#141414] hover:bg-[#1e1e1e] border border-[#282828] hover:border-neutral-500 text-neutral-300 hover:text-white transition-colors cursor-pointer"
             >
-              {copiedText === seedValue ? <Check className="w-3.5 h-3.5 text-emerald-400" /> : <Copy className="w-3.5 h-3.5" />}
+              {copiedText === seedValue ? (
+                <Check className="w-3.5 h-3.5 text-white" />
+              ) : (
+                <Copy className="w-3.5 h-3.5 text-neutral-400" />
+              )}
               <span>{copiedText === seedValue ? 'Copied' : 'Copy'}</span>
             </button>
             <a
               href={seedValue.startsWith('http') ? seedValue : `https://${seedValue}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-mono bg-sky-600 hover:bg-sky-500 text-white font-medium transition-all shadow-md cursor-pointer"
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-mono bg-white hover:bg-neutral-200 text-black font-semibold transition-colors shadow-sm cursor-pointer"
             >
               <span>Visit Site</span>
               <ExternalLink className="w-3.5 h-3.5" />
@@ -242,31 +239,37 @@ export function TargetSeedDossierModal({
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex items-center gap-1 border-b border-slate-800 pb-1 overflow-x-auto no-scrollbar font-mono text-xs">
+        <div className="flex items-center gap-1 border-b border-[#222222] pb-1.5 overflow-x-auto no-scrollbar font-sans text-xs">
           <button
             onClick={() => setActiveTab('overview')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
               activeTab === 'overview'
-                ? 'bg-slate-800 text-white font-semibold border-b-2 border-sky-400'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                ? 'bg-white text-black font-semibold border border-white shadow-sm'
+                : 'text-neutral-400 hover:text-white hover:bg-[#141414] border border-transparent'
             }`}
           >
-            <Server className="w-3.5 h-3.5" />
+            <Server className={`w-3.5 h-3.5 ${activeTab === 'overview' ? 'text-black' : 'text-neutral-400'}`} />
             <span>Overview & Infra</span>
           </button>
 
           <button
             onClick={() => setActiveTab('trackers')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
               activeTab === 'trackers'
-                ? 'bg-purple-900/40 text-purple-200 font-semibold border-b-2 border-purple-400'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                ? 'bg-white text-black font-semibold border border-white shadow-sm'
+                : 'text-neutral-400 hover:text-white hover:bg-[#141414] border border-transparent'
             }`}
           >
-            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+            <Fingerprint className={`w-3.5 h-3.5 ${activeTab === 'trackers' ? 'text-black' : 'text-neutral-400'}`} />
             <span>Trackers & Ads</span>
             {aggregatedIntel.trackers.length > 0 && (
-              <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-purple-500/30 text-purple-300 font-bold">
+              <span
+                className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-medium ${
+                  activeTab === 'trackers'
+                    ? 'bg-black/15 text-black'
+                    : 'bg-[#181818] text-neutral-400 border border-[#2a2a2a]'
+                }`}
+              >
                 {aggregatedIntel.trackers.length}
               </span>
             )}
@@ -274,39 +277,45 @@ export function TargetSeedDossierModal({
 
           <button
             onClick={() => setActiveTab('security')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
               activeTab === 'security'
-                ? 'bg-teal-900/40 text-teal-200 font-semibold border-b-2 border-teal-400'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                ? 'bg-white text-black font-semibold border border-white shadow-sm'
+                : 'text-neutral-400 hover:text-white hover:bg-[#141414] border border-transparent'
             }`}
           >
-            <ShieldCheck className="w-3.5 h-3.5 text-teal-400" />
+            <ShieldCheck className={`w-3.5 h-3.5 ${activeTab === 'security' ? 'text-black' : 'text-neutral-400'}`} />
             <span>Security & Headers</span>
           </button>
 
           <button
             onClick={() => setActiveTab('crawler')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
               activeTab === 'crawler'
-                ? 'bg-cyan-900/40 text-cyan-200 font-semibold border-b-2 border-cyan-400'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                ? 'bg-white text-black font-semibold border border-white shadow-sm'
+                : 'text-neutral-400 hover:text-white hover:bg-[#141414] border border-transparent'
             }`}
           >
-            <FileText className="w-3.5 h-3.5 text-cyan-400" />
+            <FileText className={`w-3.5 h-3.5 ${activeTab === 'crawler' ? 'text-black' : 'text-neutral-400'}`} />
             <span>Site Crawler</span>
           </button>
 
           <button
             onClick={() => setActiveTab('subdomains')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-all cursor-pointer ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors cursor-pointer ${
               activeTab === 'subdomains'
-                ? 'bg-slate-800 text-white font-semibold border-b-2 border-sky-400'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800/50'
+                ? 'bg-white text-black font-semibold border border-white shadow-sm'
+                : 'text-neutral-400 hover:text-white hover:bg-[#141414] border border-transparent'
             }`}
           >
-            <Globe2 className="w-3.5 h-3.5" />
+            <Globe2 className={`w-3.5 h-3.5 ${activeTab === 'subdomains' ? 'text-black' : 'text-neutral-400'}`} />
             <span>Subdomains</span>
-            <span className="text-[10px] px-1.5 py-0.2 rounded-full bg-slate-800 text-slate-300">
+            <span
+              className={`text-[10px] font-mono px-1.5 py-0.2 rounded font-medium ${
+                activeTab === 'subdomains'
+                  ? 'bg-black/15 text-black'
+                  : 'bg-[#181818] text-neutral-400 border border-[#2a2a2a]'
+              }`}
+            >
               {aggregatedIntel.subdomains.length}
             </span>
           </button>
@@ -318,58 +327,58 @@ export function TargetSeedDossierModal({
           {activeTab === 'overview' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
               {/* Card 1: Hosting & Origin */}
-              <div className="p-3.5 rounded-xl bg-[#0e131d] border border-slate-800/80 flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-sky-400 font-semibold pb-1 border-b border-slate-800">
-                  <Server className="w-4 h-4" />
+              <div className="p-3.5 rounded-lg bg-[#0e0e0e] border border-[#222222] flex flex-col gap-2.5">
+                <div className="flex items-center gap-2 text-white font-semibold pb-1.5 border-b border-[#1f1f1f]">
+                  <Server className="w-4 h-4 text-neutral-400" />
                   <span>Infrastruktur Hosting</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800/40">
-                  <span className="text-slate-400">Target Value:</span>
-                  <span className="text-slate-200 font-medium truncate max-w-[200px]">{seedValue}</span>
+                <div className="flex justify-between py-1 border-b border-[#1c1c1c]">
+                  <span className="text-neutral-400 font-sans">Target Value:</span>
+                  <span className="text-neutral-200 font-mono font-medium truncate max-w-[200px]">{seedValue}</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800/40">
-                  <span className="text-slate-400">Web Server Banner:</span>
-                  <span className="text-slate-200 font-medium">{aggregatedIntel.serverBanner || 'Hidden / Protected'}</span>
+                <div className="flex justify-between py-1 border-b border-[#1c1c1c]">
+                  <span className="text-neutral-400 font-sans">Web Server Banner:</span>
+                  <span className="text-neutral-200 font-mono font-medium">{aggregatedIntel.serverBanner || 'Hidden / Protected'}</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800/40">
-                  <span className="text-slate-400">WAF / Edge CDN:</span>
-                  <span className="text-emerald-400 font-medium">{aggregatedIntel.waf || 'Direct / Origin'}</span>
+                <div className="flex justify-between py-1 border-b border-[#1c1c1c]">
+                  <span className="text-neutral-400 font-sans">WAF / Edge CDN:</span>
+                  <span className="text-white font-mono font-medium">{aggregatedIntel.waf || 'Direct / Origin'}</span>
                 </div>
                 <div className="flex justify-between py-1">
-                  <span className="text-slate-400">Resolved IP Address:</span>
-                  <span className="text-cyan-400 font-medium">
+                  <span className="text-neutral-400 font-sans">Resolved IP Address:</span>
+                  <span className="text-neutral-200 font-mono font-medium">
                     {aggregatedIntel.ips.map((i) => i.ip).join(', ') || 'Resolving...'}
                   </span>
                 </div>
               </div>
 
               {/* Card 2: Security & Port Health */}
-              <div className="p-3.5 rounded-xl bg-[#0e131d] border border-slate-800/80 flex flex-col gap-2">
-                <div className="flex items-center gap-2 text-teal-400 font-semibold pb-1 border-b border-slate-800">
-                  <ShieldCheck className="w-4 h-4" />
+              <div className="p-3.5 rounded-lg bg-[#0e0e0e] border border-[#222222] flex flex-col gap-2.5">
+                <div className="flex items-center gap-2 text-white font-semibold pb-1.5 border-b border-[#1f1f1f]">
+                  <ShieldCheck className="w-4 h-4 text-neutral-400" />
                   <span>Postur Keamanan Singkat</span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800/40">
-                  <span className="text-slate-400">Security Header Grade:</span>
-                  <span className="text-emerald-400 font-bold">
+                <div className="flex justify-between py-1 border-b border-[#1c1c1c]">
+                  <span className="text-neutral-400 font-sans">Security Header Grade:</span>
+                  <span className="text-white font-mono font-bold">
                     {aggregatedIntel.securityReport?.grade ? `Grade ${aggregatedIntel.securityReport.grade} (${aggregatedIntel.securityReport.score}/100)` : 'Audit in progress'}
                   </span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800/40">
-                  <span className="text-slate-400">Open Ports (Shodan):</span>
-                  <span className="text-slate-200 font-medium">
+                <div className="flex justify-between py-1 border-b border-[#1c1c1c]">
+                  <span className="text-neutral-400 font-sans">Open Ports (Shodan):</span>
+                  <span className="text-neutral-200 font-mono font-medium">
                     {aggregatedIntel.openPorts.length > 0 ? aggregatedIntel.openPorts.map((p) => p.port).join(', ') : 'Filtered / Standard (80, 443)'}
                   </span>
                 </div>
-                <div className="flex justify-between py-1 border-b border-slate-800/40">
-                  <span className="text-slate-400">Verified Security Contact:</span>
-                  <span className="text-pink-400 font-medium truncate max-w-[180px]">
+                <div className="flex justify-between py-1 border-b border-[#1c1c1c]">
+                  <span className="text-neutral-400 font-sans">Verified Security Contact:</span>
+                  <span className="text-neutral-300 font-mono font-medium truncate max-w-[180px]">
                     {aggregatedIntel.securityContacts[0] || 'None declared in security.txt'}
                   </span>
                 </div>
                 <div className="flex justify-between py-1">
-                  <span className="text-slate-400">Tracking Tags Count:</span>
-                  <span className="text-purple-400 font-bold">{aggregatedIntel.trackers.length} Tags Found</span>
+                  <span className="text-neutral-400 font-sans">Tracking Tags Count:</span>
+                  <span className="text-white font-mono font-semibold">{aggregatedIntel.trackers.length} Tags Found</span>
                 </div>
               </div>
             </div>
@@ -378,12 +387,15 @@ export function TargetSeedDossierModal({
           {/* 2. TRACKERS & ADS PIVOTING */}
           {activeTab === 'trackers' && (
             <div className="flex flex-col gap-3">
-              <div className="p-3 rounded-xl bg-purple-950/20 border border-purple-500/30 text-purple-200 leading-relaxed text-[11px]">
-                💡 <strong>OSINT Pivoting Tip</strong>: Kode pelacak analitik dan iklan yang diekstraksi dari HTML target sering kali digunakan bersama di situs lain yang dimiliki oleh pemilik atau jaringan yang sama. Salin ID atau gunakan pivot query untuk melacak website klon / sister sites.
+              <div className="p-3 rounded-lg bg-[#121212] border border-[#242424] text-neutral-300 leading-relaxed text-[11px] font-sans flex items-start gap-2.5">
+                <Search className="w-4 h-4 text-neutral-400 shrink-0 mt-0.5" />
+                <div>
+                  <strong className="text-white">OSINT Pivoting Tip</strong>: Kode pelacak analitik dan iklan yang diekstraksi dari HTML target sering kali digunakan bersama di situs lain yang dimiliki oleh entitas yang sama. Salin ID atau gunakan pivot query untuk melacak website klon / sister infrastructure.
+                </div>
               </div>
 
               {aggregatedIntel.trackers.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 bg-[#0e131d] rounded-xl border border-slate-800">
+                <div className="p-8 text-center text-neutral-500 bg-[#0e0e0e] rounded-lg border border-[#222222] font-sans text-xs">
                   Tidak ditemukan tag analitik atau tracker pihak ketiga (Google Analytics, GTM, AdSense, Meta Pixel) pada halaman depan target.
                 </div>
               ) : (
@@ -391,39 +403,39 @@ export function TargetSeedDossierModal({
                   {aggregatedIntel.trackers.map((t, idx) => (
                     <div
                       key={idx}
-                      className="p-3 rounded-xl bg-[#0d111b] border border-purple-500/25 hover:border-purple-500/60 transition-all flex flex-col justify-between gap-2"
+                      className="p-3 rounded-lg bg-[#0e0e0e] border border-[#222222] hover:border-[#333333] transition-colors flex flex-col justify-between gap-2.5"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="flex items-center gap-2">
-                          <div className="w-6 h-6 rounded-md bg-purple-500/20 flex items-center justify-center shrink-0">
-                            <Sparkles className="w-3.5 h-3.5 text-purple-400" />
+                          <div className="w-6 h-6 rounded bg-[#161616] border border-[#282828] flex items-center justify-center shrink-0 text-neutral-300">
+                            <Fingerprint className="w-3.5 h-3.5 text-neutral-400" />
                           </div>
                           <div>
-                            <div className="text-[11px] font-bold text-white">{t.label}</div>
-                            <div className="text-[9.5px] text-purple-400 font-semibold">{t.provider}</div>
+                            <div className="text-[11px] font-bold text-white font-sans">{t.label}</div>
+                            <div className="text-[9.5px] text-neutral-400 font-mono">{t.provider}</div>
                           </div>
                         </div>
 
                         <button
                           onClick={() => handleCopy(t.id)}
-                          className="p-1 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                          className="p-1 rounded bg-[#161616] hover:bg-[#222222] text-neutral-400 hover:text-white transition-colors cursor-pointer border border-[#262626]"
                           title="Salin Tracking ID"
                         >
-                          {copiedText === t.id ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                          {copiedText === t.id ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3" />}
                         </button>
                       </div>
 
-                      <div className="p-1.5 rounded bg-black/40 border border-slate-800/80 font-mono text-[11px] text-purple-200 font-semibold truncate select-all">
+                      <div className="p-1.5 rounded bg-[#070707] border border-[#1e1e1e] font-mono text-[11px] text-neutral-200 font-semibold truncate select-all">
                         {t.id}
                       </div>
 
-                      <div className="flex items-center justify-between text-[10px] text-slate-400 pt-1 border-t border-slate-800/50">
+                      <div className="flex items-center justify-between text-[10px] text-neutral-500 pt-1 border-t border-[#1c1c1c] font-sans">
                         <span>Pivot Query:</span>
                         <a
                           href={`https://www.google.com/search?q=${encodeURIComponent(`site:* "${t.id}"`)}`}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sky-400 hover:underline flex items-center gap-1 cursor-pointer"
+                          className="text-neutral-300 hover:text-white font-mono text-[10.5px] hover:underline flex items-center gap-1 cursor-pointer"
                         >
                           <span>Google Search ↗</span>
                         </a>
@@ -441,16 +453,16 @@ export function TargetSeedDossierModal({
               {aggregatedIntel.securityReport ? (
                 <>
                   {/* Score Banner */}
-                  <div className="p-4 rounded-xl bg-[#0d1320] border border-teal-500/30 flex items-center justify-between">
+                  <div className="p-4 rounded-lg bg-[#0e0e0e] border border-[#222222] flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-xl bg-teal-500/20 border border-teal-500/40 flex items-center justify-center font-bold text-lg text-teal-300">
+                      <div className="w-12 h-12 rounded-lg bg-[#161616] border border-[#2e2e2e] flex items-center justify-center font-bold text-lg text-white font-mono">
                         {aggregatedIntel.securityReport.grade}
                       </div>
                       <div>
-                        <div className="text-sm font-bold text-white">HTTP Security Headers Score: {aggregatedIntel.securityReport.score} / 100</div>
-                        <div className="text-[10.5px] text-slate-400">
+                        <div className="text-sm font-semibold text-white font-sans">HTTP Security Headers Score: {aggregatedIntel.securityReport.score} / 100</div>
+                        <div className="text-[11px] text-neutral-400 font-sans">
                           {aggregatedIntel.securityReport.findings?.length === 0
-                            ? 'Luar biasa: Semua header keamanan esensial telah terkonfigurasi dengan baik.'
+                            ? 'Semua header keamanan esensial telah terkonfigurasi dengan baik.'
                             : `${aggregatedIntel.securityReport.findings?.length} rekomendasi perbaikan terdeteksi.`}
                         </div>
                       </div>
@@ -458,41 +470,41 @@ export function TargetSeedDossierModal({
                   </div>
 
                   {/* Checklist Table */}
-                  <div className="p-3 rounded-xl bg-[#0e131d] border border-slate-800 space-y-2">
-                    <div className="flex items-center justify-between py-1.5 border-b border-slate-800/60">
-                      <span className="font-semibold text-slate-300">Strict-Transport-Security (HSTS):</span>
-                      <span className={aggregatedIntel.securityReport.hsts?.present ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                  <div className="p-3 rounded-lg bg-[#0e0e0e] border border-[#222222] space-y-2 font-sans text-xs">
+                    <div className="flex items-center justify-between py-1.5 border-b border-[#1c1c1c]">
+                      <span className="font-medium text-neutral-300">Strict-Transport-Security (HSTS):</span>
+                      <span className={aggregatedIntel.securityReport.hsts?.present ? 'text-white font-semibold font-mono' : 'text-neutral-500 font-mono'}>
                         {aggregatedIntel.securityReport.hsts?.present ? '✓ Terpasang' : '✗ Tidak Ditemukan'}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between py-1.5 border-b border-slate-800/60">
-                      <span className="font-semibold text-slate-300">Content-Security-Policy (CSP):</span>
-                      <span className={aggregatedIntel.securityReport.csp?.present ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                    <div className="flex items-center justify-between py-1.5 border-b border-[#1c1c1c]">
+                      <span className="font-medium text-neutral-300">Content-Security-Policy (CSP):</span>
+                      <span className={aggregatedIntel.securityReport.csp?.present ? 'text-white font-semibold font-mono' : 'text-neutral-500 font-mono'}>
                         {aggregatedIntel.securityReport.csp?.present ? '✓ Terpasang' : '✗ Tidak Ditemukan'}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between py-1.5 border-b border-slate-800/60">
-                      <span className="font-semibold text-slate-300">X-Frame-Options (Anti-Clickjacking):</span>
-                      <span className={aggregatedIntel.securityReport.xFrameOptions?.present ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                    <div className="flex items-center justify-between py-1.5 border-b border-[#1c1c1c]">
+                      <span className="font-medium text-neutral-300">X-Frame-Options (Anti-Clickjacking):</span>
+                      <span className={aggregatedIntel.securityReport.xFrameOptions?.present ? 'text-white font-semibold font-mono' : 'text-neutral-500 font-mono'}>
                         {aggregatedIntel.securityReport.xFrameOptions?.present ? `✓ ${aggregatedIntel.securityReport.xFrameOptions.value}` : '✗ Tidak Ditemukan'}
                       </span>
                     </div>
-                    <div className="flex items-center justify-between py-1.5 border-b border-slate-800/60">
-                      <span className="font-semibold text-slate-300">X-Content-Type-Options:</span>
-                      <span className={aggregatedIntel.securityReport.xContentTypeOptions?.isNosniff ? 'text-emerald-400 font-bold' : 'text-rose-400 font-bold'}>
+                    <div className="flex items-center justify-between py-1.5 border-b border-[#1c1c1c]">
+                      <span className="font-medium text-neutral-300">X-Content-Type-Options:</span>
+                      <span className={aggregatedIntel.securityReport.xContentTypeOptions?.isNosniff ? 'text-white font-semibold font-mono' : 'text-neutral-500 font-mono'}>
                         {aggregatedIntel.securityReport.xContentTypeOptions?.isNosniff ? '✓ nosniff' : '✗ Tidak Ditemukan'}
                       </span>
                     </div>
                     <div className="flex items-center justify-between py-1.5">
-                      <span className="font-semibold text-slate-300">CORS Wildcard (*):</span>
-                      <span className={aggregatedIntel.securityReport.cors?.wildcard ? 'text-rose-400 font-bold' : 'text-emerald-400 font-bold'}>
+                      <span className="font-medium text-neutral-300">CORS Wildcard (*):</span>
+                      <span className={aggregatedIntel.securityReport.cors?.wildcard ? 'text-amber-300 font-medium font-mono' : 'text-neutral-400 font-mono'}>
                         {aggregatedIntel.securityReport.cors?.wildcard ? '⚠️ Wildcard Diizinkan' : '✓ Terproteksi'}
                       </span>
                     </div>
                   </div>
                 </>
               ) : (
-                <div className="p-8 text-center text-slate-500 bg-[#0e131d] rounded-xl border border-slate-800">
+                <div className="p-8 text-center text-neutral-500 bg-[#0e0e0e] rounded-lg border border-[#222222] font-sans text-xs">
                   Data HTTP Security Audit sedang diproses atau belum dieksekusi untuk target ini.
                 </div>
               )}
@@ -503,14 +515,14 @@ export function TargetSeedDossierModal({
           {activeTab === 'crawler' && (
             <div className="flex flex-col gap-3.5">
               {/* robots.txt Disallow Rules */}
-              <div className="p-3.5 rounded-xl bg-[#0e131d] border border-slate-800 flex flex-col gap-2">
-                <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
-                  <div className="flex items-center gap-2 text-cyan-400 font-semibold">
-                    <FileText className="w-4 h-4" />
+              <div className="p-3.5 rounded-lg bg-[#0e0e0e] border border-[#222222] flex flex-col gap-2">
+                <div className="flex items-center justify-between pb-1.5 border-b border-[#1f1f1f]">
+                  <div className="flex items-center gap-2 text-white font-semibold font-sans">
+                    <FileText className="w-4 h-4 text-neutral-400" />
                     <span>robots.txt (Direktori Terlarang Sensitif)</span>
                   </div>
                   {aggregatedIntel.robotsDoc?.disallowCount && (
-                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-300 font-bold">
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-[#161616] text-neutral-300 border border-[#2a2a2a]">
                       {aggregatedIntel.robotsDoc.disallowCount} rules
                     </span>
                   )}
@@ -521,22 +533,22 @@ export function TargetSeedDossierModal({
                     {aggregatedIntel.robotsDoc.sensitivePaths.map((p: string, i: number) => (
                       <span
                         key={i}
-                        className="px-2 py-0.5 rounded bg-rose-500/15 border border-rose-500/30 text-rose-300 text-[10.5px]"
+                        className="px-2 py-0.5 rounded bg-[#161616] border border-[#2a2a2a] text-neutral-300 text-[10.5px] font-mono"
                       >
                         {p}
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <span className="text-slate-500 py-1">Tidak ada path sensitif terdaftar di robots.txt.</span>
+                  <span className="text-neutral-500 py-1 font-sans">Tidak ada path sensitif terdaftar di robots.txt.</span>
                 )}
               </div>
 
               {/* security.txt Official RFC 9116 */}
-              <div className="p-3.5 rounded-xl bg-[#0e131d] border border-slate-800 flex flex-col gap-2">
-                <div className="flex items-center justify-between pb-1.5 border-b border-slate-800">
-                  <div className="flex items-center gap-2 text-pink-400 font-semibold">
-                    <Shield className="w-4 h-4" />
+              <div className="p-3.5 rounded-lg bg-[#0e0e0e] border border-[#222222] flex flex-col gap-2">
+                <div className="flex items-center justify-between pb-1.5 border-b border-[#1f1f1f]">
+                  <div className="flex items-center gap-2 text-white font-semibold font-sans">
+                    <Shield className="w-4 h-4 text-neutral-400" />
                     <span>RFC 9116 security.txt (Kontak Keamanan)</span>
                   </div>
                 </div>
@@ -544,14 +556,14 @@ export function TargetSeedDossierModal({
                 {aggregatedIntel.securityContacts.length > 0 ? (
                   <div className="space-y-1">
                     {aggregatedIntel.securityContacts.map((c, i) => (
-                      <div key={i} className="flex items-center justify-between p-1.5 rounded bg-slate-900/60 border border-slate-800">
-                        <div className="flex items-center gap-2">
-                          <Mail className="w-3.5 h-3.5 text-pink-400" />
-                          <span className="text-slate-200">{c}</span>
+                      <div key={i} className="flex items-center justify-between p-2 rounded bg-[#121212] border border-[#222222]">
+                        <div className="flex items-center gap-2 font-mono">
+                          <Mail className="w-3.5 h-3.5 text-neutral-400" />
+                          <span className="text-neutral-200">{c}</span>
                         </div>
                         <button
                           onClick={() => handleCopy(c)}
-                          className="text-[10px] text-sky-400 hover:underline cursor-pointer"
+                          className="text-[10.5px] text-neutral-400 hover:text-white font-mono hover:underline cursor-pointer"
                         >
                           Copy
                         </button>
@@ -559,7 +571,7 @@ export function TargetSeedDossierModal({
                     ))}
                   </div>
                 ) : (
-                  <span className="text-slate-500 py-1">Tidak ditemukan file security.txt resmi.</span>
+                  <span className="text-neutral-500 py-1 font-sans">Tidak ditemukan file security.txt resmi.</span>
                 )}
               </div>
             </div>
@@ -568,13 +580,13 @@ export function TargetSeedDossierModal({
           {/* 5. SUBDOMAINS */}
           {activeTab === 'subdomains' && (
             <div className="flex flex-col gap-3">
-              <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-                <span className="text-slate-400 font-semibold">Total Subdomain Terpetakan:</span>
-                <span className="text-sky-300 font-bold">{aggregatedIntel.subdomains.length} Domain</span>
+              <div className="flex items-center justify-between pb-2 border-b border-[#222222] font-sans">
+                <span className="text-neutral-400 font-medium">Total Subdomain Terpetakan:</span>
+                <span className="text-white font-mono font-bold">{aggregatedIntel.subdomains.length} Domain</span>
               </div>
 
               {aggregatedIntel.subdomains.length === 0 ? (
-                <div className="p-8 text-center text-slate-500 bg-[#0e131d] rounded-xl border border-slate-800">
+                <div className="p-8 text-center text-neutral-500 bg-[#0e0e0e] rounded-lg border border-[#222222] font-sans text-xs">
                   Belum ada subdomain yang terdaftar untuk target ini.
                 </div>
               ) : (
@@ -582,17 +594,17 @@ export function TargetSeedDossierModal({
                   {aggregatedIntel.subdomains.map((sub, idx) => (
                     <div
                       key={idx}
-                      className="p-2 rounded-lg bg-[#0e131d] border border-slate-800/80 hover:border-sky-500/50 transition-colors flex items-center justify-between gap-1.5"
+                      className="p-2 rounded-md bg-[#0e0e0e] border border-[#222222] hover:border-[#333333] transition-colors flex items-center justify-between gap-1.5"
                     >
-                      <span className="text-slate-200 text-[11px] truncate" title={sub}>
+                      <span className="text-neutral-200 text-[11px] font-mono truncate" title={sub}>
                         {sub}
                       </span>
                       <button
                         onClick={() => handleCopy(sub)}
-                        className="text-slate-500 hover:text-white p-1 transition-colors cursor-pointer"
+                        className="text-neutral-500 hover:text-white p-1 transition-colors cursor-pointer"
                         title="Salin Subdomain"
                       >
-                        {copiedText === sub ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                        {copiedText === sub ? <Check className="w-3 h-3 text-white" /> : <Copy className="w-3 h-3" />}
                       </button>
                     </div>
                   ))}

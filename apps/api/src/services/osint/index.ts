@@ -1,4 +1,6 @@
 import { instagramScraper } from './instagramScraper.js';
+import { instagramScraper2025 } from './instagramScraper2025.js';
+import { instagramLooter } from './instagramLooter.js';
 import { tiktok } from './tiktok.js';
 import { tiktokBestExperience } from './tiktokBestExperience.js';
 import { instagramFastReliable } from './instagramFastReliable.js';
@@ -8,6 +10,8 @@ import { linkedin } from './linkedin.js';
 
 export {
   instagramScraper,
+  instagramScraper2025,
+  instagramLooter,
   tiktok,
   tiktokBestExperience,
   instagramFastReliable,

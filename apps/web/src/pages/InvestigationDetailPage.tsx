@@ -29,7 +29,6 @@ import {
   ChevronRight,
   Send,
   Trash2,
-  Sparkles,
   Terminal,
   Target,
   MapPin,

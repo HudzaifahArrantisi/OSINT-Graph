@@ -16,6 +16,8 @@ import { instagramScraper } from '../services/osint/instagramScraper.js';
 import { instagramFastReliable } from '../services/osint/instagramFastReliable.js';
 import { instagramBestExperience } from '../services/osint/instagramBestExperience.js';
 import { instagramScraperStable } from '../services/osint/instagramScraperStable.js';
+import { instagramScraper2025 } from '../services/osint/instagramScraper2025.js';
+import { instagramLooter } from '../services/osint/instagramLooter.js';
 import { tiktok } from '../services/osint/tiktok.js';
 import { tiktokBestExperience } from '../services/osint/tiktokBestExperience.js';
 import { linkedin } from '../services/osint/linkedin.js';
@@ -118,6 +120,395 @@ export const socialRapidapiCollector: Collector = {
       platforms: activePlatforms,
     });
 
+    const rawInputType = String(ctx.options?.inputType || (ctx as any).inputType || '');
+    const isNameSearch =
+      handle.includes(' ') || rawInputType === 'PERSON' || rawInputType === 'NAME';
+
+    if (isNameSearch) {
+      // ─────────────────────────────────────────────────────────────────
+      // MODE A: GLOBAL NAME SEARCH & PERMUTATION DISCOVERY
+      // ─────────────────────────────────────────────────────────────────
+      entities.push({
+        type: 'PERSON',
+        value: handle,
+        title: `Target Person: ${handle}`,
+        confidence: 90,
+        metadata: {
+          fullName: handle,
+          mode: 'global-name-search',
+          source: {
+            collector: 'social-rapidapi',
+            collectedAt,
+          },
+        },
+      });
+
+      const nameParts = handle
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .split(/\s+/)
+        .filter(Boolean);
+
+      const permutations: string[] = [];
+      if (nameParts.length >= 2) {
+        permutations.push(nameParts.join('')); // hudzaifaharrantisi
+        permutations.push(nameParts.join('_')); // hudzaifah_arrantisi
+        permutations.push(nameParts.join('.')); // hudzaifah.arrantisi
+        permutations.push([...nameParts].reverse().join('')); // arrantisihudzaifah
+        permutations.push([...nameParts].reverse().join('_')); // arrantisi_hudzaifah
+      } else if (nameParts.length === 1) {
+        permutations.push(nameParts[0]);
+      }
+
+      let profilesFound = 0;
+      const searchTasks: Promise<void>[] = [];
+
+      // 1. Instagram Global Search
+      if (activePlatforms.includes('instagram')) {
+        searchTasks.push(
+          (async () => {
+            try {
+              const candidateUsers: any[] = [];
+
+              // Query user search API with the full name / query
+              try {
+                const searchRes = await instagramScraper.searchUsers(handle);
+                const rawUsers = Array.isArray(searchRes?.users)
+                  ? searchRes.users
+                  : Array.isArray(searchRes?.data?.users)
+                    ? searchRes.data.users
+                    : Array.isArray(searchRes?.data)
+                      ? searchRes.data
+                      : [];
+                for (const u of rawUsers.slice(0, 5)) {
+                  const userObj = u.user || u;
+                  if (userObj && (userObj.username || userObj.pk || userObj.id)) {
+                    candidateUsers.push(userObj);
+                  }
+                }
+              } catch (e: any) {
+                logger.debug(`Instagram searchUsers skipped: ${e.message}`);
+              }
+
+              // Also check direct handle permutations using lightweight profile probe
+              for (const perm of permutations.slice(0, 2)) {
+                try {
+                  const permRes = await instagramBestExperience
+                    .getProfileByUsername(perm)
+                    .catch(async () => {
+                      return await instagramScraper2025.getUserInfo(perm).catch(() => null);
+                    })
+                    .catch(async () => {
+                      return await instagramLooter.getProfile2(perm).catch(() => null);
+                    })
+                    .catch(async () => {
+                      return await instagramScraper.getUserInfo(perm).catch(() => null);
+                    });
+                  const userObj =
+                    permRes?.user ||
+                    permRes?.data?.user ||
+                    permRes?.data ||
+                    permRes?.result ||
+                    permRes;
+                  if (userObj?.username && !String(userObj.username).includes(' ')) {
+                    candidateUsers.push(userObj);
+                  }
+                } catch {}
+              }
+
+              const seenIg = new Set<string>();
+              for (const user of candidateUsers) {
+                const uName = String(user.username || '').trim().toLowerCase();
+                if (!uName || uName.includes(' ') || seenIg.has(uName)) continue;
+                seenIg.add(uName);
+
+                const profileUrl = `https://www.instagram.com/${uName}`;
+                const fullName = user.full_name ? String(user.full_name).trim() : null;
+                const avatar = user.profile_pic_url_hd || user.profile_pic_url || null;
+                const isVerified = Boolean(user.is_verified);
+                const followers = user.follower_count ?? user.followers ?? null;
+                const bio = user.biography ? String(user.biography).trim() : null;
+
+                profilesFound++;
+                entities.push({
+                  type: 'SOCIAL_PROFILE',
+                  value: profileUrl,
+                  title: `Instagram: @${uName}${fullName ? ` (${fullName})` : ''}`,
+                  confidence: 85,
+                  metadata: {
+                    platform: 'instagram',
+                    username: uName,
+                    full_name: fullName,
+                    avatar_url: avatar,
+                    is_verified: isVerified,
+                    followers_count: followers,
+                    biography: bio,
+                    source: {
+                      collector: 'social-rapidapi',
+                      collectedAt,
+                    },
+                  },
+                });
+
+                const isExact = Boolean(
+                  fullName && fullName.toLowerCase() === handle.toLowerCase(),
+                );
+                relationships.push({
+                  source_type: 'PERSON',
+                  source_value: handle,
+                  target_type: 'SOCIAL_PROFILE',
+                  target_value: profileUrl,
+                  relationship_type: isExact ? 'SAME_AS' : 'POSSIBLY_SAME_AS',
+                  confidence: isExact ? 90 : 75,
+                  reason: isExact
+                    ? `Verified exact matching full name "${fullName}" on Instagram`
+                    : `Discovered candidate Instagram account "@${uName}" for target name "${handle}"`,
+                });
+
+                if (avatar && typeof avatar === 'string' && avatar.startsWith('http')) {
+                  entities.push({
+                    type: 'URL',
+                    value: avatar,
+                    title: `Avatar: @${uName} (Instagram)`,
+                    confidence: 80,
+                    metadata: { platform: 'instagram', is_avatar: true },
+                  });
+                  relationships.push({
+                    source_type: 'SOCIAL_PROFILE',
+                    source_value: profileUrl,
+                    target_type: 'URL',
+                    target_value: avatar,
+                    relationship_type: 'RELATED_TO',
+                    confidence: 80,
+                    reason: 'Public profile avatar image',
+                  });
+                }
+              }
+            } catch (err: any) {
+              logger.debug(`Instagram name search error: ${err.message}`);
+            }
+          })(),
+        );
+      }
+
+      // 2. TikTok Global Search
+      if (activePlatforms.includes('tiktok')) {
+        searchTasks.push(
+          (async () => {
+            try {
+              const candidateTiktok: any[] = [];
+
+              // Search by keyword/name on TikTok
+              try {
+                let searchRes = await tiktokBestExperience.searchUsers(handle).catch(() => null);
+                if (!searchRes) {
+                  searchRes = await tiktok.searchUsers(handle).catch(() => null);
+                }
+                const rawUsers = Array.isArray(searchRes?.userInfoList)
+                  ? searchRes.userInfoList
+                  : Array.isArray(searchRes?.user_list)
+                    ? searchRes.user_list
+                    : Array.isArray(searchRes?.data)
+                      ? searchRes.data
+                      : [];
+                for (const u of rawUsers.slice(0, 5)) {
+                  const uObj = u.user || u.user_info || u;
+                  if (uObj && (uObj.uniqueId || uObj.unique_id || uObj.id || uObj.username)) {
+                    candidateTiktok.push(uObj);
+                  }
+                }
+              } catch (e: any) {
+                logger.debug(`TikTok search skipped: ${e.message}`);
+              }
+
+              // Also check candidate permutations
+              for (const perm of permutations.slice(0, 2)) {
+                try {
+                  const permRes = await tiktokBestExperience
+                    .getUserByUsername(perm)
+                    .catch(() => null);
+                  const uObj = permRes?.userInfo?.user || permRes?.user || permRes?.data;
+                  if (uObj?.uniqueId || uObj?.id) {
+                    candidateTiktok.push(uObj);
+                  }
+                } catch {}
+              }
+
+              const seenTt = new Set<string>();
+              for (const u of candidateTiktok) {
+                const uName = String(
+                  u.uniqueId || u.unique_id || u.username || '',
+                )
+                  .trim()
+                  .toLowerCase();
+                if (!uName || uName.includes(' ') || seenTt.has(uName)) continue;
+                seenTt.add(uName);
+
+                const profileUrl = `https://www.tiktok.com/@${uName}`;
+                const nickname = u.nickname ? String(u.nickname).trim() : null;
+                const avatar =
+                  u.avatarLarger ||
+                  u.avatarMedium ||
+                  u.avatar_168x168?.url_list?.[0] ||
+                  null;
+                const followers = u.followerCount ?? u.stats?.followerCount ?? null;
+                const bio = u.signature ? String(u.signature).trim() : null;
+
+                profilesFound++;
+                entities.push({
+                  type: 'SOCIAL_PROFILE',
+                  value: profileUrl,
+                  title: `TikTok: @${uName}${nickname ? ` (${nickname})` : ''}`,
+                  confidence: 85,
+                  metadata: {
+                    platform: 'tiktok',
+                    username: uName,
+                    nickname,
+                    avatar_url: avatar,
+                    followers_count: followers,
+                    signature: bio,
+                    source: {
+                      collector: 'social-rapidapi',
+                      collectedAt,
+                    },
+                  },
+                });
+
+                const isExact = Boolean(
+                  nickname && nickname.toLowerCase() === handle.toLowerCase(),
+                );
+                relationships.push({
+                  source_type: 'PERSON',
+                  source_value: handle,
+                  target_type: 'SOCIAL_PROFILE',
+                  target_value: profileUrl,
+                  relationship_type: isExact ? 'SAME_AS' : 'POSSIBLY_SAME_AS',
+                  confidence: isExact ? 90 : 75,
+                  reason: isExact
+                    ? `Verified matching nickname "${nickname}" on TikTok`
+                    : `Discovered candidate TikTok account "@${uName}" for target name "${handle}"`,
+                });
+              }
+            } catch (err: any) {
+              logger.debug(`TikTok search error: ${err.message}`);
+            }
+          })(),
+        );
+      }
+
+      // 3. LinkedIn Global Search
+      if (activePlatforms.includes('linkedin')) {
+        searchTasks.push(
+          (async () => {
+            try {
+              const candidateLinkedin: any[] = [];
+
+              try {
+                const searchRes = await linkedin.searchPeople(handle).catch(() => null);
+                const rawItems = Array.isArray(searchRes?.items)
+                  ? searchRes.items
+                  : Array.isArray(searchRes?.data)
+                    ? searchRes.data
+                    : Array.isArray(searchRes?.results)
+                      ? searchRes.results
+                      : [];
+                for (const item of rawItems.slice(0, 5)) {
+                  if (item) candidateLinkedin.push(item);
+                }
+              } catch (e: any) {
+                logger.debug(`LinkedIn search skipped: ${e.message}`);
+              }
+
+              // Also check direct permutation
+              for (const perm of [nameParts.join('-'), permutations[0]].filter(Boolean)) {
+                try {
+                  const permRes = await linkedin.getProfileByUsername(perm).catch(() => null);
+                  if (permRes?.full_name || permRes?.headline) {
+                    candidateLinkedin.push({ ...permRes, username: perm });
+                  }
+                } catch {}
+              }
+
+              const seenLi = new Set<string>();
+              for (const item of candidateLinkedin) {
+                const liUsername = String(
+                  item.username || item.publicIdentifier || item.id || '',
+                ).trim();
+                const profileUrl =
+                  item.profile_url ||
+                  item.url ||
+                  (liUsername && !liUsername.includes(' ')
+                    ? `https://www.linkedin.com/in/${liUsername}`
+                    : null);
+                if (!profileUrl || seenLi.has(profileUrl)) continue;
+                seenLi.add(profileUrl);
+
+                const fullName = item.full_name || item.name || null;
+                const headline = item.headline || item.title || null;
+                const avatar = item.profilePicture || item.avatar || null;
+
+                profilesFound++;
+                entities.push({
+                  type: 'SOCIAL_PROFILE',
+                  value: profileUrl,
+                  title: `LinkedIn: ${fullName || liUsername}`,
+                  confidence: 85,
+                  metadata: {
+                    platform: 'linkedin',
+                    username: liUsername || null,
+                    full_name: fullName,
+                    headline,
+                    avatar_url: avatar,
+                    source: {
+                      collector: 'social-rapidapi',
+                      collectedAt,
+                    },
+                  },
+                });
+
+                const isExact = Boolean(
+                  fullName && fullName.trim().toLowerCase() === handle.toLowerCase(),
+                );
+                relationships.push({
+                  source_type: 'PERSON',
+                  source_value: handle,
+                  target_type: 'SOCIAL_PROFILE',
+                  target_value: profileUrl,
+                  relationship_type: isExact ? 'SAME_AS' : 'POSSIBLY_SAME_AS',
+                  confidence: isExact ? 90 : 80,
+                  reason: isExact
+                    ? `Verified matching full name "${fullName}" on LinkedIn`
+                    : `Discovered candidate LinkedIn professional profile for "${handle}"`,
+                });
+              }
+            } catch (err: any) {
+              logger.debug(`LinkedIn search error: ${err.message}`);
+            }
+          })(),
+        );
+      }
+
+      await Promise.allSettled(searchTasks);
+
+      if (profilesFound === 0) {
+        warnings.push(
+          `Pencarian nama "${handle}" tidak menemukan akun sosial media publik yang cocok di Instagram, TikTok, atau LinkedIn.`,
+        );
+      }
+
+      return {
+        source: 'social-rapidapi',
+        collectedAt,
+        entities,
+        relationships,
+        evidence,
+        warnings,
+      };
+    }
+
+    // ─────────────────────────────────────────────────────────────────
+    // MODE B: DIRECT USERNAME DEEP RECONNAISSANCE
+    // ─────────────────────────────────────────────────────────────────
     const tasks: Promise<void>[] = [];
 
     // ─── 1. INSTAGRAM DEEP ENGINES ─────────────────────────────────────
@@ -125,9 +516,11 @@ export const socialRapidapiCollector: Collector = {
       tasks.push(
         (async () => {
           try {
-            // Run all Instagram engines in parallel
+            // Run all Instagram engines in parallel with 2025 scraper and looter as high-priority/backup
             const [
               scraperRes,
+              scraper2025Res,
+              looterRes,
               bestExpRes,
               bestExpIdRes,
               fastRelIdRes,
@@ -137,6 +530,8 @@ export const socialRapidapiCollector: Collector = {
               stableFollowersRes,
             ] = await Promise.allSettled([
               instagramScraper.getUserInfo(handle),
+              instagramScraper2025.getUserInfo(handle),
+              instagramLooter.getProfile2(handle),
               instagramBestExperience.getProfileByUsername(handle),
               instagramBestExperience.getUserIdByUsername(handle),
               instagramFastReliable.getUserIdByUsername(handle),
@@ -148,6 +543,14 @@ export const socialRapidapiCollector: Collector = {
 
             // Consolidate extracted profile data
             let igData: any = {};
+            if (scraper2025Res.status === 'fulfilled' && scraper2025Res.value) {
+              const val = scraper2025Res.value;
+              igData = { ...igData, ...(val.data?.user || val.user || val.data || val) };
+            }
+            if (looterRes.status === 'fulfilled' && looterRes.value) {
+              const val = looterRes.value;
+              igData = { ...igData, ...(val.data?.user || val.user || val.data || val) };
+            }
             if (scraperRes.status === 'fulfilled' && scraperRes.value) {
               const val = scraperRes.value;
               igData = { ...igData, ...(val.user || val.data?.user || val) };
@@ -176,14 +579,47 @@ export const socialRapidapiCollector: Collector = {
               igData = { ...igData, ...(val.user || val.data?.user || val.data || val) };
             }
 
-            const igUsername = igData.username || handle;
-            const igProfileUrl = `https://www.instagram.com/${igUsername}`;
+            const igUsername = (igData.username || handle).trim();
             const igUid = igData.user_id || igData.pk || igData.id || null;
             const igBio = igData.biography ? String(igData.biography).trim() : null;
             const igAvatar = igData.profile_pic_url_hd || igData.profile_pic_url || null;
-            const followersCount = igData.follower_count ?? igData.followers ?? null;
-            const followingCount = igData.following_count ?? igData.following ?? null;
-            const postsCount = igData.media_count ?? igData.posts_count ?? null;
+            const followersCount =
+              igData.follower_count ??
+              igData.followers ??
+              igData.edge_followed_by?.count ??
+              null;
+            const followingCount =
+              igData.following_count ??
+              igData.following ??
+              igData.edge_follow?.count ??
+              null;
+            const postsCount =
+              igData.media_count ??
+              igData.posts_count ??
+              igData.edge_owner_to_timeline_media?.count ??
+              null;
+            const igFullName = igData.full_name ? String(igData.full_name).trim() : null;
+
+            // Zero-fake-data invariant: only create profile entity if real profile data was returned
+            const hasRealData = Boolean(
+              igUid ||
+              igData.username ||
+              igFullName ||
+              igBio ||
+              igAvatar ||
+              followersCount !== null ||
+              followingCount !== null ||
+              postsCount !== null
+            );
+
+            if (!hasRealData || igUsername.includes(' ')) {
+              warnings.push(
+                `Instagram engine did not find verified profile intelligence for "${handle}" (user does not exist or upstream provider returned no profile data).`,
+              );
+              return;
+            }
+
+            const igProfileUrl = `https://www.instagram.com/${igUsername}`;
 
             // 1.1 Main Instagram Profile Node
             entities.push({
@@ -729,8 +1165,7 @@ export const socialRapidapiCollector: Collector = {
               ttData = { ...ttData, ...(val.userInfo?.user || val.user || val.data || val) };
             }
 
-            const ttUsername = ttData.uniqueId || ttData.unique_id || handle;
-            const ttProfileUrl = `https://www.tiktok.com/@${ttUsername}`;
+            const ttUsername = (ttData.uniqueId || ttData.unique_id || handle).trim();
             const ttUid = ttData.id || ttData.uid || ttData.userId || null;
             const ttSecUid = ttData.secUid || ttData.sec_uid || null;
             const ttBio = ttData.signature ? String(ttData.signature).trim() : null;
@@ -738,6 +1173,29 @@ export const socialRapidapiCollector: Collector = {
             const ttFollowers = ttData.followerCount ?? ttData.stats?.followerCount ?? ttData.follower_count ?? null;
             const ttFollowing = ttData.followingCount ?? ttData.stats?.followingCount ?? ttData.following_count ?? null;
             const ttLikes = ttData.heartCount ?? ttData.stats?.heartCount ?? ttData.total_favorited ?? null;
+            const ttNickname = ttData.nickname ? String(ttData.nickname).trim() : null;
+
+            // Zero-fake-data invariant: only create profile entity if real profile data was returned
+            const hasRealData = Boolean(
+              ttUid ||
+              ttSecUid ||
+              ttData.uniqueId ||
+              ttData.unique_id ||
+              ttNickname ||
+              ttBio ||
+              ttAvatar ||
+              ttFollowers !== null ||
+              ttLikes !== null
+            );
+
+            if (!hasRealData || ttUsername.includes(' ')) {
+              warnings.push(
+                `TikTok engine did not find verified profile intelligence for "${handle}" (user does not exist or upstream provider returned no profile data).`,
+              );
+              return;
+            }
+
+            const ttProfileUrl = `https://www.tiktok.com/@${ttUsername}`;
 
             // 2.1 Main TikTok Profile Node
             entities.push({
@@ -1119,10 +1577,11 @@ export const socialRapidapiCollector: Collector = {
               liData.id ||
               liData.urn ||
               null;
+            const liUsername = String(liMemberId || liData.username || handle).trim();
             const liProfileUrl =
               liData.profile_url ||
               liData.profileUrl ||
-              `https://www.linkedin.com/in/${liMemberId || handle}`;
+              `https://www.linkedin.com/in/${liUsername}`;
             const liSummary = liData.summary || liData.about || liData.description || null;
             const liHeadline = liData.headline || liData.title || liData.job_title || null;
             const liConnections =
@@ -1158,7 +1617,7 @@ export const socialRapidapiCollector: Collector = {
               (Array.isArray(liData.interests_companies) && liData.interests_companies.length > 0)
             );
 
-            if (!hasRealData) {
+            if (!hasRealData || liUsername.includes(' ')) {
               warnings.push(
                 `LinkedIn engine did not find verified profile intelligence for "${handle}" (upstream provider returned no profile data or service is unavailable).`,
               );

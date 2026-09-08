@@ -18,7 +18,6 @@ import {
   AlertCircle,
   Clock,
   Layers,
-  Sparkles,
 } from 'lucide-react';
 import type { DiscoveryLogEntry } from '@nexusgraph/shared';
 import { api } from '../../lib/api';

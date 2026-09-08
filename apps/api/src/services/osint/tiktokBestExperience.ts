@@ -71,10 +71,28 @@ export async function getFollowers(userId: string | number): Promise<any> {
   }
 }
 
+/**
+ * Search TikTok users by keyword or name.
+ */
+export async function searchUsers(keyword: string): Promise<any> {
+  try {
+    if (!keyword) throw new Error('keyword is required');
+    return await callRapidAPI(
+      HOST,
+      `/search/user/${encodeURIComponent(keyword.trim())}`,
+      'GET',
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`[tiktokBestExperience.searchUsers] Failed for "${keyword}": ${message}`);
+  }
+}
+
 export const tiktokBestExperience = {
   HOST,
   getUserByUsername,
   getUserById,
+  searchUsers,
   getFollowings,
   getFollowers,
 };

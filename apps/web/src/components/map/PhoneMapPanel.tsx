@@ -137,7 +137,7 @@ function MapController({
     if (!container) return;
 
     const triggerInvalidate = () => {
-      map.invalidateSize({ debounceMove: true });
+      map.invalidateSize({ debounceMoveend: true });
     };
 
     // Trigger immediately and staggered to catch flex transitions & initial layout calculation
@@ -179,7 +179,7 @@ function MapController({
   // 2. Invalidate size when sidebar collapse animation runs (transition-all duration-200)
   useEffect(() => {
     const triggerInvalidate = () => {
-      map.invalidateSize({ debounceMove: true });
+      map.invalidateSize({ debounceMoveend: true });
     };
 
     triggerInvalidate();
@@ -196,7 +196,7 @@ function MapController({
 
   // 3. Center and zoom bounds when points or focused node change
   useEffect(() => {
-    map.invalidateSize({ debounceMove: true });
+    map.invalidateSize({ debounceMoveend: true });
 
     if (focusedPoint) {
       map.flyTo([focusedPoint.lat, focusedPoint.lng], 16, {

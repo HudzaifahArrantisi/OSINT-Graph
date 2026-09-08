@@ -65,9 +65,59 @@ export function EngineModuleFilterBar({
   onSelectEngine,
   className = '',
 }: EngineModuleFilterBarProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [canvasWidth, setCanvasWidth] = useState<number>(1200);
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Measure parent canvas width to adaptively resize pills when sidebars open/close
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const parent = el.parentElement;
+    if (!parent) return;
+
+    const handleResize = () => {
+      const w = parent.clientWidth || window.innerWidth;
+      setCanvasWidth(w);
+    };
+
+    handleResize();
+
+    const ro = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        if (entry.contentRect.width > 0) {
+          setCanvasWidth(entry.contentRect.width);
+        }
+      }
+    });
+
+    ro.observe(parent);
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      ro.disconnect();
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  // Dynamically determine how many pills can fit comfortably based on available canvas width
+  const maxVisiblePills = useMemo(() => {
+    if (canvasWidth >= 1200) return 5;
+    if (canvasWidth >= 950) return 4;
+    if (canvasWidth >= 750) return 3;
+    if (canvasWidth >= 580) return 2;
+    if (canvasWidth >= 440) return 1;
+    return 0; // Compact dropdown mode when space is heavily constrained
+  }, [canvasWidth]);
+
+  // Adapt pill label truncation width based on available canvas space
+  const pillLabelMaxWidth = useMemo(() => {
+    if (canvasWidth >= 1000) return 'max-w-[100px]';
+    if (canvasWidth >= 700) return 'max-w-[75px]';
+    return 'max-w-[55px]';
+  }, [canvasWidth]);
 
   // Aggregate node counts per engine module
   const engineStats = useMemo(() => {
@@ -104,20 +154,24 @@ export function EngineModuleFilterBar({
 
   // Divide into prominent visible pills and remaining overflow pills
   const { visibleEngines, overflowEngines } = useMemo(() => {
-    if (engineStats.length <= MAX_VISIBLE_PILLS) {
+    if (maxVisiblePills === 0) {
+      return { visibleEngines: [], overflowEngines: engineStats };
+    }
+
+    if (engineStats.length <= maxVisiblePills) {
       return { visibleEngines: engineStats, overflowEngines: [] };
     }
 
     // If selected engine is beyond top pills, promote it so it is immediately visible and clearable
     const isSelectedInTop =
       selectedEngine &&
-      engineStats.slice(0, MAX_VISIBLE_PILLS).some((s) => s.meta.id === selectedEngine);
+      engineStats.slice(0, maxVisiblePills).some((s) => s.meta.id === selectedEngine);
 
     if (selectedEngine && !isSelectedInTop) {
       const selectedItem = engineStats.find((s) => s.meta.id === selectedEngine);
       const topItems = engineStats
         .filter((s) => s.meta.id !== selectedEngine)
-        .slice(0, MAX_VISIBLE_PILLS - 1);
+        .slice(0, maxVisiblePills - 1);
       const visible = selectedItem ? [...topItems, selectedItem] : topItems;
       const visibleIds = new Set(visible.map((s) => s.meta.id));
       const overflow = engineStats.filter((s) => !visibleIds.has(s.meta.id));
@@ -125,10 +179,10 @@ export function EngineModuleFilterBar({
     }
 
     return {
-      visibleEngines: engineStats.slice(0, MAX_VISIBLE_PILLS),
-      overflowEngines: engineStats.slice(MAX_VISIBLE_PILLS),
+      visibleEngines: engineStats.slice(0, maxVisiblePills),
+      overflowEngines: engineStats.slice(maxVisiblePills),
     };
-  }, [engineStats, selectedEngine]);
+  }, [engineStats, selectedEngine, maxVisiblePills]);
 
   // Handle outside click to close dropdown
   useEffect(() => {
@@ -150,7 +204,7 @@ export function EngineModuleFilterBar({
   // COLLAPSED MINIMAL CHIP: Extremely discreet, 0% obstruction
   if (isCollapsed) {
     return (
-      <div className={`flex items-center ${className}`}>
+      <div ref={containerRef} className={`flex items-center ${className}`}>
         <button
           onClick={() => setIsCollapsed(false)}
           className="flex items-center gap-2 h-7 px-2.5 bg-[#080808]/95 hover:bg-[#141414] backdrop-blur-md border border-[#222222] hover:border-neutral-600 rounded-md text-xs text-neutral-300 transition-colors shadow-lg shadow-black/50 cursor-pointer"
@@ -186,14 +240,14 @@ export function EngineModuleFilterBar({
     );
   }
 
-  // COMPACT MONOCHROME DOCK: Clean, fixed-width, zero-clutter
+  // COMPACT MONOCHROME DOCK: Clean, self-adjusting to canvas width, zero-clutter
   return (
-    <div className={`relative select-none ${className}`}>
-      <div className="flex items-center gap-1 bg-[#080808]/95 backdrop-blur-md border border-[#222222] rounded-md p-1 shadow-xl shadow-black/60 text-xs">
+    <div ref={containerRef} className={`relative select-none max-w-full ${className}`}>
+      <div className="flex items-center gap-1 bg-[#080808]/95 backdrop-blur-md border border-[#222222] rounded-md p-1 shadow-xl shadow-black/60 text-xs max-w-full">
         {/* "Semua" Button */}
         <button
           onClick={() => onSelectEngine(null)}
-          className={`flex items-center gap-1.5 h-7 px-2.5 rounded text-[11px] font-sans transition-colors cursor-pointer border ${
+          className={`flex items-center gap-1.5 h-7 px-2.5 rounded text-[11px] font-sans transition-colors shrink-0 cursor-pointer border ${
             selectedEngine === null
               ? 'bg-white text-black font-semibold border-white shadow-sm'
               : 'bg-transparent text-neutral-400 hover:text-white hover:bg-[#181818] border-transparent'
@@ -215,68 +269,92 @@ export function EngineModuleFilterBar({
         {/* Separator */}
         <div className="w-[1px] h-4 bg-[#222222] mx-0.5 shrink-0" />
 
-        {/* Top Active Module Pills (Always fits, never cuts off) */}
-        <div className="flex items-center gap-1">
-          {visibleEngines.map(({ meta, count }) => {
-            const isSelected = selectedEngine === meta.id;
-            const IconComponent = (meta.iconName && ENGINE_ICONS[meta.iconName]) || Layers;
+        {/* Top Active Module Pills (Dynamically sized, never cuts off) */}
+        {visibleEngines.length > 0 && (
+          <div className="flex items-center gap-1 shrink overflow-hidden">
+            {visibleEngines.map(({ meta, count }) => {
+              const isSelected = selectedEngine === meta.id;
+              const IconComponent = (meta.iconName && ENGINE_ICONS[meta.iconName]) || Layers;
 
-            return (
-              <button
-                key={meta.id}
-                onClick={() => onSelectEngine(isSelected ? null : meta.id)}
-                className={`flex items-center gap-1.5 h-7 px-2 rounded text-[11px] font-sans transition-colors shrink-0 cursor-pointer border ${
-                  isSelected
-                    ? 'bg-white text-black font-semibold border-white shadow-sm'
-                    : 'bg-[#121212] text-neutral-300 hover:text-white hover:bg-[#1a1a1a] border-[#222222] hover:border-neutral-700'
-                }`}
-                title={`${meta.name} (${count} entitas)`}
-              >
-                <IconComponent
-                  className={`w-3 h-3 shrink-0 ${isSelected ? 'text-black' : 'text-neutral-400'}`}
-                />
-
-                <span className="whitespace-nowrap max-w-[100px] truncate">
-                  {meta.shortName}
-                </span>
-
-                <span
-                  className={`font-mono text-[9.5px] px-1 py-0.2 rounded ${
+              return (
+                <button
+                  key={meta.id}
+                  onClick={() => onSelectEngine(isSelected ? null : meta.id)}
+                  className={`flex items-center gap-1.5 h-7 px-2 rounded text-[11px] font-sans transition-colors shrink-0 cursor-pointer border ${
                     isSelected
-                      ? 'bg-black/15 text-black font-medium'
-                      : 'text-neutral-400 bg-black/60 border border-neutral-800'
+                      ? 'bg-white text-black font-semibold border-white shadow-sm'
+                      : 'bg-[#121212] text-neutral-300 hover:text-white hover:bg-[#1a1a1a] border-[#222222] hover:border-neutral-700'
                   }`}
+                  title={`${meta.name} (${count} entitas)`}
                 >
-                  {count}
-                </span>
-
-                {isSelected && (
-                  <X
-                    className="w-3 h-3 ml-0.5 text-black/70 hover:text-black"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onSelectEngine(null);
-                    }}
+                  <IconComponent
+                    className={`w-3 h-3 shrink-0 ${isSelected ? 'text-black' : 'text-neutral-400'}`}
                   />
-                )}
-              </button>
-            );
-          })}
-        </div>
+
+                  <span className={`whitespace-nowrap ${pillLabelMaxWidth} truncate`}>
+                    {meta.shortName}
+                  </span>
+
+                  <span
+                    className={`font-mono text-[9.5px] px-1 py-0.2 rounded ${
+                      isSelected
+                        ? 'bg-black/15 text-black font-medium'
+                        : 'text-neutral-400 bg-black/60 border border-neutral-800'
+                    }`}
+                  >
+                    {count}
+                  </span>
+
+                  {isSelected && (
+                    <X
+                      className="w-3 h-3 ml-0.5 text-black/70 hover:text-black"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectEngine(null);
+                      }}
+                    />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Compact Selected Indicator (when visibleEngines is 0 due to narrow canvas, but an engine is filtered) */}
+        {visibleEngines.length === 0 && activeMeta && (
+          <div className="flex items-center gap-1 shrink-0">
+            <button
+              onClick={() => onSelectEngine(null)}
+              className="flex items-center gap-1.5 h-7 px-2 rounded text-[11px] font-sans bg-white text-black font-semibold border border-white shadow-sm shrink-0 cursor-pointer"
+              title={`Filter aktif: ${activeMeta.name} (Klik untuk reset)`}
+            >
+              <span className={`whitespace-nowrap ${pillLabelMaxWidth} truncate`}>
+                {activeMeta.shortName}
+              </span>
+              <X className="w-3 h-3 text-black/70 hover:text-black" />
+            </button>
+          </div>
+        )}
 
         {/* Overflow Dropdown: Neat compact popup for remaining modules */}
-        {overflowEngines.length > 0 && (
-          <div className="relative" ref={dropdownRef}>
+        {(overflowEngines.length > 0 || visibleEngines.length === 0) && (
+          <div className="relative shrink-0" ref={dropdownRef}>
             <button
               onClick={() => setDropdownOpen((prev) => !prev)}
-              className={`flex items-center gap-1 h-7 px-2 rounded text-[11px] font-sans border transition-colors cursor-pointer ${
+              className={`flex items-center gap-1 h-7 px-2 rounded text-[11px] font-sans border transition-colors cursor-pointer shrink-0 ${
                 dropdownOpen
                   ? 'bg-[#222222] text-white border-neutral-600'
                   : 'bg-[#121212] text-neutral-400 hover:text-white hover:bg-[#1a1a1a] border-[#222222]'
               }`}
               title="Pilih modul lainnya"
             >
-              <span>+{overflowEngines.length} Lainnya</span>
+              <span className="whitespace-nowrap">
+                {visibleEngines.length === 0
+                  ? activeMeta
+                    ? 'Ganti Modul'
+                    : `Modul (${engineStats.length})`
+                  : `+${overflowEngines.length} Lainnya`}
+              </span>
               <ChevronDown
                 className={`w-3 h-3 text-neutral-400 transition-transform ${
                   dropdownOpen ? 'rotate-180' : ''

@@ -5,7 +5,6 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { SeedType, TransformDefinition } from '@nexusgraph/shared';
 import {
-  Sparkles,
   ShieldCheck,
   Globe2,
   Mail,

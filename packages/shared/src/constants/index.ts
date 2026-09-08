@@ -240,6 +240,7 @@ export const COLLECTOR_NAMES = [
   'well-known-recon',
   'passive-dns',
   'cloud-bucket-finder',
+  'getcontact',
 ] as const;
 
 export type CollectorName = (typeof COLLECTOR_NAMES)[number];

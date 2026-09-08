@@ -279,6 +279,16 @@ export const TRANSFORM_DEFINITIONS: TransformDefinition[] = [
     riskLevel: 'low',
     enabled: true,
   },
+  {
+    id: 'contact.getcontact-intelligence',
+    name: 'GetContact Caller & Tag Intelligence',
+    description: 'Extract caller subscriber name, address-book tags, and total tag statistics using local GetContact CLI (gtc.py)',
+    inputTypes: ['PHONE'],
+    outputTypes: ['PERSON', 'PHONE', 'PUBLIC_MENTION'],
+    category: 'contact',
+    riskLevel: 'low',
+    enabled: true,
+  },
 
   {
     id: 'infrastructure.shodan-recon',
