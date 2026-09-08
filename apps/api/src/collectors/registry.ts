@@ -38,6 +38,9 @@ import { siteCrawlerCollector } from './site-crawler.js';
 import { httpSecurityAuditCollector } from './http-security-audit.js';
 import { dirsearchCollector } from './dirsearch.js';
 import { companyGeoCollector } from './company-geo.js';
+import { wellKnownReconCollector } from './well-known-recon.js';
+import { passiveDnsCollector } from './passive-dns.js';
+import { cloudBucketFinderCollector } from './cloud-bucket-finder.js';
 import { logger } from '../lib/logger.js';
 
 // Collector registry
@@ -77,6 +80,9 @@ collectors.set('site-crawler', siteCrawlerCollector);
 collectors.set('http-security-audit', httpSecurityAuditCollector);
 collectors.set('dirsearch', dirsearchCollector);
 collectors.set('company-geo', companyGeoCollector);
+collectors.set('well-known-recon', wellKnownReconCollector);
+collectors.set('passive-dns', passiveDnsCollector);
+collectors.set('cloud-bucket-finder', cloudBucketFinderCollector);
 
 export function getCollector(name: CollectorName): Collector | undefined {
   return collectors.get(name);

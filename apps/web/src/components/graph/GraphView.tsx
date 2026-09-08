@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -459,9 +459,21 @@ function GraphViewInner({ graphData }: GraphViewProps) {
     [initialNodes, initialEdges, collapsedCategories, handleToggleCollapse, setNodes, setEdges],
   );
 
+  const prevNodeCountRef = useRef(initialNodes.length);
+
   useEffect(() => {
-    applyLayout(graphLayout, initialNodes, initialEdges, collapsedCategories);
-  }, [initialNodes, initialEdges, graphLayout, collapsedCategories]);
+    const isNewBatch = Math.abs(initialNodes.length - prevNodeCountRef.current) > 3;
+    prevNodeCountRef.current = initialNodes.length;
+
+    // If new batch of scanning nodes arrived, force clean layout recalculation
+    applyLayout(graphLayout, initialNodes, initialEdges, collapsedCategories, isNewBatch);
+
+    if (isNewBatch) {
+      setTimeout(() => {
+        fitView({ duration: 500, padding: 0.15 });
+      }, 80);
+    }
+  }, [initialNodes, initialEdges, graphLayout, collapsedCategories, applyLayout, fitView]);
 
   const handleSelectSeedFilter = (seedId: string | null) => {
     setSelectedSeedFilter(seedId);
@@ -643,7 +655,10 @@ function GraphViewInner({ graphData }: GraphViewProps) {
       } catch {}
     }
     applyLayout(graphLayout, initialNodes, initialEdges, collapsedCategories, true);
-  }, [caseId, applyLayout, graphLayout, initialNodes, initialEdges, collapsedCategories]);
+    setTimeout(() => {
+      fitView({ duration: 450, padding: 0.15 });
+    }, 60);
+  }, [caseId, applyLayout, graphLayout, initialNodes, initialEdges, collapsedCategories, fitView]);
 
   return (
     <div className="relative w-full h-full bg-app overflow-hidden">

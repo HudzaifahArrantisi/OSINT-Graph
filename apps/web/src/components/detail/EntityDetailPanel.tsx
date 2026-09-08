@@ -37,6 +37,7 @@ import {
   FolderSearch,
 } from 'lucide-react';
 import type { Entity, Relationship, Evidence, TimelineEvent } from '@nexusgraph/shared';
+import { resolveAccurateLocation } from '@nexusgraph/shared';
 
 interface EntityDetailPanelProps {
   caseId: string;
@@ -966,18 +967,45 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
                         <MapPin className="w-4 h-4 text-white" />
                         <span>Corporate HQ & Physical Office</span>
                       </div>
-                      {(selectedEntity.metadata as any)?.googleMapsUrl && (
-                        <a
-                          href={(selectedEntity.metadata as any).googleMapsUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="flex items-center gap-1 text-[11px] text-neutral-400 hover:text-white transition-colors"
-                          title="Buka lokasi di Google Maps"
-                        >
-                          <span>Google Maps</span>
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
+                      {(() => {
+                        const rawAddressText = String(
+                          (selectedEntity.metadata as any)?.fullAddress ||
+                            (selectedEntity.metadata as any)?.address ||
+                            selectedEntity.value ||
+                            ''
+                        );
+                        const corporateDomain = String(
+                          (selectedEntity.metadata as any)?.companyDomain ||
+                            (selectedEntity.metadata as any)?.domain ||
+                            ''
+                        );
+                        const rawLat =
+                          (selectedEntity.metadata as any)?.lat ?? (selectedEntity.metadata as any)?.latitude;
+                        const rawLng =
+                          (selectedEntity.metadata as any)?.lng ?? (selectedEntity.metadata as any)?.longitude;
+                        const accurate = resolveAccurateLocation(
+                          rawAddressText,
+                          corporateDomain,
+                          Number(rawLat),
+                          Number(rawLng)
+                        );
+                        const targetGmapsUrl =
+                          accurate?.googleMapsUrl || (selectedEntity.metadata as any)?.googleMapsUrl;
+
+                        if (!targetGmapsUrl) return null;
+                        return (
+                          <a
+                            href={targetGmapsUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-1 text-[11px] text-neutral-400 hover:text-white transition-colors"
+                            title="Buka lokasi di Google Maps"
+                          >
+                            <span>Google Maps</span>
+                            <ExternalLink className="w-3 h-3" />
+                          </a>
+                        );
+                      })()}
                     </div>
 
                     <div className="space-y-1.5 text-[11px]">
@@ -990,15 +1018,62 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
                         </div>
                       )}
 
-                      {((selectedEntity.metadata as any)?.lat !== undefined || (selectedEntity.metadata as any)?.latitude !== undefined) && (
-                        <div className="flex justify-between items-center py-1">
-                          <span className="text-neutral-500">Koordinat Presisi:</span>
-                          <span className="text-white font-bold">
-                            {Number((selectedEntity.metadata as any)?.lat ?? (selectedEntity.metadata as any)?.latitude).toFixed(5)},{' '}
-                            {Number((selectedEntity.metadata as any)?.lng ?? (selectedEntity.metadata as any)?.longitude).toFixed(5)}
-                          </span>
-                        </div>
-                      )}
+                      {(() => {
+                        const rawAddressText = String(
+                          (selectedEntity.metadata as any)?.fullAddress ||
+                            (selectedEntity.metadata as any)?.address ||
+                            selectedEntity.value ||
+                            ''
+                        );
+                        const corporateDomain = String(
+                          (selectedEntity.metadata as any)?.companyDomain ||
+                            (selectedEntity.metadata as any)?.domain ||
+                            ''
+                        );
+                        const rawLat =
+                          (selectedEntity.metadata as any)?.lat ?? (selectedEntity.metadata as any)?.latitude;
+                        const rawLng =
+                          (selectedEntity.metadata as any)?.lng ?? (selectedEntity.metadata as any)?.longitude;
+                        let numLat =
+                          rawLat !== null && rawLat !== undefined && rawLat !== '' ? Number(rawLat) : NaN;
+                        let numLng =
+                          rawLng !== null && rawLng !== undefined && rawLng !== '' ? Number(rawLng) : NaN;
+
+                        const accurate = resolveAccurateLocation(rawAddressText, corporateDomain, numLat, numLng);
+                        if (accurate) {
+                          numLat = accurate.lat;
+                          numLng = accurate.lng;
+                        }
+
+                        const hasCoords =
+                          Number.isFinite(numLat) &&
+                          Number.isFinite(numLng) &&
+                          !(Math.abs(numLat) < 0.0001 && Math.abs(numLng) < 0.0001);
+                        if (!hasCoords) return null;
+
+                        const prec = accurate?.precision || String((selectedEntity.metadata as any)?.precision || '');
+                        const label =
+                          prec === 'EXACT_COORDINATES'
+                            ? 'Koordinat GPS (Eksak):'
+                            : prec === 'STREET_ADDRESS'
+                            ? 'Koordinat Alamat Jalan:'
+                            : prec === 'DISTRICT_LEVEL'
+                            ? 'Koordinat Kecamatan:'
+                            : prec === 'VENUE_LEVEL'
+                            ? 'Koordinat Gedung:'
+                            : prec.includes('CITY')
+                            ? 'Perkiraan Tingkat Kota:'
+                            : 'Koordinat Lokasi:';
+
+                        return (
+                          <div className="flex justify-between items-center py-1">
+                            <span className="text-neutral-500">{label}</span>
+                            <span className="text-white font-bold font-mono">
+                              {numLat.toFixed(5)}, {numLng.toFixed(5)}
+                            </span>
+                          </div>
+                        );
+                      })()}
 
                       {(selectedEntity.metadata as any)?.detectionMethod && (
                         <div className="flex justify-between items-center py-0.5">
@@ -1025,17 +1100,44 @@ export function EntityDetailPanel({ caseId, onClose, width, onResizeStart }: Ent
                           <span>Lihat di Tab Geo Map</span>
                         </button>
 
-                        {(selectedEntity.metadata as any)?.googleMapsUrl && (
-                          <a
-                            href={(selectedEntity.metadata as any).googleMapsUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="w-full flex items-center justify-center gap-1.5 py-1 px-2.5 rounded bg-[#121212] hover:bg-[#181818] border border-[#222222] text-neutral-400 hover:text-white transition-colors text-[11px] font-sans"
-                            title="Buka lokasi di Google Maps eksternal"
-                          >
-                            <span>Google Maps Eksternal ↗</span>
-                          </a>
-                        )}
+                        {(() => {
+                          const rawAddressText = String(
+                            (selectedEntity.metadata as any)?.fullAddress ||
+                              (selectedEntity.metadata as any)?.address ||
+                              selectedEntity.value ||
+                              ''
+                          );
+                          const corporateDomain = String(
+                            (selectedEntity.metadata as any)?.companyDomain ||
+                              (selectedEntity.metadata as any)?.domain ||
+                              ''
+                          );
+                          const rawLat =
+                            (selectedEntity.metadata as any)?.lat ?? (selectedEntity.metadata as any)?.latitude;
+                          const rawLng =
+                            (selectedEntity.metadata as any)?.lng ?? (selectedEntity.metadata as any)?.longitude;
+                          const accurate = resolveAccurateLocation(
+                            rawAddressText,
+                            corporateDomain,
+                            Number(rawLat),
+                            Number(rawLng)
+                          );
+                          const targetGmapsUrl =
+                            accurate?.googleMapsUrl || (selectedEntity.metadata as any)?.googleMapsUrl;
+
+                          if (!targetGmapsUrl) return null;
+                          return (
+                            <a
+                              href={targetGmapsUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="w-full flex items-center justify-center gap-1.5 py-1 px-2.5 rounded bg-[#121212] hover:bg-[#181818] border border-[#222222] text-neutral-400 hover:text-white transition-colors text-[11px] font-sans"
+                              title="Buka lokasi di Google Maps eksternal"
+                            >
+                              <span>Google Maps Eksternal ↗</span>
+                            </a>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>

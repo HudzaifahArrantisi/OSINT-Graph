@@ -381,6 +381,32 @@ const TRANSFORM_HANDLERS: Record<string, TransformHandler> = {
     },
     collectors: [{ name: 'company-geo' }],
   },
+  'domain.well-known-recon': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl) return v.trim();
+      if (analysis.isDomain) return `https://${v.trim()}`;
+      const d = extractDomain(v);
+      return d && d.includes('.') ? `https://${d}` : null;
+    },
+    collectors: [{ name: 'well-known-recon' }],
+  },
+  'domain.passive-dns-history': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;
+      if (analysis.isDomain) return v.trim();
+      const d = extractDomain(v);
+      return d && d.includes('.') ? d : null;
+    },
+    collectors: [{ name: 'passive-dns' }],
+  },
+  'domain.cloud-bucket-finder': {
+    deriveInput: (v, _st, analysis) => {
+      if (analysis.isUrl && analysis.extractedHostname) return analysis.extractedHostname;
+      if (analysis.isDomain) return v.trim();
+      return v.trim();
+    },
+    collectors: [{ name: 'cloud-bucket-finder' }],
+  },
   'mentions.search-public-web': {
     deriveInput: (v, st, analysis) => {
       // Only allowed for DOMAIN, IP_ADDRESS, URL, ORGANIZATION

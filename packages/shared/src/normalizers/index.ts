@@ -110,6 +110,9 @@ export function normalizeIpAddress(input: string): string {
   return ip.toLowerCase();
 }
 
+/** Alias for normalizeIpAddress */
+export const normalizeIp = normalizeIpAddress;
+
 // ─── Organization Normalizer ────────────────────────────────────────
 
 export function normalizeOrganization(input: string): string {
@@ -170,3 +173,7 @@ export function normalize(type: NormalizableType, value: string): string {
       return value.trim().toLowerCase();
   }
 }
+
+// ─── Geo Normalizer & Sanitizer ──────────────────────────────────────
+export * from './geoNormalizer.js';
+

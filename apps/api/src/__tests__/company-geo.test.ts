@@ -7,9 +7,13 @@ import {
   extractDirectHtmlCoordinates,
   extractPageMetadata,
   isGeocodingResultRelevant,
+  cleanAddressText,
+  generateAddressGeocodingQueries,
   KNOWN_CORPORATE_HQS,
   resolveCoordinates,
+  resolveKnownIndonesianLocation,
 } from '../collectors/company-geo.js';
+import { resolveAccurateLocation } from '@nexusgraph/shared';
 import * as ssrfModule from '../security/ssrf.js';
 
 describe('company-geo collector & parser', () => {
@@ -240,6 +244,44 @@ describe('company-geo collector & parser', () => {
       expect(resolved?.lng).toBeCloseTo(106.8295);
       expect(resolved?.precision).toBe('EXACT_COORDINATES');
     });
+
+    it('resolves Nurul Fikri Kampus A (Cimanggis, Depok) to real Google Maps coordinates', async () => {
+      const match = resolveKnownIndonesianLocation(
+        'Kampus A : Jl. Situ Indah 116, Tugu, Cimanggis, Depok, Jawa Barat. Kampus B',
+        'nurulfikri.ac.id'
+      );
+      expect(match).not.toBeNull();
+      expect(match?.lat).toBeCloseTo(-6.36276, 4);
+      expect(match?.lng).toBeCloseTo(106.84382, 4);
+      expect(match?.precision).toBe('STREET_ADDRESS');
+      expect(match?.matchedName).toContain('Cimanggis, Depok');
+    });
+
+    it('resolves Nurul Fikri Kampus B (Jagakarsa, Jakarta Selatan) to real Google Maps coordinates', async () => {
+      const match = resolveKnownIndonesianLocation(
+        'Kampus B : Jl. Raya Lenteng Agung No.20-21, RT.4/RW.1, Srengseng Sawah, Kec. Jagakarsa, Kota Jakarta Selatan',
+        'nurulfikri.ac.id'
+      );
+      expect(match).not.toBeNull();
+      expect(match?.lat).toBeCloseTo(-6.34241, 4);
+      expect(match?.lng).toBeCloseTo(106.83154, 4);
+      expect(match?.precision).toBe('STREET_ADDRESS');
+      expect(match?.matchedName).toContain('Jagakarsa');
+    });
+
+    it('sanitizes legacy Jakarta centroid (-6.2088, 106.8456) when address is in Cimanggis Depok', () => {
+      const corrected = resolveAccurateLocation(
+        'Kampus A : Jl. Situ Indah 116, Tugu, Cimanggis, Depok, Jawa Barat. Kampus B',
+        'nurulfikri.ac.id',
+        -6.2088,
+        106.8456
+      );
+      expect(corrected).not.toBeNull();
+      expect(corrected?.lat).toBeCloseTo(-6.36276, 4);
+      expect(corrected?.lng).toBeCloseTo(106.84382, 4);
+      expect(corrected?.precision).toBe('STREET_ADDRESS');
+      expect(corrected?.googleMapsUrl).toContain('-6.36276,106.84382');
+    });
   });
 
   describe('companyGeoCollector.run execution', () => {
@@ -388,6 +430,160 @@ describe('company-geo collector & parser', () => {
       // Must NOT be Tanjung Enim or South Sumatra
       expect(meta.address).not.toContain('Tanjung Enim');
       expect(meta.address).not.toContain('PTBA');
+    });
+
+    describe('cleanAddressText & generateAddressGeocodingQueries', () => {
+      it('cleans campus prefixes and trailing call-us noise', () => {
+        const raw = 'Kampus A : Jl. Raya Lenteng Agung No.20-21, RT.4/RW.1, Srengseng Sawah, Kec. Jagakarsa, Jakarta Selatan, Call Us';
+        const cleaned = cleanAddressText(raw);
+        expect(cleaned).toBe('Jl. Raya Lenteng Agung No.20-21, RT.4/RW.1, Srengseng Sawah, Kec. Jagakarsa, Jakarta Selatan');
+        expect(cleaned).not.toContain('Kampus A :');
+        expect(cleaned).not.toContain('Call Us');
+      });
+
+      it('generates focused queries with street and city', () => {
+        const raw = 'Jl. Situ Indah 116, Tugu, Cimanggis, Depok, Jawa Barat 16451';
+        const queries = generateAddressGeocodingQueries(raw);
+        expect(queries.some((q) => q.includes('Jalan Situ Indah') && q.includes('Depok'))).toBe(true);
+      });
+    });
+
+    it('resolves Nurul Fikri Depok address to verified Cimanggis coordinates', async () => {
+      const html = `
+        <html>
+          <head><title>STT Terpadu Nurul Fikri</title></head>
+          <body><p>Kampus A : Jl. Situ Indah 116, Tugu, Cimanggis, Depok, Jawa Barat</p></body>
+        </html>
+      `;
+
+      vi.spyOn(ssrfModule, 'safeFetch').mockResolvedValue({
+        status: 200,
+        headers: new Headers({ 'content-type': 'text/html' }),
+      } as any);
+      vi.spyOn(ssrfModule, 'readResponseWithLimit').mockResolvedValue(html);
+
+      const result = await companyGeoCollector.run('nurulfikri.ac.id', {
+        caseId: 'case-depok-1',
+        requestId: 'req-depok-1',
+        signal: new AbortController().signal,
+      });
+
+      const location = result.entities.find((entity) =>
+        String((entity.metadata as any)?.address).includes('Situ Indah')
+      );
+      expect(location).toBeDefined();
+
+      const metadata = location?.metadata as any;
+      expect(metadata.latitude).toBeCloseTo(-6.36276, 4);
+      expect(metadata.longitude).toBeCloseTo(106.84382, 4);
+      expect(metadata.precision).toBe('STREET_ADDRESS');
+      expect(metadata.googleMapsUrl).toContain('-6.36276');
+    });
+
+    it('does not attach the Jakarta centroid to an unknown domain with Depok address when geocoding fails', async () => {
+      const html = `
+        <html>
+          <head><title>Random Organization</title></head>
+          <body><p>Jl. Raden Sanim No. 99, Tanah Baru, Beji, Depok, Jawa Barat 16426</p></body>
+        </html>
+      `;
+
+      vi.spyOn(ssrfModule, 'safeFetch').mockImplementation(async (url: string) => {
+        if (url.includes('photon.komoot.io') || url.includes('nominatim.openstreetmap.org')) {
+          return {
+            status: 200,
+            headers: new Headers({ 'content-type': 'application/json' }),
+          } as any;
+        }
+        return {
+          status: 200,
+          headers: new Headers({ 'content-type': 'text/html' }),
+        } as any;
+      });
+      vi.spyOn(ssrfModule, 'readResponseWithLimit').mockImplementation(async (res: any) => {
+        if (res.headers.get('content-type')?.includes('application/json')) {
+          return '[]'; // Simulate geocoders returning no results
+        }
+        return html;
+      });
+
+      const result = await companyGeoCollector.run('unknown-domain-test.com', {
+        caseId: 'case-depok-unresolved',
+        requestId: 'req-depok-unresolved',
+        signal: new AbortController().signal,
+      });
+
+      const location = result.entities.find((entity) =>
+        String((entity.metadata as any)?.address).includes('Raden Sanim')
+      );
+      expect(location).toBeDefined();
+
+      const metadata = location?.metadata as any;
+      expect(metadata.latitude).toBeUndefined();
+      expect(metadata.longitude).toBeUndefined();
+      expect(metadata.precision).toBe('UNRESOLVED');
+      expect(metadata.googleMapsUrl).toContain(encodeURIComponent('Jl. Raden Sanim'));
+    });
+
+    it('selects a relevant address candidate instead of the first fuzzy geocoder result', async () => {
+      const html = `
+        <html>
+          <head><title>Mitra Niaga Logistics</title></head>
+          <body><p>Jl. Danau Sunter Barat No. 12, Tanjung Priok, Jakarta Utara</p></body>
+        </html>
+      `;
+
+      vi.spyOn(ssrfModule, 'safeFetch').mockImplementation(async (url: string) => ({
+        status: 200,
+        headers: new Headers({
+          'content-type': url.includes('photon.komoot.io') || url.includes('nominatim.openstreetmap.org')
+            ? 'application/json'
+            : 'text/html',
+        }),
+        mockUrl: url,
+      } as any));
+      vi.spyOn(ssrfModule, 'readResponseWithLimit').mockImplementation(async (response: any) => {
+        if (response.mockUrl?.includes('photon.komoot.io')) {
+          return JSON.stringify({
+            features: [
+              {
+                geometry: { coordinates: [112.7521, -7.2575] },
+                properties: {
+                  name: 'Taman Danau',
+                  city: 'Surabaya',
+                  country: 'Indonesia',
+                },
+              },
+              {
+                geometry: { coordinates: [106.8712, -6.1384] },
+                properties: {
+                  name: 'Mitra Niaga Office',
+                  street: 'Jalan Danau Sunter Barat',
+                  district: 'Tanjung Priok',
+                  city: 'Jakarta Utara',
+                  country: 'Indonesia',
+                },
+              },
+            ],
+          });
+        }
+        if (response.mockUrl?.includes('nominatim.openstreetmap.org')) return '[]';
+        return html;
+      });
+
+      const result = await companyGeoCollector.run('mitraniaga-test.co.id', {
+        caseId: 'case-candidate-2',
+        requestId: 'req-candidate-2',
+        signal: new AbortController().signal,
+      });
+
+      const location = result.entities.find((entity) =>
+        String((entity.metadata as any)?.address).includes('Danau Sunter')
+      );
+      const metadata = location?.metadata as any;
+      expect(metadata.latitude).toBeCloseTo(-6.1384, 4);
+      expect(metadata.longitude).toBeCloseTo(106.8712, 4);
+      expect(metadata.precision).toBe('STREET_ADDRESS');
     });
   });
 });

@@ -313,7 +313,7 @@ export function GraphToolbar({
             if (onResetLayout) onResetLayout();
           }}
           className="p-1.5 rounded-md text-neutral-400 hover:text-white hover:bg-[#181818] transition-colors"
-          title="Reset filters & auto-align layout"
+          title="Rapikan Graf & Tata Ulang Otomatis (Zero Overlap)"
         >
           <RotateCcw className="w-3.5 h-3.5" />
         </button>

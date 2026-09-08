@@ -22,6 +22,9 @@ export interface DiscoveryPlanOutput {
 const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   URL: [
     'domain.company-geo-location',
+    'domain.well-known-recon',
+    'domain.passive-dns-history',
+    'domain.cloud-bucket-finder',
     'domain.xnlinkfinder-js-params',
     'domain.sensitive-url-classifier',
     'domain.web-tech-fingerprint',
@@ -47,6 +50,9 @@ const SEED_TRANSFORM_MAP: Record<SeedType, string[]> = {
   ],
   DOMAIN: [
     'domain.company-geo-location',
+    'domain.well-known-recon',
+    'domain.passive-dns-history',
+    'domain.cloud-bucket-finder',
     'domain.xnlinkfinder-js-params',
     'domain.sensitive-url-classifier',
     'domain.web-tech-fingerprint',

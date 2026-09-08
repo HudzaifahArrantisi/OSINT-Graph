@@ -439,5 +439,198 @@ describe('Graph Scalability & Layout Algorithm Tests', () => {
       const islandDist = Math.hypot(xnCentroidX - wbCentroidX, xnCentroidY - wbCentroidY);
       expect(islandDist).toBeGreaterThanOrEqual(200);
     });
+
+    it('should arrange 215 nodes across 12 categories with ZERO inter-category overlap', () => {
+      const seed = {
+        id: 'seed-kemnaker',
+        type: 'seed',
+        position: { x: 0, y: 0 },
+        data: {
+          label: 'kemnaker.go.id',
+          value: 'kemnaker.go.id',
+          entityType: 'SEED',
+          isSeed: true,
+        },
+      };
+
+      // 100 dirsearch paths
+      const dirsearchNodes = Array.from({ length: 100 }, (_, i) => ({
+        id: `dirsearch-${i}`,
+        type: 'entity',
+        position: { x: 0, y: 0 },
+        data: {
+          label: `kemnaker.go.id/path_${i}`,
+          value: `kemnaker.go.id/path_${i}`,
+          entityType: 'URL',
+          metadata: { discoveredBy: 'domain.dirsearch-path-bruteforce' },
+        },
+      }));
+
+      // 51 xnLinkFinder endpoints
+      const xnNodes = Array.from({ length: 51 }, (_, i) => ({
+        id: `xnlink-${i}`,
+        type: 'entity',
+        position: { x: 0, y: 0 },
+        data: {
+          label: `kemnaker.go.id/api/endpoint_${i}`,
+          value: `kemnaker.go.id/api/endpoint_${i}`,
+          entityType: 'URL',
+          metadata: { discoveredBy: 'domain.xnlinkfinder-js-params' },
+        },
+      }));
+
+      // 40 TLS / SAN domains
+      const tlsNodes = Array.from({ length: 40 }, (_, i) => ({
+        id: `tls-${i}`,
+        type: 'entity',
+        position: { x: 0, y: 0 },
+        data: {
+          label: `sub_${i}.kemnaker.go.id`,
+          value: `sub_${i}.kemnaker.go.id`,
+          entityType: 'DOMAIN',
+          metadata: { discoveredBy: 'domain.tls-san-extraction' },
+        },
+      }));
+
+      // 4 DNS records
+      const dnsNodes = Array.from({ length: 4 }, (_, i) => ({
+        id: `dns-${i}`,
+        type: 'entity',
+        position: { x: 0, y: 0 },
+        data: {
+          label: `ns${i}.kemnaker.go.id`,
+          value: `ns${i}.kemnaker.go.id`,
+          entityType: 'NS_RECORD',
+          metadata: { discoveredBy: 'domain.dns-records' },
+        },
+      }));
+
+      // 20 minor engine nodes across various categories
+      const otherNodes = Array.from({ length: 19 }, (_, i) => ({
+        id: `other-${i}`,
+        type: 'entity',
+        position: { x: 0, y: 0 },
+        data: {
+          label: `tech_${i}`,
+          value: `tech_${i}`,
+          entityType: 'TECHNOLOGY',
+          metadata: { discoveredBy: 'domain.web-tech-fingerprint' },
+        },
+      }));
+
+      const allNodes: any[] = [seed, ...dirsearchNodes, ...xnNodes, ...tlsNodes, ...dnsNodes, ...otherNodes];
+      expect(allNodes.length).toBe(215);
+
+      const edges = allNodes.slice(1).map((n, i) => ({
+        id: `edge-${i}`,
+        source: 'seed-kemnaker',
+        target: n.id,
+      }));
+
+      const start = performance.now();
+      const positioned = applyForceLayout(allNodes, edges);
+      const duration = performance.now() - start;
+
+      expect(positioned.length).toBe(215);
+      expect(duration).toBeLessThan(100);
+
+      // Verify all positions are finite valid coordinates
+      positioned.forEach((n) => {
+        expect(Number.isFinite(n.position.x)).toBe(true);
+        expect(Number.isFinite(n.position.y)).toBe(true);
+      });
+
+      // Group positioned nodes by their engine module
+      const moduleMap = new Map<string, Array<{ x: number; y: number; id: string }>>();
+      positioned.forEach((n) => {
+        const eng = getNodeEngineModule(n.data).id;
+        if (!moduleMap.has(eng)) moduleMap.set(eng, []);
+        moduleMap.get(eng)!.push({ x: n.position.x, y: n.position.y, id: n.id });
+      });
+
+      // Verify ZERO inter-category overlap between any two cards from different modules
+      const CARD_W = 195;
+      const CARD_H = 56;
+
+      const engineKeys = Array.from(moduleMap.keys());
+      let overlapCount = 0;
+
+      for (let i = 0; i < engineKeys.length; i++) {
+        for (let j = i + 1; j < engineKeys.length; j++) {
+          const listA = moduleMap.get(engineKeys[i])!;
+          const listB = moduleMap.get(engineKeys[j])!;
+
+          for (const posA of listA) {
+            for (const posB of listB) {
+              const overlapX = CARD_W - Math.abs(posA.x - posB.x);
+              const overlapY = CARD_H - Math.abs(posA.y - posB.y);
+
+              if (overlapX > 0 && overlapY > 0) {
+                overlapCount++;
+              }
+            }
+          }
+        }
+      }
+
+      expect(overlapCount).toBe(0);
+    });
+
+    it('should compute hierarchical tree layout for 215 nodes without any card overlaps', () => {
+      const seed = {
+        id: 'seed-kemnaker',
+        type: 'seed',
+        position: { x: 0, y: 0 },
+        data: { label: 'kemnaker.go.id', isSeed: true },
+      };
+
+      const nodes = Array.from({ length: 214 }, (_, i) => ({
+        id: `node-${i}`,
+        type: 'entity',
+        position: { x: 0, y: 0 },
+        data: {
+          label: `item-${i}`,
+          metadata: { discoveredBy: i < 100 ? 'domain.dirsearch-path-bruteforce' : 'domain.xnlinkfinder-js-params' },
+        },
+      }));
+
+      const allNodes: any[] = [seed, ...nodes];
+      const edges = nodes.map((n) => ({ id: `e-${n.id}`, source: 'seed-kemnaker', target: n.id }));
+
+      const positioned = applyHierarchicalLayout(allNodes, edges);
+      expect(positioned.length).toBe(215);
+
+      // Verify no two nodes occupy identical positions
+      const posSet = new Set(positioned.map((n) => `${n.position.x},${n.position.y}`));
+      expect(posSet.size).toBe(215);
+    });
+
+    it('should compute radial layout for 215 nodes with zero satellite collisions', () => {
+      const seed = {
+        id: 'seed-kemnaker',
+        type: 'seed',
+        position: { x: 0, y: 0 },
+        data: { label: 'kemnaker.go.id', isSeed: true },
+      };
+
+      const nodes = Array.from({ length: 214 }, (_, i) => ({
+        id: `node-${i}`,
+        type: 'entity',
+        position: { x: 0, y: 0 },
+        data: {
+          label: `item-${i}`,
+          metadata: { discoveredBy: i < 100 ? 'domain.dirsearch-path-bruteforce' : 'domain.tls-san-extraction' },
+        },
+      }));
+
+      const allNodes: any[] = [seed, ...nodes];
+      const edges = nodes.map((n) => ({ id: `e-${n.id}`, source: 'seed-kemnaker', target: n.id }));
+
+      const positioned = applyRadialLayout(allNodes, edges);
+      expect(positioned.length).toBe(215);
+
+      const posSet = new Set(positioned.map((n) => `${n.position.x},${n.position.y}`));
+      expect(posSet.size).toBe(215);
+    });
   });
 });

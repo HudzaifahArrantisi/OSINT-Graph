@@ -867,7 +867,7 @@ export function partitionGraphClusters<T extends Record<string, unknown>>(
 export function layoutStarburst<T extends Record<string, unknown>>(
   centerPos: { x: number; y: number },
   nodes: SimpleNode<T>[],
-  startRadius = 120,
+  startRadius = 180,
   _startAngle = -Math.PI / 2,
   _angleSpan = 2 * Math.PI,
 ): SimpleNode<T>[] {
@@ -885,8 +885,8 @@ export function layoutStarburst<T extends Record<string, unknown>>(
   const result: SimpleNode<T>[] = [];
   let nodeIndex = 0;
   let ringIndex = 0;
-  const RING_STEP = 58; // Compact radial spacing between concentric rings
-  const MIN_ARC_PER_NODE = 120; // Compact arc distance per node badge to prevent excessive distance
+  const RING_STEP = 75; // Generous radial spacing between concentric rings (56px node + 19px gap)
+  const MIN_ARC_PER_NODE = 225; // Arc distance per node card to guarantee no horizontal card overlaps (195px node + 30px gap)
 
   while (nodeIndex < nodes.length) {
     const currentRadius = startRadius + ringIndex * RING_STEP;
@@ -984,6 +984,181 @@ export function computeClusterGridOffsets(
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Bounding Box 2D & AABB Overlap Resolution Engine
+// Eliminates any overlap between module islands, categories, and clusters
+// ─────────────────────────────────────────────────────────────────────────────
+export interface BoundingBox2D {
+  id: string;
+  cx: number;
+  cy: number;
+  width: number;
+  height: number;
+  isFixed?: boolean;
+}
+
+/**
+ * Resolves overlapping 2D Axis-Aligned Bounding Boxes iteratively.
+ * Pushes colliding boxes apart along minimum-penetration vectors with a safety gap.
+ * Fixed boxes (such as the central Seed Target) will not move.
+ */
+export function resolveAABBCollisions(
+  boxes: BoundingBox2D[],
+  gap = 140,
+  maxIterations = 60,
+): void {
+  for (let iter = 0; iter < maxIterations; iter++) {
+    let hasCollision = false;
+
+    for (let i = 0; i < boxes.length; i++) {
+      for (let j = i + 1; j < boxes.length; j++) {
+        const b1 = boxes[i];
+        const b2 = boxes[j];
+
+        const minDistanceX = (b1.width + b2.width) / 2 + gap;
+        const minDistanceY = (b1.height + b2.height) / 2 + gap;
+
+        const dx = b2.cx - b1.cx;
+        const dy = b2.cy - b1.cy;
+
+        const overlapX = minDistanceX - Math.abs(dx);
+        const overlapY = minDistanceY - Math.abs(dy);
+
+        if (overlapX > 0 && overlapY > 0) {
+          hasCollision = true;
+
+          // Push along the axis of minimum penetration
+          const pushAlongX = overlapX < overlapY;
+          const signX = dx === 0 ? (i % 2 === 0 ? 1 : -1) : Math.sign(dx);
+          const signY = dy === 0 ? (j % 2 === 0 ? 1 : -1) : Math.sign(dy);
+
+          if (pushAlongX) {
+            const shift = overlapX / 2;
+            if (!b1.isFixed && !b2.isFixed) {
+              b1.cx -= signX * shift;
+              b2.cx += signX * shift;
+            } else if (!b1.isFixed) {
+              b1.cx -= signX * overlapX;
+            } else if (!b2.isFixed) {
+              b2.cx += signX * overlapX;
+            }
+          } else {
+            const shift = overlapY / 2;
+            if (!b1.isFixed && !b2.isFixed) {
+              b1.cy -= signY * shift;
+              b2.cy += signY * shift;
+            } else if (!b1.isFixed) {
+              b1.cy -= signY * overlapY;
+            } else if (!b2.isFixed) {
+              b2.cy += signY * overlapY;
+            }
+          }
+        }
+      }
+    }
+
+    if (!hasCollision) break;
+  }
+}
+
+/**
+ * Calculates optimal subgrid dimensions (columns, rows, width, height)
+ * based on node count to create balanced ~1.4 : 1 aspect ratio cards panels.
+ * Prevents tall narrow towers (e.g. 4 cols x 25 rows) that cut across the canvas.
+ */
+export function computeModuleSubgrid(
+  count: number,
+  nodeXStep = 220,
+  nodeYStep = 72,
+  cardWidth = 195,
+  cardHeight = 56,
+): {
+  cols: number;
+  rows: number;
+  width: number;
+  height: number;
+} {
+  if (count <= 1) {
+    return { cols: 1, rows: 1, width: cardWidth, height: cardHeight };
+  }
+  if (count <= 3) {
+    return {
+      cols: 1,
+      rows: count,
+      width: cardWidth,
+      height: (count - 1) * nodeYStep + cardHeight,
+    };
+  }
+  if (count <= 6) {
+    const cols = 2;
+    const rows = Math.ceil(count / cols);
+    return {
+      cols,
+      rows,
+      width: (cols - 1) * nodeXStep + cardWidth,
+      height: (rows - 1) * nodeYStep + cardHeight,
+    };
+  }
+  if (count <= 14) {
+    const cols = 3;
+    const rows = Math.ceil(count / cols);
+    return {
+      cols,
+      rows,
+      width: (cols - 1) * nodeXStep + cardWidth,
+      height: (rows - 1) * nodeYStep + cardHeight,
+    };
+  }
+  if (count <= 28) {
+    const cols = 4;
+    const rows = Math.ceil(count / cols);
+    return {
+      cols,
+      rows,
+      width: (cols - 1) * nodeXStep + cardWidth,
+      height: (rows - 1) * nodeYStep + cardHeight,
+    };
+  }
+  if (count <= 48) {
+    const cols = 5;
+    const rows = Math.ceil(count / cols);
+    return {
+      cols,
+      rows,
+      width: (cols - 1) * nodeXStep + cardWidth,
+      height: (rows - 1) * nodeYStep + cardHeight,
+    };
+  }
+  if (count <= 75) {
+    const cols = 6;
+    const rows = Math.ceil(count / cols);
+    return {
+      cols,
+      rows,
+      width: (cols - 1) * nodeXStep + cardWidth,
+      height: (rows - 1) * nodeYStep + cardHeight,
+    };
+  }
+  if (count <= 120) {
+    const cols = 7;
+    const rows = Math.ceil(count / cols);
+    return {
+      cols,
+      rows,
+      width: (cols - 1) * nodeXStep + cardWidth,
+      height: (rows - 1) * nodeYStep + cardHeight,
+    };
+  }
+  const cols = Math.max(7, Math.min(10, Math.ceil(Math.sqrt(count * 1.5))));
+  const rows = Math.ceil(count / cols);
+  return {
+    cols,
+    rows,
+    width: (cols - 1) * nodeXStep + cardWidth,
+    height: (rows - 1) * nodeYStep + cardHeight,
+  };
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // 1. Force / Grid Layout (Cluster-Aware 2D Organic Layout)
 // ─────────────────────────────────────────────────────────────────────────────
 export function applyForceLayout<T extends Record<string, unknown>>(
@@ -999,6 +1174,10 @@ export function applyForceLayout<T extends Record<string, unknown>>(
   const clusterBoxes: ClusterBox[] = [];
   const clusterRelativePositions: Array<Map<string, { x: number; y: number }>> = [];
 
+  const NODE_X_STEP = 220; // Node card width (195px) + 25px horizontal clearance
+  const NODE_Y_STEP = 72; // Node card height (56px) + 16px vertical clearance
+  const CATEGORY_ISLAND_GAP = 140; // Guaranteed separation margin between distinct engine module islands
+
   for (const cluster of clusters) {
     const cNodes = cluster.nodes;
     const cEdges = cluster.edges;
@@ -1007,7 +1186,7 @@ export function applyForceLayout<T extends Record<string, unknown>>(
     if (cNodes.length === 1) {
       posMap.set(cNodes[0].id, { x: 0, y: 0 });
       clusterRelativePositions.push(posMap);
-      clusterBoxes.push({ width: 140, height: 100, minX: -70, minY: -50 });
+      clusterBoxes.push({ width: 220, height: 100, minX: -110, minY: -50 });
       continue;
     }
 
@@ -1028,30 +1207,25 @@ export function applyForceLayout<T extends Record<string, unknown>>(
     const connected = nodeDegrees.filter((item) => item.degree > 0);
     const isolated = nodeDegrees.filter((item) => item.degree === 0);
 
-    const xSpacing = 205;
-    const ySpacing = 125;
-
     // If all nodes are isolated or graph has very few edges:
     // Arrange in a clean, balanced, data-dense 2D grid matrix centered around (0, 0)
     if (connected.length <= 1) {
       const allItems = nodeDegrees;
       const cols = Math.max(3, Math.min(8, Math.ceil(Math.sqrt(allItems.length * 1.5))));
       const rows = Math.ceil(allItems.length / cols);
-      const startX = -((cols - 1) * xSpacing) / 2;
-      const startY = -((rows - 1) * ySpacing) / 2;
+      const startX = -((cols - 1) * NODE_X_STEP) / 2;
+      const startY = -((rows - 1) * NODE_Y_STEP) / 2;
 
       allItems.forEach((item, index) => {
         const r = Math.floor(index / cols);
         const c = index % cols;
-        const jitterX = ((index * 37) % 16) - 8;
-        const jitterY = ((index * 23) % 12) - 6;
         posMap.set(item.node.id, {
-          x: Math.round(startX + c * xSpacing + jitterX + (r % 2 === 1 ? xSpacing / 4 : 0)),
-          y: Math.round(startY + r * ySpacing + jitterY),
+          x: Math.round(startX + c * NODE_X_STEP),
+          y: Math.round(startY + r * NODE_Y_STEP),
         });
       });
     } else {
-      // Connected nodes: Seed at center (0, 0), remaining nodes partitioned into Engine Module islands
+      // Connected nodes: Seed at center (0, 0), remaining nodes partitioned into discrete Engine Module islands
       const seedItem = nodeDegrees.find((item) => isSeedNode(item.node));
       const nonSeedConnected = nodeDegrees.filter((item) => !isSeedNode(item.node) && item.degree > 0);
 
@@ -1075,90 +1249,131 @@ export function applyForceLayout<T extends Record<string, unknown>>(
       });
       const numEngines = engineKeys.length;
 
-      const NODE_X_STEP = 210; // Node width (190px) + 20px gap
-      const NODE_Y_STEP = 64; // Node height (44px) + 20px gap
-
       if (numEngines === 1) {
-        // Single engine module: arrange in balanced radial flower around seed
+        // Single engine module: arrange in a clean structured subgrid centered under seed
         const singleGroup = engineGroups.get(engineKeys[0])!;
-        const starNodes = layoutStarburst({ x: 0, y: 0 }, singleGroup.map((item) => item.node), 130);
-        starNodes.forEach((sn) => {
-          posMap.set(sn.id, { x: sn.position.x, y: sn.position.y });
-        });
+        const count = singleGroup.length;
+        if (count <= 8) {
+          const starNodes = layoutStarburst({ x: 0, y: 0 }, singleGroup.map((item) => item.node), 180);
+          starNodes.forEach((sn) => posMap.set(sn.id, { x: sn.position.x, y: sn.position.y }));
+        } else {
+          const grid = computeModuleSubgrid(count);
+          const startX = -((grid.cols - 1) * NODE_X_STEP) / 2;
+          const startY = 180; // Neat vertical drop below central seed
+          singleGroup.forEach((item, i) => {
+            const col = i % grid.cols;
+            const row = Math.floor(i / grid.cols);
+            posMap.set(item.node.id, {
+              x: Math.round(startX + col * NODE_X_STEP),
+              y: Math.round(startY + row * NODE_Y_STEP),
+            });
+          });
+        }
       } else {
-        // Multiple engine modules: Assign each Engine Module its own distinct orbital sector / island!
-        const totalNodes = nonSeedConnected.length;
-        const orbitRadius = Math.max(320, Math.min(850, 220 + Math.sqrt(totalNodes) * 48));
+        // Multiple engine modules: Calculate exact bounding boxes for each module island
+        interface ModuleIslandBox {
+          engKey: string;
+          items: typeof nonSeedConnected;
+          cols: number;
+          rows: number;
+          width: number;
+          height: number;
+          cx: number;
+          cy: number;
+        }
 
-        engineKeys.forEach((engKey, idx) => {
+        const islandBoxes: ModuleIslandBox[] = [];
+        let totalIslandPerimeter = 0;
+
+        engineKeys.forEach((engKey) => {
           const group = engineGroups.get(engKey)!;
-          const count = group.length;
+          const grid = computeModuleSubgrid(group.length);
+          const boxW = Math.max(220, (grid.cols - 1) * NODE_X_STEP + 195);
+          const boxH = Math.max(72, (grid.rows - 1) * NODE_Y_STEP + 56);
 
-          // Distribute island centers evenly around 360 degrees
-          const angle = -Math.PI / 2 + (2 * Math.PI * idx) / numEngines;
-          const islandCenterX = Math.round(Math.cos(angle) * orbitRadius);
-          const islandCenterY = Math.round(Math.sin(angle) * orbitRadius);
+          islandBoxes.push({
+            engKey,
+            items: group,
+            cols: grid.cols,
+            rows: grid.rows,
+            width: boxW,
+            height: boxH,
+            cx: 0,
+            cy: 0,
+          });
 
-          if (count === 1) {
-            posMap.set(group[0].node.id, { x: islandCenterX, y: islandCenterY });
-          } else if (count <= 4) {
-            // Small cluster: compact column or mini starburst
-            group.forEach((item, i) => {
-              const offsetY = (i - (count - 1) / 2) * NODE_Y_STEP;
-              posMap.set(item.node.id, {
-                x: islandCenterX,
-                y: Math.round(islandCenterY + offsetY),
-              });
-            });
-          } else {
-            // Structured compact subgrid for this engine
-            const cols = Math.max(2, Math.min(4, Math.ceil(Math.sqrt(count * 1.1))));
-            const rows = Math.ceil(count / cols);
-            const gridW = (cols - 1) * NODE_X_STEP;
-            const gridH = (rows - 1) * NODE_Y_STEP;
-            const startX = islandCenterX - gridW / 2;
-            const startY = islandCenterY - gridH / 2;
-
-            group.forEach((item, i) => {
-              const col = i % cols;
-              const row = Math.floor(i / cols);
-              const jitterX = ((i * 17) % 10) - 5;
-              const jitterY = ((i * 13) % 8) - 4;
-              posMap.set(item.node.id, {
-                x: Math.round(startX + col * NODE_X_STEP + jitterX),
-                y: Math.round(startY + row * NODE_Y_STEP + jitterY),
-              });
-            });
-          }
+          totalIslandPerimeter += Math.max(boxW, boxH) + CATEGORY_ISLAND_GAP;
         });
-      }
 
-      // Cluster-preserving spring relaxation (8 iterations)
-      // Maintains cohesive engine islands while easing local edge tensions
-      for (let iter = 0; iter < 8; iter++) {
-        cEdges.forEach((e) => {
-          const p1 = posMap.get(e.source);
-          const p2 = posMap.get(e.target);
-          if (!p1 || !p2) return;
-          const dx = p2.x - p1.x;
-          const dy = p2.y - p1.y;
-          const dist = Math.sqrt(dx * dx + dy * dy) || 1;
-          const targetDist = 180;
-          const force = (dist - targetDist) * 0.02;
-          const nx = (dx / dist) * force;
-          const ny = (dy / dist) * force;
+        // Dynamic base orbit radius based on sum of island footprints
+        const baseOrbitRadius = Math.max(450, totalIslandPerimeter / (2 * Math.PI));
 
-          const n1 = nodeDegrees.find((n) => n.node.id === e.source)?.node;
-          const n2 = nodeDegrees.find((n) => n.node.id === e.target)?.node;
+        // Proportional angular sectors for balanced distribution around seed
+        let currentAngle = -Math.PI / 2; // Start from top
+        islandBoxes.forEach((box) => {
+          const footprint = Math.max(box.width, box.height) + CATEGORY_ISLAND_GAP;
+          const angleSpan = (footprint / totalIslandPerimeter) * (2 * Math.PI);
+          const midAngle = currentAngle + angleSpan / 2;
+          currentAngle += angleSpan;
 
-          if (n1 && !isSeedNode(n1)) {
-            p1.x += nx;
-            p1.y += ny;
+          // Distance from seed ensures no overlap with central seed node (at 0, 0)
+          const minSeedClearance = 180 + Math.hypot(box.width / 2, box.height / 2) + 60;
+          const islandRadius = Math.max(baseOrbitRadius, minSeedClearance);
+
+          box.cx = Math.round(Math.cos(midAngle) * islandRadius);
+          box.cy = Math.round(Math.sin(midAngle) * islandRadius);
+        });
+
+        // Add the Seed Target as a fixed central bounding box
+        const seedBox: BoundingBox2D = {
+          id: 'seed-center',
+          cx: 0,
+          cy: 0,
+          width: 220,
+          height: 80,
+          isFixed: true,
+        };
+
+        const collisionBoxes: BoundingBox2D[] = [
+          seedBox,
+          ...islandBoxes.map((b) => ({
+            id: b.engKey,
+            cx: b.cx,
+            cy: b.cy,
+            width: b.width,
+            height: b.height,
+            isFixed: false,
+          })),
+        ];
+
+        // Solve AABB collisions with guaranteed zero-overlap separation
+        resolveAABBCollisions(collisionBoxes, CATEGORY_ISLAND_GAP, 60);
+
+        // Sync resolved center positions back to islandBoxes
+        const resolvedMap = new Map<string, BoundingBox2D>();
+        collisionBoxes.forEach((cb) => resolvedMap.set(cb.id, cb));
+
+        islandBoxes.forEach((box) => {
+          const resolved = resolvedMap.get(box.engKey);
+          if (resolved) {
+            box.cx = Math.round(resolved.cx);
+            box.cy = Math.round(resolved.cy);
           }
-          if (n2 && !isSeedNode(n2)) {
-            p2.x -= nx;
-            p2.y -= ny;
-          }
+
+          // Place all nodes of this module strictly within its resolved non-overlapping subgrid
+          const gridW = (box.cols - 1) * NODE_X_STEP;
+          const gridH = (box.rows - 1) * NODE_Y_STEP;
+          const startX = box.cx - gridW / 2;
+          const startY = box.cy - gridH / 2;
+
+          box.items.forEach((item, i) => {
+            const col = i % box.cols;
+            const row = Math.floor(i / box.cols);
+            posMap.set(item.node.id, {
+              x: Math.round(startX + col * NODE_X_STEP),
+              y: Math.round(startY + row * NODE_Y_STEP),
+            });
+          });
         });
       }
 
@@ -1169,18 +1384,16 @@ export function applyForceLayout<T extends Record<string, unknown>>(
           if (pos.y > maxConnectedY) maxConnectedY = pos.y;
         });
 
-        const isoCols = Math.max(3, Math.min(8, Math.ceil(Math.sqrt(isolated.length * 1.5))));
-        const isoStartX = -((isoCols - 1) * xSpacing) / 2;
-        const isoStartY = maxConnectedY + 140;
+        const isoCols = Math.max(4, Math.min(10, Math.ceil(Math.sqrt(isolated.length * 1.6))));
+        const isoStartX = -((isoCols - 1) * NODE_X_STEP) / 2;
+        const isoStartY = maxConnectedY + 160;
 
         isolated.forEach((item, index) => {
           const r = Math.floor(index / isoCols);
           const c = index % isoCols;
-          const jitterX = ((index * 37) % 14) - 7;
-          const jitterY = ((index * 23) % 10) - 5;
           posMap.set(item.node.id, {
-            x: Math.round(isoStartX + c * xSpacing + jitterX),
-            y: Math.round(isoStartY + r * ySpacing + jitterY),
+            x: Math.round(isoStartX + c * NODE_X_STEP),
+            y: Math.round(isoStartY + r * NODE_Y_STEP),
           });
         });
       }
@@ -1199,15 +1412,15 @@ export function applyForceLayout<T extends Record<string, unknown>>(
     });
 
     clusterBoxes.push({
-      width: Math.max(140, maxX - minX),
-      height: Math.max(100, maxY - minY),
+      width: Math.max(220, maxX - minX + 220),
+      height: Math.max(120, maxY - minY + 72),
       minX: minX === Infinity ? 0 : minX,
       minY: minY === Infinity ? 0 : minY,
     });
     clusterRelativePositions.push(posMap);
   }
 
-  const placements = computeClusterGridOffsets(clusterBoxes, 180);
+  const placements = computeClusterGridOffsets(clusterBoxes, 240);
   const result: SimpleNode<T>[] = [];
 
   clusters.forEach((cluster, cIdx) => {
@@ -1321,24 +1534,25 @@ export function applyHierarchicalLayout<T extends Record<string, unknown>>(
       layerGroups.get(layer)!.push(n);
     });
 
-    const CARD_W = 160;
-    const CARD_GAP_X = 24;
-    const xSpacing = CARD_W + CARD_GAP_X; // 184px spacing between node columns
-    const layerYSpacing = 160; // Clean vertical drop between Seed and child layers
-    const subRowSpacing = 56; // 38px node height + 18px vertical row gap
-    const CATEGORY_BLOCK_GAP = 48; // Clear horizontal separation between distinct category clusters
+    const xSpacing = 220; // 195px node card + 25px horizontal column gap
+    const subRowSpacing = 72; // 56px node card + 16px vertical row gap
+    const CATEGORY_BLOCK_GAP = 120; // Clean separation between distinct category clusters
 
-    // Arrange nodes per layer with sub-row wrapping to prevent infinite horizontal lines!
-    layerGroups.forEach((groupNodes, layerIndex) => {
-      const layerBaseY = layerIndex * layerYSpacing;
+    // Arrange nodes per layer with dynamic layer height tracking and block wrapping
+    let currentLayerY = 0;
+    const sortedLayers = Array.from(layerGroups.keys()).sort((a, b) => a - b);
+
+    sortedLayers.forEach((layerIndex) => {
+      const groupNodes = layerGroups.get(layerIndex)!;
 
       if (layerIndex === 0) {
-        // Layer 0: Root nodes centered at (0, layerBaseY)
+        // Layer 0: Root nodes centered at (0, currentLayerY)
         const totalW = (groupNodes.length - 1) * xSpacing;
         const startX = -totalW / 2;
         groupNodes.forEach((n, i) => {
-          posMap.set(n.id, { x: Math.round(startX + i * xSpacing), y: layerBaseY });
+          posMap.set(n.id, { x: Math.round(startX + i * xSpacing), y: currentLayerY });
         });
+        currentLayerY += 180;
         return;
       }
 
@@ -1350,46 +1564,57 @@ export function applyHierarchicalLayout<T extends Record<string, unknown>>(
         catGroups.get(k)!.push(n);
       });
 
-      // Calculate width of each category block (each block has max 5 cols)
-      const MAX_COLS_PER_BLOCK = 5;
+      // Calculate width and height of each category block using computeModuleSubgrid
       const catBlocks: Array<{
         catKey: string;
         nodes: SimpleNode<T>[];
         cols: number;
         rows: number;
         spanWidth: number;
+        spanHeight: number;
       }> = [];
 
       catGroups.forEach((catGroupNodes, catKey) => {
-        const cols = Math.min(catGroupNodes.length, MAX_COLS_PER_BLOCK);
-        const rows = Math.ceil(catGroupNodes.length / cols);
+        const grid = computeModuleSubgrid(catGroupNodes.length, xSpacing, subRowSpacing);
         catBlocks.push({
           catKey,
           nodes: catGroupNodes,
-          cols,
-          rows,
-          spanWidth: cols * xSpacing,
+          cols: grid.cols,
+          rows: grid.rows,
+          spanWidth: grid.cols * xSpacing,
+          spanHeight: grid.rows * subRowSpacing,
         });
       });
 
-      const totalBlocksWidth =
-        catBlocks.reduce((acc, b) => acc + b.spanWidth, 0) +
-        Math.max(0, catBlocks.length - 1) * CATEGORY_BLOCK_GAP;
+      // Wrap category blocks into tiers (max 4 blocks per row) so the tree doesn't stretch 6000px horizontally
+      const MAX_BLOCKS_PER_ROW = 4;
+      for (let blockIdx = 0; blockIdx < catBlocks.length; blockIdx += MAX_BLOCKS_PER_ROW) {
+        const rowBlocks = catBlocks.slice(blockIdx, blockIdx + MAX_BLOCKS_PER_ROW);
+        const totalRowWidth =
+          rowBlocks.reduce((acc, b) => acc + b.spanWidth, 0) +
+          Math.max(0, rowBlocks.length - 1) * CATEGORY_BLOCK_GAP;
 
-      let currentBlockX = -totalBlocksWidth / 2;
+        let currentBlockX = -totalRowWidth / 2;
+        let rowMaxHeight = 0;
 
-      catBlocks.forEach((block) => {
-        const startX = currentBlockX;
-        block.nodes.forEach((n, i) => {
-          const col = i % block.cols;
-          const row = Math.floor(i / block.cols);
-          posMap.set(n.id, {
-            x: Math.round(startX + col * xSpacing),
-            y: Math.round(layerBaseY + row * subRowSpacing),
+        rowBlocks.forEach((block) => {
+          const startX = currentBlockX;
+          block.nodes.forEach((n, i) => {
+            const col = i % block.cols;
+            const row = Math.floor(i / block.cols);
+            posMap.set(n.id, {
+              x: Math.round(startX + col * xSpacing),
+              y: Math.round(currentLayerY + row * subRowSpacing),
+            });
           });
+          currentBlockX += block.spanWidth + CATEGORY_BLOCK_GAP;
+          if (block.spanHeight > rowMaxHeight) {
+            rowMaxHeight = block.spanHeight;
+          }
         });
-        currentBlockX += block.spanWidth + CATEGORY_BLOCK_GAP;
-      });
+
+        currentLayerY += rowMaxHeight + 140;
+      }
     });
 
     // Measure bounding box
@@ -1567,63 +1792,87 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
       }
     } else {
       // Multiple balanced categories: Place each category flower in a spacious orbit around the seed
-      const categoryFootprints = new Map<string, number>();
+      const satelliteBoxes: BoundingBox2D[] = [];
+      let totalFootprintCircumference = 0;
+
       categoryKeys.forEach((key) => {
         const count = categoryGroups.get(key)!.length;
-        if (count <= 1) {
-          categoryFootprints.set(key, 60);
-        } else if (count <= 6) {
-          categoryFootprints.set(key, 110);
-        } else if (count <= 18) {
-          categoryFootprints.set(key, 170);
-        } else if (count <= 40) {
-          categoryFootprints.set(key, 240);
-        } else {
-          categoryFootprints.set(key, Math.min(340, 240 + Math.sqrt(count) * 10));
-        }
+        const grid = computeModuleSubgrid(count);
+        const w = grid.cols * 220;
+        const h = grid.rows * 72;
+        satelliteBoxes.push({
+          id: key,
+          cx: 0,
+          cy: 0,
+          width: w,
+          height: h,
+          isFixed: false,
+        });
+        totalFootprintCircumference += Math.max(w, h) + 140;
       });
 
-      let maxFootprint = 0;
-      categoryFootprints.forEach((fp) => {
-        if (fp > maxFootprint) maxFootprint = fp;
+      const globalOrbitRadius = Math.max(450, totalFootprintCircumference / (2 * Math.PI));
+
+      let currentAngle = -Math.PI / 2;
+      satelliteBoxes.forEach((box) => {
+        const footprint = Math.max(box.width, box.height) + 140;
+        const angleSpan = (footprint / totalFootprintCircumference) * (2 * Math.PI);
+        const midAngle = currentAngle + angleSpan / 2;
+        currentAngle += angleSpan;
+
+        const minClearance = 180 + Math.hypot(box.width / 2, box.height / 2) + 60;
+        const radius = Math.max(globalOrbitRadius, minClearance);
+
+        box.cx = Math.round(Math.cos(midAngle) * radius);
+        box.cy = Math.round(Math.sin(midAngle) * radius);
       });
 
-      const minChord = Math.max(180, 2 * maxFootprint * 0.8 + 60);
-      const requiredOrbitForAngle = minChord / (2 * Math.sin(Math.PI / Math.max(numCategories, 2)));
-      const globalOrbitRadius = Math.max(200, Math.min(550, requiredOrbitForAngle));
+      // Add central seed box as fixed
+      const seedBox: BoundingBox2D = {
+        id: 'seed-root',
+        cx: 0,
+        cy: 0,
+        width: 220,
+        height: 80,
+        isFixed: true,
+      };
 
-      categoryKeys.forEach((catKey, idx) => {
+      resolveAABBCollisions([seedBox, ...satelliteBoxes], 140, 60);
+
+      const resolvedSatMap = new Map<string, BoundingBox2D>();
+      satelliteBoxes.forEach((b) => resolvedSatMap.set(b.id, b));
+
+      categoryKeys.forEach((catKey) => {
         const catNodes = categoryGroups.get(catKey)!;
         const count = catNodes.length;
-
-        // Distribute category centers around full 360 circle
-        const catAngle = -Math.PI / 2 + (2 * Math.PI * idx) / numCategories;
-        const centerX = Math.round(Math.cos(catAngle) * globalOrbitRadius);
-        const centerY = Math.round(Math.sin(catAngle) * globalOrbitRadius);
+        const sat = resolvedSatMap.get(catKey)!;
+        const centerX = sat.cx;
+        const centerY = sat.cy;
 
         if (count === 1) {
           posMap.set(catNodes[0].id, { x: centerX, y: centerY });
         } else if (count <= 6) {
           posMap.set(catNodes[0].id, { x: centerX, y: centerY });
           const ringNodes = catNodes.slice(1);
-          const ringRadius = 80;
+          const ringRadius = 110;
           ringNodes.forEach((node, i) => {
-            const a = catAngle - Math.PI / 2 + (2 * Math.PI * i) / ringNodes.length;
+            const a = -Math.PI / 2 + (2 * Math.PI * i) / ringNodes.length;
             posMap.set(node.id, {
               x: Math.round(centerX + Math.cos(a) * ringRadius),
               y: Math.round(centerY + Math.sin(a) * ringRadius),
             });
           });
         } else {
-          const starNodes = layoutStarburst(
-            { x: centerX, y: centerY },
-            catNodes,
-            90,
-            catAngle,
-            2 * Math.PI,
-          );
-          starNodes.forEach((sn) => {
-            posMap.set(sn.id, { x: sn.position.x, y: sn.position.y });
+          const grid = computeModuleSubgrid(count);
+          const startX = centerX - ((grid.cols - 1) * 220) / 2;
+          const startY = centerY - ((grid.rows - 1) * 72) / 2;
+          catNodes.forEach((node, i) => {
+            const col = i % grid.cols;
+            const row = Math.floor(i / grid.cols);
+            posMap.set(node.id, {
+              x: Math.round(startX + col * 220),
+              y: Math.round(startY + row * 72),
+            });
           });
         }
       });
@@ -1631,8 +1880,8 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
 
     // Elliptical inter-node relaxation to eliminate any remaining overlaps
     const posList = Array.from(posMap.entries()).filter(([id]) => id !== root.id);
-    const NODE_BOX_W = 162; // Entity node badge width (160px) + 2px safety margin
-    const NODE_BOX_H = 44; // Entity node badge height (38px) + 6px breathing gap
+    const NODE_BOX_W = 220; // Entity node badge width (195px) + 25px safety margin
+    const NODE_BOX_H = 72; // Entity node badge height (56px) + 16px breathing gap
 
     for (let iter = 0; iter < 10; iter++) {
       let moved = false;
@@ -1646,9 +1895,9 @@ export function applyRadialLayout<T extends Record<string, unknown>>(
           // Elliptical normalized distance
           const normDist = Math.hypot(dx / NODE_BOX_W, dy / NODE_BOX_H);
 
-          if (normDist < 0.92) {
+          if (normDist < 0.95) {
             const safeDist = normDist || 0.001;
-            const overlapRatio = (0.92 - normDist) / 2;
+            const overlapRatio = (0.95 - normDist) / 2;
             const shiftX = Math.round((dx / safeDist) * overlapRatio * 0.35 * NODE_BOX_W);
             const shiftY = Math.round((dy / safeDist) * overlapRatio * 0.35 * NODE_BOX_H);
 

@@ -254,3 +254,16 @@ body {
   animation: pulseGlow 1.8s ease-in-out infinite;
 }
 
+/* ─── Leaflet Tiles Protection (Overrides Tailwind preflight img max-width) ─── */
+.leaflet-container img {
+  max-width: none !important;
+}
+
+.leaflet-tile-container img {
+  max-width: none !important;
+}
+
+.leaflet-tile {
+  visibility: inherit !important;
+}
+

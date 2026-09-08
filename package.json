@@ -4,7 +4,9 @@
   "private": true,
   "description": "OSINT Investigation Graph - Public digital-footprint correlation platform",
   "scripts": {
-    "dev": "pnpm -r --parallel dev",
+    "dev": "concurrently -k -p \"[{name}]\" -n \"APPS,HEXSTRIKE\" -c \"cyan,magenta\" \"pnpm -r --parallel dev\" \"pnpm run dev:hexstrike\"",
+    "dev:apps": "pnpm -r --parallel dev",
+    "dev:hexstrike": "cd vendor\\hexstrike-ai && hexstrike-env\\Scripts\\python.exe -X utf8 hexstrike_server.py --port 8888",
     "dev:web": "pnpm --filter @nexusgraph/web dev",
     "dev:api": "pnpm --filter @nexusgraph/api dev",
     "build": "pnpm -r build",
@@ -21,5 +23,8 @@
     "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
   },
-  "packageManager": "pnpm@10.12.1"
+  "packageManager": "pnpm@10.12.1",
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
 }

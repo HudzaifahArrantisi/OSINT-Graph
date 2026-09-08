@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Marker, Popup, Circle, useMap } from 'react-le
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { GraphPayload } from '@nexusgraph/shared';
+import { resolveAccurateLocation } from '@nexusgraph/shared';
 import { useAppStore } from '../../stores/appStore';
 import {
   MapPin,
@@ -99,17 +100,104 @@ function parseCoordinatesFromUrl(url?: string): { lat: number; lng: number } | n
   return null;
 }
 
-/** Map controller handling initial bounds and reactive zoom to focused node */
+function formatPrecisionLabel(precision: string): string {
+  if (precision === 'EXACT_COORDINATES') return 'GPS (Eksak)';
+  if (precision === 'STREET_ADDRESS') return 'Alamat Jalan';
+  if (precision === 'DISTRICT_LEVEL') return 'Kecamatan / Area';
+  if (precision === 'VENUE_LEVEL') return 'Gedung / Tempat';
+  if (precision.includes('CITY')) return 'Tingkat Kota';
+  if (precision === 'UNRESOLVED') return 'Belum Terpetakan';
+  return 'Centroid Wilayah';
+}
+
+function getPrecisionRadius(precision: string, isCompany: boolean): number {
+  if (precision === 'EXACT_COORDINATES') return 100;
+  if (precision === 'STREET_ADDRESS') return 300;
+  if (precision === 'VENUE_LEVEL') return 500;
+  if (precision === 'DISTRICT_LEVEL') return 3000;
+  if (precision.includes('CITY')) return 15000;
+  return isCompany ? 5000 : 500000;
+}
+
+/** Map controller handling initial bounds, reactive zoom to focused node, and auto-resize invalidation */
 function MapController({
   points,
   focusedPoint,
+  sidebarCollapsed,
 }: {
   points: GeoPoint[];
   focusedPoint?: GeoPoint | null;
+  sidebarCollapsed: boolean;
 }) {
   const map = useMap();
 
+  // 1. Invalidate size on mount, container resize (drawers/console/sidebars), and window resize
   useEffect(() => {
+    const container = map.getContainer();
+    if (!container) return;
+
+    const triggerInvalidate = () => {
+      map.invalidateSize({ debounceMove: true });
+    };
+
+    // Trigger immediately and staggered to catch flex transitions & initial layout calculation
+    triggerInvalidate();
+    const animId = requestAnimationFrame(triggerInvalidate);
+    const t1 = setTimeout(triggerInvalidate, 80);
+    const t2 = setTimeout(triggerInvalidate, 200);
+    const t3 = setTimeout(triggerInvalidate, 450);
+    const t4 = setTimeout(triggerInvalidate, 800);
+
+    // Watch for size changes using ResizeObserver on map container and its parent element
+    let rafTimer: number | null = null;
+    const ro = new ResizeObserver(() => {
+      if (rafTimer !== null) cancelAnimationFrame(rafTimer);
+      rafTimer = requestAnimationFrame(() => {
+        triggerInvalidate();
+      });
+    });
+
+    ro.observe(container);
+    if (container.parentElement) {
+      ro.observe(container.parentElement);
+    }
+
+    window.addEventListener('resize', triggerInvalidate);
+
+    return () => {
+      cancelAnimationFrame(animId);
+      if (rafTimer !== null) cancelAnimationFrame(rafTimer);
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+      clearTimeout(t4);
+      ro.disconnect();
+      window.removeEventListener('resize', triggerInvalidate);
+    };
+  }, [map]);
+
+  // 2. Invalidate size when sidebar collapse animation runs (transition-all duration-200)
+  useEffect(() => {
+    const triggerInvalidate = () => {
+      map.invalidateSize({ debounceMove: true });
+    };
+
+    triggerInvalidate();
+    const t1 = setTimeout(triggerInvalidate, 80);
+    const t2 = setTimeout(triggerInvalidate, 220);
+    const t3 = setTimeout(triggerInvalidate, 350);
+
+    return () => {
+      clearTimeout(t1);
+      clearTimeout(t2);
+      clearTimeout(t3);
+    };
+  }, [map, sidebarCollapsed]);
+
+  // 3. Center and zoom bounds when points or focused node change
+  useEffect(() => {
+    map.invalidateSize({ debounceMove: true });
+
     if (focusedPoint) {
       map.flyTo([focusedPoint.lat, focusedPoint.lng], 16, {
         duration: 1.2,
@@ -166,8 +254,10 @@ export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
         (meta.source as any)?.collector === 'company-geo'
       );
 
-      let lat = Number(meta.lat ?? meta.latitude);
-      let lng = Number(meta.lng ?? meta.longitude);
+      const rawLat = meta.lat ?? meta.latitude;
+      const rawLng = meta.lng ?? meta.longitude;
+      let lat = rawLat !== null && rawLat !== undefined && rawLat !== '' ? Number(rawLat) : NaN;
+      let lng = rawLng !== null && rawLng !== undefined && rawLng !== '' ? Number(rawLng) : NaN;
 
       // Fallback coordinate extraction if missing
       if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -175,22 +265,43 @@ export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
         if (parsed) {
           lat = parsed.lat;
           lng = parsed.lng;
-        } else if (isCompanyGeo) {
-          const textCorpus = `${n.data?.value || ''} ${n.data?.title || ''} ${meta.address || ''}`.toLowerCase();
-          if (textCorpus.includes('kopi kenangan') || textCorpus.includes('kopikenangan') || textCorpus.includes('btpn')) {
-            lat = -6.2297;
-            lng = 106.8295;
-          }
         }
       }
 
-      // If valid coordinates found
-      if (Number.isFinite(lat) && Number.isFinite(lng)) {
+      // Dynamic real-world location resolution (Google Maps verified)
+      // Corrects legacy Jakarta fallback centroids (-6.2088, 106.8456) when address explicitly belongs to Depok, Cimanggis, Jagakarsa, etc.
+      const fullAddressText = String(
+        meta.address || meta.fullAddress || n.data?.label || n.data?.title || ''
+      );
+      const corporateDomain = String(meta.companyDomain || meta.domain || meta.apex || '');
+      const accurateResolution = resolveAccurateLocation(fullAddressText, corporateDomain, lat, lng);
+
+      if (accurateResolution) {
+        lat = accurateResolution.lat;
+        lng = accurateResolution.lng;
+      }
+
+      // If valid coordinates found (reject NaN, null, Null Island (0,0), and out-of-bounds)
+      if (
+        Number.isFinite(lat) &&
+        Number.isFinite(lng) &&
+        Math.abs(lat) <= 90 &&
+        Math.abs(lng) <= 180 &&
+        !(Math.abs(lat) < 0.0001 && Math.abs(lng) < 0.0001)
+      ) {
+        const rawPrecision = String(meta.precision || '');
+        const precision =
+          accurateResolution?.precision || rawPrecision || (isCompanyGeo ? 'STREET_ADDRESS' : 'COUNTRY');
+        const googleMapsUrl =
+          accurateResolution?.googleMapsUrl ||
+          meta.googleMapsUrl ||
+          `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+
         locations.push({
           nodeId: n.id,
           lat,
           lng,
-          precision: String(meta.precision || (isCompanyGeo ? 'EXACT_COORDINATES' : 'COUNTRY')),
+          precision,
           countryName: meta.countryName,
           countryIso: meta.countryIso,
           sourcePhone: meta.sourcePhone || (n.data?.entityType === 'PHONE' ? n.data.value : undefined),
@@ -198,10 +309,10 @@ export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
           confidence: n.data?.confidence ?? 0,
           label: n.data?.label || n.data?.title || n.data?.value || n.id,
           isCompanyGeo,
-          googleMapsUrl: meta.googleMapsUrl,
-          address: meta.address || meta.fullAddress,
-          detectionMethod: meta.detectionMethod,
-          corporateDomain: meta.domain || meta.apex,
+          googleMapsUrl,
+          address: meta.address || meta.fullAddress || accurateResolution?.matchedName,
+          detectionMethod: accurateResolution ? 'known_verified_location' : meta.detectionMethod,
+          corporateDomain,
         });
       }
     }
@@ -269,7 +380,7 @@ export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
 
   return (
     <div className="h-full relative bg-[#0a0a0a] flex overflow-hidden select-text">
-      {/* Dark Leaflet Popup Global CSS Override */}
+      {/* Dark Leaflet Popup Global CSS Override & Tile Layer Safety */}
       <style>{`
         .leaflet-popup-content-wrapper, .leaflet-popup-tip {
           background: #111111 !important;
@@ -284,6 +395,16 @@ export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
         }
         .leaflet-container a.leaflet-popup-close-button:hover {
           color: #ffffff !important;
+        }
+        /* Protect Leaflet tile images from Tailwind CSS img { max-width: 100% } constraints */
+        .leaflet-container img {
+          max-width: none !important;
+        }
+        .leaflet-tile-container img {
+          max-width: none !important;
+        }
+        .leaflet-tile {
+          visibility: inherit !important;
         }
       `}</style>
 
@@ -471,7 +592,7 @@ export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
       </div>
 
       {/* Main Leaflet Map View */}
-      <div className="flex-1 h-full relative">
+      <div className="flex-1 h-full relative min-w-0 overflow-hidden">
         {/* Floating Controls Bar */}
         <div className="absolute top-3 right-3 z-[500] flex items-center gap-2">
           {/* Quick Office Center Shortcut */}
@@ -498,7 +619,7 @@ export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
             <span className="text-[11px] text-neutral-300 font-sans">
               Precision:{' '}
               <strong className="text-white font-medium">
-                {[...new Set(geoPoints.map((p) => (p.isCompanyGeo ? 'Physical Office (Exact)' : p.precision.includes('CITY') ? 'City Area' : 'Country Centroid')))].join(', ')}
+                {[...new Set(geoPoints.map((p) => formatPrecisionLabel(p.precision)))].join(', ')}
               </strong>
             </span>
           </div>
@@ -515,15 +636,19 @@ export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
           <TileLayer
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            maxZoom={19}
           />
 
-          <MapController points={geoPoints} focusedPoint={focusedPoint} />
+          <MapController
+            points={geoPoints}
+            focusedPoint={focusedPoint}
+            sidebarCollapsed={sidebarCollapsed}
+          />
 
           {geoPoints.map((p) => {
             const isCompany = Boolean(p.isCompanyGeo);
             const isFocused = focusedGeoNodeId === p.nodeId;
-            const isCity = p.precision.includes('CITY') || p.precision.includes('EXACT') || isCompany;
-            const radius = isCompany ? 200 : isCity ? 15000 : 500000;
+            const radius = getPrecisionRadius(p.precision, isCompany);
             const circleColor = isFocused ? '#000000' : '#404040';
             const icon = isCompany
               ? isFocused
@@ -602,7 +727,7 @@ export function PhoneMapPanel({ graphData }: PhoneMapPanelProps) {
 
                       <div className="flex items-center justify-between pt-1.5 border-t border-[#262626]">
                         <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-[#1e1e1e] text-neutral-300 border border-[#2e2e2e]">
-                          {isCompany ? 'Physical Office' : isCity ? 'City Level' : 'Country Centroid'}
+                          {formatPrecisionLabel(p.precision)}
                         </span>
 
                         {p.googleMapsUrl && (

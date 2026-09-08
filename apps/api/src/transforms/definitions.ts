@@ -383,6 +383,36 @@ export const TRANSFORM_DEFINITIONS: TransformDefinition[] = [
     riskLevel: 'low',
     enabled: true,
   },
+  {
+    id: 'domain.well-known-recon',
+    name: 'Standard Disclosures (Well-Known & Security.txt)',
+    description: 'Inspect RFC 9116 security.txt, robots.txt disallowed directories, OpenID configurations, and Android Digital Asset Links',
+    inputTypes: ['DOMAIN', 'URL', 'WEBSITE'],
+    outputTypes: ['EMAIL', 'URL', 'IDENTITY_PROVIDER', 'ORGANIZATION'],
+    category: 'web',
+    riskLevel: 'low',
+    enabled: true,
+  },
+  {
+    id: 'domain.passive-dns-history',
+    name: 'Passive DNS & Historical IP Resolution',
+    description: 'Unmask origin IP addresses and historical subdomains from public passive DNS feeds (HackerTarget & AlienVault OTX)',
+    inputTypes: ['DOMAIN', 'URL', 'WEBSITE'],
+    outputTypes: ['IP_ADDRESS', 'SUBDOMAIN', 'DOMAIN'],
+    category: 'infrastructure',
+    riskLevel: 'low',
+    enabled: true,
+  },
+  {
+    id: 'domain.cloud-bucket-finder',
+    name: 'Cloud Storage Bucket Permutation & Access Scanner',
+    description: 'Enumerate and test accessibility of multi-cloud storage buckets (AWS S3, Google Cloud Storage, Azure Blob) based on target brand permutations',
+    inputTypes: ['DOMAIN', 'URL', 'WEBSITE', 'ORGANIZATION'],
+    outputTypes: ['CLOUD_BUCKET', 'URL'],
+    category: 'infrastructure',
+    riskLevel: 'low',
+    enabled: true,
+  },
 
   // ─── Intelligence Transforms ────────────────────────────────────────
   {

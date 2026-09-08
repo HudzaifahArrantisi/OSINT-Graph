@@ -24,6 +24,8 @@ export const ENTITY_TYPES = [
   'MX_RECORD',
   'NS_RECORD',
   'PUBLIC_MENTION',
+  'CLOUD_BUCKET',
+  'IDENTITY_PROVIDER',
 ] as const;
 
 export type EntityType = (typeof ENTITY_TYPES)[number];
@@ -52,6 +54,11 @@ export const RELATIONSHIP_TYPES = [
   'HAS_GITLAB',
   'HAS_YOUTUBE',
   'GEOLOCATED_IN',
+  'RESOLVED_HISTORICALLY',
+  'CONTACT_POINT',
+  'CONTAINS_ENDPOINT',
+  'ASSOCIATED_STORAGE',
+  'USES_AUTH_PROVIDER',
 ] as const;
 
 export type RelationshipType = (typeof RELATIONSHIP_TYPES)[number];
@@ -187,6 +194,9 @@ export const EVIDENCE_SOURCE_TYPES = [
   'SENSITIVE_PARAM_ANALYSIS',
   'DIRSEARCH_SCAN',
   'COMPANY_GEO_RECON',
+  'WELL_KNOWN_RECON',
+  'PASSIVE_DNS',
+  'CLOUD_BUCKET_SCAN',
 ] as const;
 
 export type EvidenceSourceType = (typeof EVIDENCE_SOURCE_TYPES)[number];
@@ -227,6 +237,9 @@ export const COLLECTOR_NAMES = [
   'http-security-audit',
   'dirsearch',
   'company-geo',
+  'well-known-recon',
+  'passive-dns',
+  'cloud-bucket-finder',
 ] as const;
 
 export type CollectorName = (typeof COLLECTOR_NAMES)[number];

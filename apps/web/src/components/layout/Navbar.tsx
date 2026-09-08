@@ -1,7 +1,6 @@
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuthStore } from '../../stores/authStore';
-import { Network, FolderKanban, LogOut, Plus } from 'lucide-react';
-import { Button } from '../ui/Button';
+import { Network, FolderKanban, LogOut } from 'lucide-react';
 
 export function Navbar() {
   const { user, signOut } = useAuthStore();
@@ -60,18 +59,7 @@ export function Navbar() {
       </div>
 
       {/* Right controls */}
-      <div className="flex items-center gap-2">
-        <Button
-          variant="primary"
-          size="sm"
-          icon={<Plus className="w-3.5 h-3.5" />}
-          onClick={() => navigate('/investigations/new')}
-        >
-          <span className="hidden sm:inline">New Case</span>
-        </Button>
-
-        <div className="h-4 w-[1px] bg-[#222222] mx-1" />
-
+      <div className="flex items-center gap-3">
         {/* User profile dropdown / signout */}
         <div className="flex items-center gap-2">
           <div className="hidden lg:flex flex-col text-right text-xs">
