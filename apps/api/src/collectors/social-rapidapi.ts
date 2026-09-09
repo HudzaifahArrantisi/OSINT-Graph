@@ -1472,6 +1472,56 @@ export const socialRapidapiCollector: Collector = {
                 reason: `Referenced @${mention} in TikTok bio signature`,
               });
             }
+
+            // 2.11 TikTok User Recent Videos Feed
+            if (ttUid) {
+              try {
+                const feedRes = await tiktokBestExperience.getUserFeed(ttUid).catch(() => null);
+                const feedItems = Array.isArray(feedRes?.itemList)
+                  ? feedRes.itemList
+                  : Array.isArray(feedRes?.items)
+                    ? feedRes.items
+                    : Array.isArray(feedRes?.data)
+                      ? feedRes.data
+                      : [];
+
+                for (const item of feedItems.slice(0, 6)) {
+                  const vId = item.id || item.video?.id || Math.random().toString(36).slice(2, 7);
+                  const vDesc = item.desc || item.title || '';
+                  const vSnippet = vDesc.length > 70 ? `${vDesc.slice(0, 67)}...` : vDesc;
+                  const vUrl = `https://www.tiktok.com/@${ttUsername}/video/${vId}`;
+                  const vTitle = vSnippet ? `🎵 Video: "${vSnippet}"` : `🎵 TikTok Video (${vId})`;
+
+                  entities.push({
+                    type: 'DOCUMENT',
+                    value: vUrl,
+                    title: vTitle,
+                    confidence: 85,
+                    metadata: {
+                      platform: 'tiktok',
+                      video_id: vId,
+                      description: vDesc,
+                      play_count: item.stats?.playCount || null,
+                      digg_count: item.stats?.diggCount || null,
+                      comment_count: item.stats?.commentCount || null,
+                      account: ttProfileUrl,
+                    },
+                  });
+
+                  relationships.push({
+                    source_type: 'SOCIAL_PROFILE',
+                    source_value: ttProfileUrl,
+                    target_type: 'DOCUMENT',
+                    target_value: vUrl,
+                    relationship_type: 'MENTIONS',
+                    confidence: 85,
+                    reason: 'Public TikTok video upload from user feed',
+                  });
+                }
+              } catch {
+                // Ignore feed fetching failure gracefully
+              }
+            }
           } catch (ttErr) {
             const msg = ttErr instanceof Error ? ttErr.message : String(ttErr);
             warnings.push(`TikTok Engine: ${msg}`);

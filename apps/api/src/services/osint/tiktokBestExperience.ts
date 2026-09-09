@@ -72,6 +72,27 @@ export async function getFollowers(userId: string | number): Promise<any> {
 }
 
 /**
+ * Get TikTok user feed / posts by user ID.
+ * GET /user/id/{userId}/feed?max_cursor={max_cursor}
+ */
+export async function getUserFeed(userId: string | number, maxCursor?: string | number): Promise<any> {
+  try {
+    if (!userId) throw new Error('userId is required');
+    const path = maxCursor
+      ? `/user/id/${encodeURIComponent(String(userId))}/feed?max_cursor=${encodeURIComponent(String(maxCursor))}`
+      : `/user/id/${encodeURIComponent(String(userId))}/feed`;
+    return await callRapidAPI(
+      HOST,
+      path,
+      'GET',
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    throw new Error(`[tiktokBestExperience.getUserFeed] Failed for "${userId}": ${message}`);
+  }
+}
+
+/**
  * Search TikTok users by keyword or name.
  */
 export async function searchUsers(keyword: string): Promise<any> {
@@ -93,6 +114,7 @@ export const tiktokBestExperience = {
   getUserByUsername,
   getUserById,
   searchUsers,
+  getUserFeed,
   getFollowings,
   getFollowers,
 };

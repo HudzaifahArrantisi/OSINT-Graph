@@ -403,4 +403,74 @@ describe('social-rapidapi collector and transform integration', () => {
     expect(igProfile?.metadata?.full_name).toBe('Jyfrah Backup Recon');
     expect(igProfile?.metadata?.followers_count).toBe(840);
   });
+
+  it('extracts TikTok profile by username, ID, and recent video feed via tiktokBestExperience', async () => {
+    vi.spyOn(globalThis, 'fetch').mockImplementation(async (input: any) => {
+      const urlStr = typeof input === 'string' ? input : input?.url || '';
+
+      // 1. Get user by username
+      if (urlStr.includes('/user/nike')) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              id: '208464585232822272',
+              uniqueId: 'nike',
+              nickname: 'Nike Official',
+              signature: 'Just Do It.',
+              avatarLarger: 'https://images.tiktok.com/nike.jpg',
+              followerCount: 2500000,
+              followingCount: 15,
+              heartCount: 15000000,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      // 2. Feed by ID
+      if (urlStr.includes('/feed')) {
+        return new Response(
+          JSON.stringify({
+            itemList: [
+              {
+                id: '7234567890123456789',
+                desc: 'Winning isn’t for everyone. It’s for whoever is willing. #JustDoIt',
+                stats: {
+                  playCount: 1500000,
+                  diggCount: 250000,
+                  commentCount: 3400,
+                },
+              },
+            ],
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        );
+      }
+
+      return new Response(JSON.stringify({}), { status: 200 });
+    });
+
+    const res = await socialRapidapiCollector.run('nike', {
+      requestId: 'test-tiktok-feed',
+      caseId: 'case-123',
+      signal: AbortSignal.timeout(5000),
+      platforms: ['tiktok'],
+    });
+
+    const ttProfile = res.entities.find(
+      (e) => e.type === 'SOCIAL_PROFILE' && e.value === 'https://www.tiktok.com/@nike',
+    );
+    expect(ttProfile).toBeDefined();
+    expect(ttProfile?.metadata?.nickname).toBe('Nike Official');
+    expect(ttProfile?.metadata?.user_id).toBe('208464585232822272');
+    expect(ttProfile?.metadata?.followers_count).toBe(2500000);
+
+    // Video feed item extracted as DOCUMENT
+    const videoPost = res.entities.find(
+      (e) => e.type === 'DOCUMENT' && e.value.includes('7234567890123456789'),
+    );
+    expect(videoPost).toBeDefined();
+    expect(videoPost?.metadata?.description).toContain('Winning isn’t for everyone');
+    expect(videoPost?.metadata?.play_count).toBe(1500000);
+  });
 });
